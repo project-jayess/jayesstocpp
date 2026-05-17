@@ -82,6 +82,7 @@ out
 .nuxt
 dist
 .output
+temp/
 
 # Gatsby files
 .cache/
@@ -141,3 +142,6 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+Agents.md
+AGENTS.md
