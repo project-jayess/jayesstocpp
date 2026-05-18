@@ -1,8 +1,8 @@
 # Private Fields Implementation Plan
 
-Jayess now supports a narrow first private-member slice for JavaScript-style private instance fields such as `#value`.
+Jayess now supports a narrow shipped private-member slice for JavaScript-style private instance members such as `#value`.
 
-The shipped slice includes parser, semantic, runtime, and backend support for private instance field declarations plus private reads/writes inside methods or field initializers of the declaring class.
+The shipped slice includes parser, semantic, runtime, and backend support for private instance field declarations, private instance methods, and private reads/writes/calls inside methods or field initializers of the declaring class.
 
 ## Required Build Areas
 
@@ -17,7 +17,7 @@ The current Jayess class model supports:
 
 The current Jayess private-member model now implements:
 
-- per-class private field identity
+- per-class private member identity
 - cross-method and field-initializer access to the same private name
 - duplicate private-name validation
 - emitted hidden storage that does not flow through ordinary public object property lookup
@@ -25,17 +25,16 @@ The current Jayess private-member model now implements:
 It still does not implement:
 
 - private static members
-- private methods
 
-Because Jayess classes lower through a focused runtime object model, private fields need an explicit visibility/storage design instead of being treated like ordinary string-keyed object properties.
+Because Jayess classes lower through a focused runtime object model, private members need an explicit visibility/storage design instead of being treated like ordinary string-keyed object properties.
 
 ## First Shipped Slice
 
-The first shipped private-member slice is intentionally narrow:
+The shipped private-member slice is intentionally narrow:
 
-- support **private instance fields only**
+- support **private instance fields and private instance methods**
 - use JavaScript-style `#field` syntax
-- keep private methods and private static members out of the first slice
+- keep private static members out of the shipped slice
 - keep ordinary public fields as the existing supported class-field mechanism
 - keep explicit diagnostics for all unsupported private-member forms until later slices land
 
@@ -43,14 +42,14 @@ The first shipped private-member slice is intentionally narrow:
 
 ### Surface Area
 
-The first slice should support:
+The shipped slice should support:
 
 - private instance field declarations such as `class Box { #value = 1; }`
-- private instance reads and writes such as `this.#value` and `other.#value` when the access occurs inside the declaring class body
+- private instance methods such as `class Box { #value() { return 1; } }`
+- private instance reads, writes, and calls such as `this.#value`, `other.#value`, and `other.#value()` when the access occurs inside the declaring class body
 
-The first slice should not support:
+The shipped slice should not support:
 
-- private instance methods
 - private static fields
 - private static methods
 - private access outside methods/field initializers of the declaring class
@@ -63,25 +62,25 @@ That means:
 
 - `#value` declared in `class A` is distinct from `#value` declared in `class B`
 - access is validated against the declaring class identity, not just the textual spelling
-- one class body owns the private-name identity for each declared private field
+- one class body owns the private-name identity for each declared private field or private method
 
 ### Duplicate Names
 
-Duplicate private field names inside the same class body are invalid.
+Duplicate private member names inside the same class body are invalid.
 
-The first slice should reject:
+The shipped slice should reject:
 
 - two private instance fields with the same `#name` in one class
-
-The first slice does not yet need to define shared-name interactions with private methods or private static members because those forms remain outside the slice.
+- two private instance methods with the same `#name` in one class
+- a private field and a private method that reuse the same `#name` in one class
 
 ### Inheritance Behavior
 
-Private fields remain owned by the declaring class even when inheritance exists.
+Private members remain owned by the declaring class even when inheritance exists.
 
 That means:
 
-- a derived class does not gain direct access to a base class private field through name matching
+- a derived class does not gain direct access to a base class private field or private method through name matching
 - `super` does not expose private storage
 - a derived class may declare its own `#value`, and that private name is distinct from a base class `#value`
 
@@ -89,13 +88,14 @@ This keeps private access lexical/class-owned rather than inheritance-driven.
 
 ### Storage Model
 
-The first slice should use **class-owned hidden runtime keys** rather than ordinary public object properties.
+The shipped slice uses **class-owned hidden runtime keys** rather than ordinary public object properties.
 
 That means:
 
 - private storage stays attached to instances in the runtime object model
 - private values must not be readable through ordinary `get_property(...)`
 - backend lowering should use dedicated private helpers, not public string-key lookup
+- private instance methods lower as hidden per-instance bound callables stored through the same class-owned private storage model
 - the runtime should treat private keys as non-public implementation detail, not Jayess-visible property names
 
 ## Implementation Direction
@@ -106,4 +106,15 @@ The remaining follow-up work should keep these rules intact:
 - do not lower private fields through public object property helpers
 - do not model private fields as inherited public properties
 
-Private fields should land through an intentional hidden-storage model in the class runtime.
+Private instance members should land through an intentional hidden-storage model in the class runtime.
+
+## Follow-Up Policy
+
+The next private-member follow-up work should stay split into separate slices:
+
+1. private static fields
+2. private static methods
+
+Private static fields should remain a later separate slice because they need class-owned hidden storage on the class value rather than instance-owned hidden storage.
+
+Private static methods should remain a further separate slice because they combine private-name visibility with class-side callable storage and class-side dispatch rules.

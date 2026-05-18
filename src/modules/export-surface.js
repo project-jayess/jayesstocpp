@@ -37,6 +37,9 @@ export function expandExportSurfaces(graph) {
         }
 
         for (const [exportedName, nestedExportRecord] of resolveSurface(targetModule)) {
+          if (exportedName === "default") {
+            continue;
+          }
           if (!surface.has(exportedName)) {
             surface.set(exportedName, nestedExportRecord);
           }

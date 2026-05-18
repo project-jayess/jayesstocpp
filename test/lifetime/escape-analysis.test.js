@@ -80,6 +80,22 @@ test("escape analysis marks captures from arrow functions as escaping", () => {
   assert.equal(result.escaping.has("this"), true);
 });
 
+test("escape analysis marks captures from async function expressions as escaping", () => {
+  const sourceText = createSourceText("function outer(x) { var declared = async function run(y) { return await x + y; }; return declared; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("x"), true);
+});
+
+test("escape analysis marks captures from async arrows as escaping", () => {
+  const sourceText = createSourceText("function outer(x) { var grouped = async (delta = x) => await x + delta; return grouped; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("x"), true);
+});
+
 test("escape analysis marks class field initializer values as escaping", () => {
   const sourceText = createSourceText("function build(x) { class Box { value = x; } return new Box(); }");
   const ast = parse(sourceText);

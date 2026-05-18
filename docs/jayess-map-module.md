@@ -1,6 +1,6 @@
 # Jayess Map Module
 
-This document defines the first intended API surface and runtime-boundary decision for the first repository-owned `jayess:collections/map` slice.
+This document defines the current shipped API surface and runtime-boundary decision for the repository-owned `jayess:collections/map` module.
 
 ## Module Identity
 
@@ -10,11 +10,11 @@ The first `Map` surface belongs to:
 
 It is a Jayess standard-library module, not an ambient global `Map` constructor.
 
-## First-Slice API
+## Current Shipped API
 
-The first shipped `jayess:collections/map` slice should stay narrow and explicit.
+The shipped `jayess:collections/map` surface stays narrow and explicit.
 
-Planned exports:
+Current exports:
 
 - `create()`
 - `get(map, key)`
@@ -23,6 +23,9 @@ Planned exports:
 - `deleteKey(map, key)`
 - `clear(map)`
 - `size(map)`
+- `keys(map)`
+- `values(map)`
+- `entries(map)`
 - `isMap(value)`
 
 ## First-Slice Semantics
@@ -63,6 +66,12 @@ Planned exports:
 ### `size(map)`
 
 - returns the current entry count as one numeric value
+
+### Iteration Helpers
+
+- `keys(map)` returns one Jayess array of keys in insertion order
+- `values(map)` returns one Jayess array of stored values in insertion order
+- `entries(map)` returns one Jayess array of `[key, value]` pairs in insertion order
 
 ### `isMap(value)`
 
@@ -184,6 +193,31 @@ The first primitive layer now has a concrete runtime direction:
 - the first shipped slice should start with function exports, not a large compatibility class surface
 - the first shipped slice should not emulate `Map` through plain object fields or array pairs just to claim support
 
-## Next Slice
+## Remaining Follow-Up
 
-The next bounded step is to move on to the first `Set` design slice.
+The next `jayess:collections/map` work now starts after the shipped iteration helpers.
+
+### Bulk Construction
+
+The next approved bulk-construction helper is:
+
+- `fromEntries(entries)`
+
+Rules:
+
+- accepts one Jayess array of two-item entry arrays
+- returns one new Jayess map
+- rejects malformed entry shapes with a clear runtime exception
+
+### Update Helpers
+
+The next approved update helpers are:
+
+- `setAll(map, entries)`
+- `deleteAll(map, keys)`
+
+Rules:
+
+- `setAll(map, entries)` mutates one existing map from an entries array and returns that same map
+- `deleteAll(map, keys)` removes each listed key from one existing map and returns that same map
+- these helpers stay data-oriented and do not introduce callback-based update protocols in the next slice

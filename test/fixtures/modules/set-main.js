@@ -3,20 +3,25 @@ import {
   clear,
   create,
   deleteValue,
+  entries,
   has,
   isSet,
-  size
+  size,
+  values
 } from "jayess:collections/set";
 
 export function run() {
-  var values = create();
-  add(values, "jayess");
-  if (isSet(values) && has(values, "jayess")) {
-    var count = size(values);
-    deleteValue(values, "jayess");
-    clear(values);
+  var set = create();
+  add(set, "jayess");
+  add(set, "native");
+  if (isSet(set) && has(set, "jayess")) {
+    var count = size(set);
+    var valueList = values(set);
+    var entryList = entries(set);
+    deleteValue(set, "jayess");
+    clear(set);
     if (count > 0) {
-      return "jayess";
+      return ["jayess", valueList, entryList];
     }
   }
   return "invalid";

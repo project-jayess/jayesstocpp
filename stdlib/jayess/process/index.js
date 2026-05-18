@@ -1,8 +1,13 @@
 import {
+  jayessProcessArgv,
   jayessProcessCwd,
   jayessProcessExit,
   jayessProcessGetEnv
 } from "./process-primitives.hpp";
+
+export function argv() {
+  return jayessProcessArgv();
+}
 
 export function cwd() {
   return jayessProcessCwd();

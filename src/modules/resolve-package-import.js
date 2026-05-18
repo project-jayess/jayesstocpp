@@ -44,24 +44,42 @@ function fileIfExists(candidate) {
 
 function resolveExportTarget(packageDirectory, packageJson, subpath) {
   if (typeof packageJson.exports === "string" && subpath.length === 0) {
-    return path.resolve(packageDirectory, packageJson.exports);
+    return { resolved: path.resolve(packageDirectory, packageJson.exports), unsupported: false };
   }
 
   if (packageJson.exports != null && typeof packageJson.exports === "object") {
     const key = subpath.length === 0 ? "." : `./${subpath}`;
     const value = packageJson.exports[key];
     if (typeof value === "string") {
-      return path.resolve(packageDirectory, value);
+      return { resolved: path.resolve(packageDirectory, value), unsupported: false };
     }
     if (value != null && typeof value === "object") {
       const importTarget = value.import ?? value.default;
       if (typeof importTarget === "string") {
-        return path.resolve(packageDirectory, importTarget);
+        return { resolved: path.resolve(packageDirectory, importTarget), unsupported: false };
+      }
+      return { resolved: null, unsupported: true, key };
+    }
+
+    if (value != null) {
+      return { resolved: null, unsupported: true, key };
+    }
+
+    if (subpath.length === 0 && !Object.prototype.hasOwnProperty.call(packageJson.exports, ".")) {
+      const rootImportTarget = packageJson.exports.import ?? packageJson.exports.default;
+      if (typeof rootImportTarget === "string") {
+        return { resolved: path.resolve(packageDirectory, rootImportTarget), unsupported: false };
+      }
+      const looksLikeConditionalRoot = ["import", "require", "default", "node", "browser"].some(
+        (condition) => Object.prototype.hasOwnProperty.call(packageJson.exports, condition)
+      );
+      if (looksLikeConditionalRoot) {
+        return { resolved: null, unsupported: true, key: "." };
       }
     }
   }
 
-  return null;
+  return { resolved: null, unsupported: false };
 }
 
 export function resolvePackageImport(fromFilename, source) {
@@ -89,17 +107,26 @@ export function resolvePackageImportDetailed(fromFilename, source) {
   const packageJsonPath = path.join(packageDirectory, "package.json");
   const packageJson = readPackageJson(packageJsonPath);
 
-  const resolvedFromExports = packageJson == null ? null : resolveExportTarget(packageDirectory, packageJson, subpath);
-  if (resolvedFromExports != null) {
-    if (fileIfExists(resolvedFromExports) != null) {
-      return { resolved: resolvedFromExports, reason: null, packageName, subpath };
+  const resolvedFromExports = packageJson == null ? { resolved: null, unsupported: false } : resolveExportTarget(packageDirectory, packageJson, subpath);
+  if (resolvedFromExports.resolved != null) {
+    if (fileIfExists(resolvedFromExports.resolved) != null) {
+      return { resolved: resolvedFromExports.resolved, reason: null, packageName, subpath };
     }
     return {
       resolved: null,
       reason: "package-export-target-missing",
       packageName,
       subpath,
-      attemptedPath: resolvedFromExports
+      attemptedPath: resolvedFromExports.resolved
+    };
+  }
+  if (resolvedFromExports.unsupported) {
+    return {
+      resolved: null,
+      reason: "package-export-unsupported",
+      packageName,
+      subpath,
+      exportKey: resolvedFromExports.key
     };
   }
 

@@ -9,11 +9,11 @@ jayess::value label(const std::vector<jayess::value>& jayess_args) {
     return jayess::value(std::string("yes"));
   }
   return jayess::value(std::string("no"));
-  return 0.0;
+  return jayess::value(std::monostate{});
 }
 
 jayess::value jayess_module_init() {
   jayess::scope_cleanup_frame jayess_scope;
-  return 0.0;
+  return jayess::value(std::monostate{});
 }
 } // namespace jayess_module_snapshot_conditional_string_import

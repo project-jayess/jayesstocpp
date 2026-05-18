@@ -2,11 +2,14 @@ import {
   jayessMapClear,
   jayessMapCreate,
   jayessMapDeleteKey,
+  jayessMapEntries,
   jayessMapGet,
   jayessMapHas,
   jayessMapIsMap,
+  jayessMapKeys,
   jayessMapSet,
-  jayessMapSize
+  jayessMapSize,
+  jayessMapValues
 } from "./map-primitives.hpp";
 
 export function create() {
@@ -35,6 +38,18 @@ export function clear(map) {
 
 export function size(map) {
   return jayessMapSize(map);
+}
+
+export function keys(map) {
+  return jayessMapKeys(map);
+}
+
+export function values(map) {
+  return jayessMapValues(map);
+}
+
+export function entries(map) {
+  return jayessMapEntries(map);
 }
 
 export function isMap(value) {

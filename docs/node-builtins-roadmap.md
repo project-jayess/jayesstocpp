@@ -45,6 +45,32 @@ The first Jayess-owned system-module slice now lands through:
 
 `node:` imports still remain explicitly unsupported in Jayess source, and their diagnostics now point users toward the Jayess-owned system-module namespace instead of ambient Node compatibility.
 
+## Next Approved Direction
+
+The next bounded system-module work is now explicitly split into small Jayess-owned slices:
+
+Those next approved helpers are now shipped through:
+
+- `jayess:fs`
+  - `remove(path)`
+  - `list(path)`
+  - `rename(fromPath, toPath)`
+  - `stat(path)` with narrow inspection fields only
+- `jayess:path`
+  - `resolve(...)`
+  - `relative(fromPath, toPath)`
+  - `isAbsolute(path)`
+- `jayess:process`
+  - `argv()`
+
+The remaining unapproved areas are still:
+
+- no env-mutation helpers in the current slice
+- no subprocess spawning in the current slice
+- `exit(code)` remains the only current exit primitive
+
+Possible later Jayess-owned modules such as `jayess:os`, `jayess:url`, and `jayess:timers` are not approved for implementation yet and should remain separate later slices if they are adopted at all.
+
 ## Contributor Guidance
 
 - keep `node:` imports explicitly unsupported in Jayess source

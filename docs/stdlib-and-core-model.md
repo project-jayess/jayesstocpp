@@ -112,6 +112,8 @@ The current bootstrap filesystem layout for future built-in modules is:
 
 - `stdlib/jayess/date/`
 - `stdlib/jayess/json/`
+- `stdlib/jayess/number/`
+- `stdlib/jayess/object/`
 - `stdlib/jayess/collections/map/`
 - `stdlib/jayess/collections/set/`
 - `stdlib/jayess/fs/`
@@ -134,7 +136,7 @@ Examples:
 
 The same applies to:
 
-- `Promise`-like abstractions
+- Jayess-owned async composition abstractions
 - `Map` / `Set` APIs
 - JSON/date helper layers
 - future core-library modules

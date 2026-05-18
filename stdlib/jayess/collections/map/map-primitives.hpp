@@ -41,6 +41,21 @@ inline jayess::value jayessMapSize(const std::vector<jayess::value>& jayessArgs)
   return jayess::map_size(map);
 }
 
+inline jayess::value jayessMapKeys(const std::vector<jayess::value>& jayessArgs) {
+  const auto map = jayess::argument_at(jayessArgs, 0);
+  return jayess::map_keys(map);
+}
+
+inline jayess::value jayessMapValues(const std::vector<jayess::value>& jayessArgs) {
+  const auto map = jayess::argument_at(jayessArgs, 0);
+  return jayess::map_values(map);
+}
+
+inline jayess::value jayessMapEntries(const std::vector<jayess::value>& jayessArgs) {
+  const auto map = jayess::argument_at(jayessArgs, 0);
+  return jayess::map_entries(map);
+}
+
 inline jayess::value jayessMapIsMap(const std::vector<jayess::value>& jayessArgs) {
   const auto value = jayess::argument_at(jayessArgs, 0);
   return jayess::value(jayess::is_map_value(value));

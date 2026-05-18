@@ -1,6 +1,7 @@
 import {
   arrayExpression,
   arrayPattern,
+  assignmentPattern,
   arrowFunctionExpression,
   assignmentExpression,
   awaitExpression,
@@ -88,7 +89,8 @@ function parserError(sourceText, token, message) {
 const unsupportedStatementMessages = new Map([
   ["catch", "Unexpected 'catch' without a matching try block"],
   ["extends", "Jayess does not support 'extends' yet; inheritance depends on a future class-runtime design"],
-  ["finally", "Unexpected 'finally' without a matching try block"]
+  ["finally", "Unexpected 'finally' without a matching try block"],
+  ["with", "Jayess does not support 'with'; it is unsupported by design because Jayess keeps lexical name resolution explicit"]
 ]);
 
 export function parse(sourceText) {
@@ -152,7 +154,7 @@ export function parse(sourceText) {
       return parseFunctionDeclaration(false);
     }
     if (match(tokenTypes.keyword, "let")) {
-      parserError(sourceText, current(), "Jayess does not support 'let'; use 'var' or 'const'");
+      parserError(sourceText, current(), "Jayess does not support 'let'; it is unsupported by design in Jayess, so use 'var' or 'const'");
     }
     if (match(tokenTypes.keyword) && unsupportedStatementMessages.has(current().value)) {
       parserError(sourceText, current(), unsupportedStatementMessages.get(current().value));
@@ -367,13 +369,23 @@ export function parse(sourceText) {
 
   function parseFunctionExpression() {
     const start = expect(tokenTypes.keyword, "function").start;
+    return parseFunctionExpressionAfterKeyword(start, false);
+  }
+
+  function parseAsyncFunctionExpression() {
+    const start = expect(tokenTypes.keyword, "async").start;
+    expect(tokenTypes.keyword, "function", "Expected 'function' after 'async'");
+    return parseFunctionExpressionAfterKeyword(start, true);
+  }
+
+  function parseFunctionExpressionAfterKeyword(start, isAsync) {
     const isGenerator = match(tokenTypes.operator, "*");
     if (isGenerator) {
       advance();
     }
     const id = match(tokenTypes.identifier) ? parseIdentifier() : null;
     const { params, body } = parseFunctionSignatureAndBody();
-    return functionExpression(params, body, start, body.end, [], id, false, isGenerator);
+    return functionExpression(params, body, start, body.end, [], id, isAsync, isGenerator);
   }
 
   function parseClassDeclaration(exported) {
@@ -423,13 +435,6 @@ export function parse(sourceText) {
       );
     }
     if (match(tokenTypes.punctuator, "(")) {
-      if (key.type === "PrivateIdentifier") {
-        parserError(
-          sourceText,
-          key,
-          "Jayess does not support private methods yet; the first private-member slice starts with private instance fields only"
-        );
-      }
       const { params, body } = parseFunctionSignatureAndBody();
       const kind = !computed && key.name === "constructor" ? "constructor" : "method";
       return methodDefinition(key, params, body, start, body.end, kind, isStatic, computed);
@@ -506,6 +511,16 @@ export function parse(sourceText) {
     parserError(sourceText, current(), "Expected binding target");
   }
 
+  function parseBindingTargetWithDefault() {
+    const target = parseBindingTarget();
+    if (!match(tokenTypes.operator, "=")) {
+      return target;
+    }
+    advance();
+    const defaultValue = parseAssignment();
+    return assignmentPattern(target, defaultValue, target.start, defaultValue.end);
+  }
+
   function parseArrayBindingPattern() {
     const start = expect(tokenTypes.punctuator, "[", "Expected '[' to start array binding pattern").start;
     const elements = [];
@@ -526,10 +541,7 @@ export function parse(sourceText) {
       if (match(tokenTypes.punctuator, ",")) {
         parserError(sourceText, current(), "Array destructuring elisions are not supported");
       }
-      if (match(tokenTypes.punctuator, "[") || match(tokenTypes.punctuator, "{")) {
-        parserError(sourceText, current(), "Nested destructuring patterns are not supported in this slice");
-      }
-      elements.push(parseIdentifier());
+      elements.push(parseBindingTargetWithDefault());
       if (match(tokenTypes.punctuator, ",")) {
         advance();
       } else {
@@ -566,16 +578,17 @@ export function parse(sourceText) {
         value = key;
         if (match(tokenTypes.punctuator, ":")) {
           advance();
-          if (match(tokenTypes.punctuator, "[") || match(tokenTypes.punctuator, "{")) {
-            parserError(sourceText, current(), "Nested destructuring patterns are not supported in this slice");
-          }
-          value = parseIdentifier();
+          value = parseBindingTargetWithDefault();
+        } else if (match(tokenTypes.operator, "=")) {
+          advance();
+          const defaultValue = parseAssignment();
+          value = assignmentPattern(value, defaultValue, value.start, defaultValue.end);
         }
       } else if (match(tokenTypes.string)) {
         const token = advance();
         key = literal("string", token.value, token.start, token.end);
         expect(tokenTypes.punctuator, ":", "String-key object destructuring entries require a local binding");
-        value = parseIdentifier();
+        value = parseBindingTargetWithDefault();
       } else {
         parserError(sourceText, current(), "Expected object binding property");
       }
@@ -654,12 +667,29 @@ export function parse(sourceText) {
     return arrowFunctionExpression(parameterList.params, body, expressionBody, parameterList.start, end, []);
   }
 
+  function parseAsyncArrowFunctionWithParentheses() {
+    const start = expect(tokenTypes.keyword, "async").start;
+    const parameterList = parseArrowFunctionParameterList();
+    expect(tokenTypes.operator, "=>", "Expected '=>' after arrow function parameters");
+    const { body, expressionBody, end } = parseArrowFunctionBody();
+    return arrowFunctionExpression(parameterList.params, body, expressionBody, start, end, [], true);
+  }
+
   function parseArrowFunctionWithIdentifier() {
     const id = parseIdentifier();
     const param = parameter(id, null, id.start, id.end);
     expect(tokenTypes.operator, "=>", "Expected '=>' after arrow function parameter");
     const { body, expressionBody, end } = parseArrowFunctionBody();
     return arrowFunctionExpression([param], body, expressionBody, id.start, end, []);
+  }
+
+  function parseAsyncArrowFunctionWithIdentifier() {
+    const start = expect(tokenTypes.keyword, "async").start;
+    const id = parseIdentifier();
+    const param = parameter(id, null, id.start, id.end);
+    expect(tokenTypes.operator, "=>", "Expected '=>' after arrow function parameter");
+    const { body, expressionBody, end } = parseArrowFunctionBody();
+    return arrowFunctionExpression([param], body, expressionBody, start, end, [], true);
   }
 
   function parseParenthesizedExpression() {
@@ -956,6 +986,27 @@ export function parse(sourceText) {
     return isArrowParameterStart(next);
   }
 
+  function isAsyncArrowFunctionStart() {
+    if (!match(tokenTypes.keyword, "async")) {
+      return false;
+    }
+
+    if (lookahead().type === tokenTypes.identifier) {
+      return lookahead(2).type === tokenTypes.operator && lookahead(2).value === "=>";
+    }
+
+    if (!(lookahead().type === tokenTypes.punctuator && lookahead().value === "(")) {
+      return false;
+    }
+
+    const next = lookahead(2);
+    if (next.type === tokenTypes.punctuator && next.value === ")") {
+      return lookahead(3).type === tokenTypes.operator && lookahead(3).value === "=>";
+    }
+
+    return isArrowParameterStart(next);
+  }
+
   function parseTemplateExpression(expressionSource, absoluteOffset) {
     const prefix = sourceText.text.slice(0, absoluteOffset).replace(/[^\n]/g, " ");
     const expressionSourceText = createSourceText(`${prefix}${expressionSource};`, sourceText.filename);
@@ -983,6 +1034,23 @@ export function parse(sourceText) {
   }
 
   function parseAssignment() {
+    if (match(tokenTypes.punctuator, "[") || match(tokenTypes.punctuator, "{")) {
+      const savedIndex = index;
+      try {
+        const pattern = match(tokenTypes.punctuator, "[")
+          ? parseArrayBindingPattern()
+          : parseObjectBindingPattern();
+        if (match(tokenTypes.operator, "=")) {
+          advance();
+          const right = parseAssignment();
+          return assignmentExpression(pattern, "=", right, pattern.start, right.end);
+        }
+      } catch {
+        // Fall through to ordinary expression parsing if the left-hand side is not a destructuring pattern.
+      }
+      index = savedIndex;
+    }
+
     if (match(tokenTypes.keyword, "yield")) {
       return parseYieldExpression();
     }
@@ -1150,6 +1218,13 @@ export function parse(sourceText) {
   }
 
   function parsePrimaryExpression() {
+    if (isAsyncArrowFunctionStart()) {
+      if (lookahead().type === tokenTypes.identifier) {
+        return parseAsyncArrowFunctionWithIdentifier();
+      }
+      return parseAsyncArrowFunctionWithParentheses();
+    }
+
     if (isArrowFunctionStart()) {
       if (match(tokenTypes.identifier)) {
         return parseArrowFunctionWithIdentifier();
@@ -1177,27 +1252,12 @@ export function parse(sourceText) {
     }
     if (match(tokenTypes.keyword, "async")) {
       if (lookahead().type === tokenTypes.keyword && lookahead().value === "function") {
-        parserError(
-          sourceText,
-          current(),
-          "Jayess does not support async function expressions yet; the first async slice starts with async function declarations only"
-        );
-      }
-      if (
-        lookahead().type === tokenTypes.identifier
-        && lookahead(2).type === tokenTypes.operator
-        && lookahead(2).value === "=>"
-      ) {
-        parserError(
-          sourceText,
-          current(),
-          "Jayess does not support async arrow functions yet; the first async slice starts with async function declarations only"
-        );
+        return parseAsyncFunctionExpression();
       }
       parserError(
         sourceText,
         current(),
-        "Jayess does not support this async form yet; the first async slice starts with async function declarations only"
+        "Jayess does not support this async form yet; the next async slice is limited to async function expressions and async arrow functions"
       );
     }
     if (match(tokenTypes.keyword, "yield")) {
@@ -1205,6 +1265,13 @@ export function parse(sourceText) {
     }
     if (match(tokenTypes.keyword, "function")) {
       return parseFunctionExpression();
+    }
+    if (match(tokenTypes.keyword, "import")) {
+      parserError(
+        sourceText,
+        current(),
+        "Jayess does not support dynamic import(); it is unsupported by design because Jayess keeps module resolution closed at compile time"
+      );
     }
     if (match(tokenTypes.keyword, "null")) {
       const token = advance();

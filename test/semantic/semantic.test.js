@@ -101,6 +101,15 @@ test("semantic analysis records named re-exports without diagnostics", () => {
   assert.equal(result.exports[0].exportedName, "sum");
 });
 
+test("semantic analysis rejects duplicate exported names", () => {
+  const sourceText = createSourceText("var one = 1; var two = 2; export { one as value }; export { two as value };");
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /Duplicate export 'value'/
+  );
+});
+
 test("semantic analysis rejects local export specifiers for undefined names", () => {
   const sourceText = createSourceText("export { missing as renamed };");
   const ast = parse(sourceText);
@@ -158,6 +167,24 @@ test("semantic analysis accepts async declarations once lowering/runtime lands",
   const ast = parse(sourceText);
   const result = analyzeModule(ast, sourceText, { throwOnError: false });
   assert.equal(result.diagnostics.length, 0);
+});
+
+test("semantic analysis accepts async function expressions and async arrows once lowering lands", () => {
+  const sourceText = createSourceText("var declared = async function run(value) { return await value; }; var unary = async value => await value; var grouped = async (left, right = 1) => { return await left; };");
+  const ast = parse(sourceText);
+  const result = analyzeModule(ast, sourceText, { throwOnError: false });
+  assert.equal(result.diagnostics.length, 0);
+});
+
+test("semantic analysis keeps await scoped correctly inside async function expressions and async arrows", () => {
+  const sourceText = createSourceText("var declared = async function run(value) { return await value; }; var grouped = async (value) => { function inner() { return await value; } return await value; };");
+  const ast = parse(sourceText);
+  const result = analyzeModule(ast, sourceText, { throwOnError: false });
+
+  assert.equal(
+    result.diagnostics.filter((diagnostic) => /'await' is only valid inside async functions/.test(diagnostic.message)).length,
+    1
+  );
 });
 
 test("semantic analysis rejects yield outside generator functions", () => {
@@ -252,12 +279,26 @@ test("semantic analysis accepts same-class private field access", () => {
   assert.equal(result.diagnostics.length, 0);
 });
 
+test("semantic analysis accepts private instance methods once the class-model slice lands", () => {
+  const sourceText = createSourceText("class Box { #value() { return 1; } }");
+  const ast = parse(sourceText);
+  const result = analyzeModule(ast, sourceText, { throwOnError: false });
+  assert.equal(result.diagnostics.length, 0);
+});
+
+test("semantic analysis validates same-class private method access", () => {
+  const sourceText = createSourceText("class Box { #value() { return 1; } call(other) { return other.#value(); } }");
+  const ast = parse(sourceText);
+  const result = analyzeModule(ast, sourceText, { throwOnError: false });
+  assert.equal(result.diagnostics.length, 0);
+});
+
 test("semantic analysis rejects private field access outside the declaring class", () => {
   const sourceText = createSourceText("var box = null; box.#value;");
   const ast = parse(sourceText);
   assert.throws(
     () => analyzeModule(ast, sourceText),
-    /Jayess private field access is only valid inside methods or field initializers of the declaring class/
+    /Jayess private member access is only valid inside methods or field initializers of the declaring class/
   );
 });
 
@@ -266,7 +307,7 @@ test("semantic analysis rejects private field access from a different class", ()
   const ast = parse(sourceText);
   assert.throws(
     () => analyzeModule(ast, sourceText),
-    /Private field '#value' is not declared in class 'Reader'/
+    /Private member '#value' is not declared in class 'Reader'/
   );
 });
 
@@ -275,17 +316,33 @@ test("semantic analysis rejects duplicate private field names in one class", () 
   const ast = parse(sourceText);
   assert.throws(
     () => analyzeModule(ast, sourceText),
-    /Duplicate private field '#value' in class 'Box'/
+    /Duplicate private field '#value' conflicts with existing private field in class 'Box'/
   );
 });
 
-test("semantic analysis rejects generator function expressions outside the first slice", () => {
-  const sourceText = createSourceText("var make = function* named(value) { yield value; };");
+test("semantic analysis rejects duplicate private field and method names in one class", () => {
+  const sourceText = createSourceText("class Box { #value = 1; #value() { return 2; } }");
   const ast = parse(sourceText);
   assert.throws(
     () => analyzeModule(ast, sourceText),
-    /Jayess does not support generator function expressions yet; the first generator slice starts with generator declarations only/
+    /Duplicate private method '#value' conflicts with existing private field in class 'Box'/
   );
+});
+
+test("semantic analysis rejects inherited private method access through name matching", () => {
+  const sourceText = createSourceText("class Base { #value() { return 1; } } class Child extends Base { read(other) { return other.#value(); } }");
+  const ast = parse(sourceText);
+  const result = analyzeModule(ast, sourceText, { throwOnError: false });
+  assert.ok(
+    result.diagnostics.some((diagnostic) => /Private member '#value' is not declared in class 'Child'/.test(diagnostic.message))
+  );
+});
+
+test("semantic analysis accepts generator function expressions once lowering lands", () => {
+  const sourceText = createSourceText("var make = function* named(value) { yield value; };");
+  const ast = parse(sourceText);
+  const result = analyzeModule(ast, sourceText, { throwOnError: false });
+  assert.equal(result.diagnostics.length, 0);
 });
 
 test("semantic analysis rejects break and continue outside loops", () => {
@@ -538,7 +595,7 @@ test("semantic analysis accepts update expressions for mutable bindings and memb
 });
 
 test("semantic analysis accepts supported composite built-ins", () => {
-  const sourceText = createSourceText('var values = [1, 2]; var size = values.length; values.push(3); values.pop(); values.join("-"); var nameSize = "Jayess".length; "Jayess".slice(1, 3); "Jayess".substring(2); "Jayess".startsWith("Ja");');
+  const sourceText = createSourceText('var values = [1, 2]; var size = values.length; values.push(3); values.pop(); values.join("-"); values.includes(2); var nameSize = "Jayess".length; "Jayess".slice(1, 3); "Jayess".substring(2); "Jayess".startsWith("Ja"); "Jayess".includes("aye"); "Jayess".indexOf("ye"); "Jayess".endsWith("ss");');
   const ast = parse(sourceText);
   const result = analyzeModule(ast, sourceText, { throwOnError: false });
   assert.equal(result.diagnostics.length, 0);
@@ -557,6 +614,51 @@ test("semantic analysis rejects unsupported composite built-ins on literals", ()
   assert.throws(
     () => analyzeModule(ast, sourceText),
     /Unsupported built-in array property 'map'/
+  );
+});
+
+test("semantic analysis rejects ambient global parseInt with a focused module diagnostic", () => {
+  const sourceText = createSourceText('parseInt("12");');
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /import \{ parseInt \} from 'jayess:number'/
+  );
+});
+
+test("semantic analysis rejects ambient global Object helpers with a focused module diagnostic", () => {
+  const sourceText = createSourceText("Object.keys({ value: 1 });");
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /import \{ keys, values, entries \} from 'jayess:object'/
+  );
+});
+
+test("semantic analysis rejects ambient global RegExp with a focused module diagnostic", () => {
+  const sourceText = createSourceText("RegExp;");
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /import helpers from 'jayess:regex'/
+  );
+});
+
+test("semantic analysis rejects ambient global eval with an unsupported-by-design diagnostic", () => {
+  const sourceText = createSourceText('eval("value");');
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /runtime source evaluation is unsupported by design/
+  );
+});
+
+test("semantic analysis rejects the JavaScript Function constructor with an unsupported-by-design diagnostic", () => {
+  const sourceText = createSourceText('Function("return 1;");');
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /runtime source evaluation is unsupported by design/
   );
 });
 
@@ -588,12 +690,28 @@ test("semantic analysis rejects invalid array and string built-in argument count
     /array method 'join' accepts at most one argument/
   );
   assert.throws(
+    () => analyzeModule(parse(createSourceText("[1, 2].includes();")), createSourceText("[1, 2].includes();")),
+    /array method 'includes' requires exactly one argument/
+  );
+  assert.throws(
     () => analyzeModule(parse(createSourceText('"Jayess".slice();')), createSourceText('"Jayess".slice();')),
     /string method 'slice' requires one or two arguments/
   );
   assert.throws(
     () => analyzeModule(parse(createSourceText('"Jayess".startsWith();')), createSourceText('"Jayess".startsWith();')),
     /string method 'startsWith' requires exactly one argument/
+  );
+  assert.throws(
+    () => analyzeModule(parse(createSourceText('"Jayess".includes();')), createSourceText('"Jayess".includes();')),
+    /string method 'includes' requires exactly one argument/
+  );
+  assert.throws(
+    () => analyzeModule(parse(createSourceText('"Jayess".indexOf();')), createSourceText('"Jayess".indexOf();')),
+    /string method 'indexOf' requires exactly one argument/
+  );
+  assert.throws(
+    () => analyzeModule(parse(createSourceText('"Jayess".endsWith();')), createSourceText('"Jayess".endsWith();')),
+    /string method 'endsWith' requires exactly one argument/
   );
 });
 
@@ -645,6 +763,17 @@ test("semantic analysis records captures for arrow functions with lexical this",
 
   assert.equal(result.diagnostics.length, 0);
   assert.deepEqual(arrowFunction.captures, ["step", "this"]);
+});
+
+test("semantic analysis records captures for async function expressions and async arrows", () => {
+  const sourceText = createSourceText("function outer(x) { var declared = async function run(y) { return await x + y; }; var grouped = async (delta = x) => await x + delta; return grouped; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const functionExpression = ast.body[0].body.body[0].declarations[0].init;
+  const arrowFunction = ast.body[0].body.body[1].declarations[0].init;
+
+  assert.deepEqual(functionExpression.captures, ["x"]);
+  assert.deepEqual(arrowFunction.captures, ["x"]);
 });
 
 test("semantic analysis rejects arguments inside arrow functions clearly", () => {
@@ -731,7 +860,7 @@ test("semantic analysis rejects this outside class methods", () => {
   );
 });
 
-test("semantic analysis rejects duplicate destructuring bindings and for-loop destructuring", () => {
+test("semantic analysis rejects duplicate destructuring bindings and accepts for-loop destructuring", () => {
   const duplicateSource = createSourceText("var values = [1, 2]; var [left, left] = values;");
   const duplicateAst = parse(duplicateSource);
   assert.throws(
@@ -739,11 +868,32 @@ test("semantic analysis rejects duplicate destructuring bindings and for-loop de
     /Duplicate declaration 'left'/
   );
 
-  const forSource = createSourceText("var values = [1, 2]; for (var [left, right] = values; false; ) { }");
+  const forSource = createSourceText("var values = [1, 2]; for (var [left = 1, { right }] = values; left; left = left - 1) { right; }");
   const forAst = parse(forSource);
+  const result = analyzeModule(forAst, forSource, { throwOnError: false });
+  assert.equal(result.diagnostics.length, 0);
+});
+
+test("semantic analysis enforces destructuring default-value binding order", () => {
+  const validSource = createSourceText("var values = [null, null]; var [left = 1, right = left] = values;");
+  const validAst = parse(validSource);
+  const validResult = analyzeModule(validAst, validSource, { throwOnError: false });
+  assert.equal(validResult.diagnostics.length, 0);
+
+  const invalidSource = createSourceText("var values = [null, null]; var [left = right, right = 1] = values;");
+  const invalidAst = parse(invalidSource);
   assert.throws(
-    () => analyzeModule(forAst, forSource),
-    /Destructuring declarations are not yet supported in for-loop initializers/
+    () => analyzeModule(invalidAst, invalidSource),
+    /Undefined identifier 'right'/
+  );
+});
+
+test("semantic analysis rejects const targets in destructuring assignment", () => {
+  const sourceText = createSourceText("const left = 1; [left] = values;");
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /Cannot reassign const 'left'/
   );
 });
 

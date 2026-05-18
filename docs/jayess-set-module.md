@@ -1,6 +1,6 @@
 # Jayess Set Module
 
-This document defines the runtime-boundary decision for the first repository-owned `jayess:collections/set` slice.
+This document defines the current shipped API surface and runtime-boundary decision for the repository-owned `jayess:collections/set` module.
 
 ## Module Identity
 
@@ -10,11 +10,11 @@ The first `Set` surface belongs to:
 
 It is a Jayess standard-library module, not an ambient global `Set` constructor.
 
-## First-Slice API
+## Current Shipped API
 
-The first shipped `jayess:collections/set` slice should stay narrow and explicit.
+The shipped `jayess:collections/set` surface stays narrow and explicit.
 
-Planned exports:
+Current exports:
 
 - `create()`
 - `add(set, value)`
@@ -22,6 +22,8 @@ Planned exports:
 - `deleteValue(set, value)`
 - `clear(set)`
 - `size(set)`
+- `values(set)`
+- `entries(set)`
 - `isSet(value)`
 
 ## First-Slice Semantics
@@ -56,6 +58,11 @@ Planned exports:
 ### `size(set)`
 
 - returns the current member count as one numeric value
+
+### Iteration Helpers
+
+- `values(set)` returns one Jayess array of members in insertion order
+- `entries(set)` returns one Jayess array of `[value, value]` pairs in insertion order
 
 ### `isSet(value)`
 
@@ -170,7 +177,7 @@ The first primitive layer now has a concrete runtime direction:
 - the first shipped slice should start with function exports, not a large compatibility class surface
 - the first shipped slice should not emulate `Set` through arrays or plain object fields just to claim support
 
-## Next Slice
+## Current Verification Coverage
 
 Current verification coverage:
 
@@ -178,6 +185,32 @@ Current verification coverage:
 - generated-output tests that verify the Jayess module and native bridge are written into `transpileFile()` output
 - compile-validation tests that confirm a generated project importing `jayess:collections/set` compiles with the available C++ compiler
 
-## Next Slice
+## Remaining Follow-Up
 
-The next bounded step is to move on to the first Jayess system-module slice.
+The next `jayess:collections/set` work now starts after the shipped iteration helpers.
+
+### Bulk Construction
+
+The next approved bulk-construction helper is:
+
+- `fromValues(values)`
+
+Rules:
+
+- accepts one Jayess array of candidate values
+- returns one new Jayess set
+- duplicate values collapse under the set's existing membership rules
+
+### Set-Operation Helpers
+
+The next approved set-operation helpers are:
+
+- `union(left, right)`
+- `intersection(left, right)`
+- `difference(left, right)`
+
+Rules:
+
+- each helper returns one new Jayess set instead of mutating its inputs
+- result order follows the left-hand set's insertion order first, then any newly added right-hand values when applicable
+- the next slice does not add iterator-based or callback-based set algebra APIs

@@ -8,7 +8,7 @@ It is intentionally descriptive, not aspirational. If behavior changes, update t
 
 Jayess truthiness is narrower and more explicit than JavaScript truthiness.
 
-Current runtime behavior:
+Final current rule:
 
 - `null` is falsey
 - `false` is falsey and `true` is truthy
@@ -19,18 +19,22 @@ Current runtime behavior:
 - callable values are always truthy
 - async handles are always truthy
 - generator handles are always truthy
+- maps are truthy only when non-empty
+- sets are truthy only when non-empty
 
 Important differences from JavaScript:
 
 - empty arrays are falsey in current Jayess
 - empty objects are falsey in current Jayess
-- there is no separate `undefined` value model today
+- empty maps are falsey in current Jayess
+- empty sets are falsey in current Jayess
+- there is no separate `undefined` value model; Jayess keeps `null` as its only built-in missing-value sentinel
 
 ## Equality
 
 Jayess equality is exact-type equality today.
 
-Current runtime behavior:
+Final current rule:
 
 - values of different runtime kinds compare unequal immediately
 - `null == null` and `null === null` are true
@@ -42,6 +46,8 @@ Current runtime behavior:
 - callables compare by shared runtime identity
 - async handles compare by shared runtime identity
 - generator handles compare by shared runtime identity
+- maps compare by shared runtime identity
+- sets compare by shared runtime identity
 
 Current operator note:
 
@@ -50,18 +56,27 @@ Current operator note:
 
 This means JavaScript-style coercive equality is intentionally not implemented.
 
+Important strictness note:
+
+- `null` is not equal to `false`
+- `null` is not equal to `0`
+- `null` is not equal to the empty string
+- Jayess does not implement JavaScript-style coercive equality around `null`
+
 ## Numeric Operators
 
-Current numeric operators assume numeric operands and do not perform JavaScript-style coercion.
+Jayess numeric operators intentionally avoid JavaScript-style coercion.
 
-Current runtime behavior:
+Final current rule:
 
 - unary `+` reads a numeric value directly
 - unary `-` lowers through numeric subtraction from zero
 - `-`, `*`, `/`, `%`, and `**` operate on numeric values only
 - comparison helpers `>`, `<`, `>=`, and `<=` operate on numeric values only
+- mixed string/number arithmetic is not part of the language contract
+- booleans, `null`, arrays, objects, callables, async handles, generator handles, maps, and sets do not participate in numeric coercion
 
-If a non-numeric runtime value reaches these helpers, the generated runtime path is not modeling JavaScript coercion.
+If a non-numeric runtime value reaches these helpers, the generated runtime path is intentionally outside the language contract rather than an emulation of JavaScript coercion.
 
 ## Addition
 
@@ -71,6 +86,7 @@ Current `+` support is intentionally narrow:
 - string + string
 
 Mixed-type addition such as string-plus-number is not implemented as JavaScript coercion.
+`"5" + 1`, `"5" - 1`, `true + 1`, and similar JavaScript coercive behavior are intentionally absent.
 
 ## Nullish Coalescing
 
@@ -80,7 +96,7 @@ Current `??` support is intentionally narrow:
 - `left ?? right` returns `right` when `left` is `null`
 - only Jayess `null` participates in nullish-coalescing today
 
-There is no separate `undefined` value model today, so JavaScript-style `undefined ?? right` behavior is not part of the current contract.
+There is no separate `undefined` value model, so JavaScript-style `undefined ?? right` behavior is not part of the current contract.
 
 ## Optional Chaining
 
@@ -96,6 +112,28 @@ Current contract notes:
 - Jayess uses `null` as the optional-chaining short-circuit sentinel
 - arguments to `fn?.(...)` are not evaluated when the callee is `null`
 - computed index expressions for `obj?.[expr]` are not evaluated when the receiver is `null`
+
+## Missing Values And Implicit Results
+
+Jayess uses `null` as its only built-in missing-value sentinel.
+
+Current language-direction rules:
+
+- there is no separate `undefined` runtime value
+- omitted arguments do not create a separate `undefined` value
+- missing object properties do not create a separate `undefined` value
+- missing array elements do not create a separate `undefined` value
+- falling off the end of a function without `return expr` does not create a separate `undefined` value
+
+Current runtime contract:
+
+- missing object-property lookups yield Jayess `null`
+- missing array-element lookups yield Jayess `null`
+- declaration destructuring missing elements/properties yield Jayess `null`
+- optional chaining short-circuits to Jayess `null`
+- nullish coalescing tests only against Jayess `null`
+
+The intended language direction is that implicit function completion also yields Jayess `null`, keeping one consistent missing-value sentinel across the language.
 
 ## Switch Statements
 
@@ -135,6 +173,8 @@ Current control-flow note:
 Current async support is intentionally narrow:
 
 - `async function` declarations are supported
+- async function expressions are supported
+- async arrow functions are supported
 - `await expr` is supported only inside async function bodies
 - async functions return Jayess-owned async handles
 - `await` evaluates its operand exactly once
@@ -145,8 +185,6 @@ Current async support is intentionally narrow:
 
 Current limitations:
 
-- async function expressions are not supported
-- async arrow functions are not supported
 - async methods and constructors are not supported
 - top-level `await` is not supported
 - the first slice uses explicit Jayess async handles rather than ambient JavaScript `Promise` behavior
@@ -156,6 +194,7 @@ Current limitations:
 Current generator support is intentionally narrow:
 
 - `function*` declarations are supported
+- generator function expressions are supported
 - `yield expr` is supported inside generator declaration bodies
 - `yield* expr` is supported inside generator declaration bodies
 - generator calls return Jayess-owned generator handles
@@ -172,8 +211,6 @@ Current first-slice behavior:
 
 Current limitations:
 
-- generator support is declaration-only in this slice
-- generator function expressions are not supported
 - generator methods are not supported
 - async generators are not supported
 - more complex yield nesting beyond the current direct positions is not supported
@@ -231,7 +268,6 @@ Current runtime behavior:
 
 Current limitations:
 
-- private methods are not supported
 - private static fields are not supported
 - private static methods are not supported
 - private access outside methods or field initializers of the declaring class is rejected
@@ -266,24 +302,26 @@ Current limitations:
 - static inheritance is not supported
 - broader JavaScript class edge cases around computed keys and class-side evaluation are still outside the current slice
 
-## Destructuring Declarations
+## Destructuring
 
-Current declaration destructuring support is intentionally narrow:
+Current destructuring support includes:
 
-- `var [left, right] = value;`
-- `const { name, score: total } = value;`
-- `var [head, ...tail] = value;`
-- `const { name, ...rest } = value;`
-- the initializer expression is evaluated exactly once
-- missing array elements or object properties currently yield Jayess `null`
+- declaration destructuring such as `var [left, right] = value;` and `const { name, score: total } = value;`
+- nested patterns such as `var [head, { nested: [left, right] }] = value;`
+- pattern defaults such as `var [left = 1] = value;` and `const { name = "Jayess" } = value;`
+- final rest bindings such as `var [head, ...tail] = value;` and `const { name, ...rest } = value;`
+- assignment destructuring into existing identifiers such as `([left, right] = value);`
+- destructuring declarations in `for` initializers
+- the source expression is evaluated exactly once for each destructuring operation
+- missing array elements or object properties yield Jayess `null`
+- defaults trigger only when the matched value is Jayess `null`
 
 Current limitations:
 
-- only declaration destructuring is supported
-- patterns are flat in this slice; nested patterns are not supported
-- rest bindings must be final and bind to a single identifier
-- pattern-local default values are not supported
-- destructuring in `for` initializers is not supported yet
+- rest bindings must remain final within their immediate pattern level and bind to a single identifier
+- assignment destructuring still targets existing identifiers only
+- array elisions are not supported
+- destructured parameters are not supported
 
 ## Rest Parameters
 
@@ -296,7 +334,6 @@ Current rest-parameter support is intentionally narrow:
 
 Current limitations:
 
-- rest bindings in destructuring patterns are only supported for flat declaration patterns
 - single-identifier arrow shorthand such as `value => value` remains distinct from parenthesized rest syntax like `(...items) => items`
 
 ## Coercions Jayess Does Not Currently Implement

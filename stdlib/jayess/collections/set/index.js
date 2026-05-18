@@ -3,9 +3,11 @@ import {
   jayessSetClear,
   jayessSetCreate,
   jayessSetDeleteValue,
+  jayessSetEntries,
   jayessSetHas,
   jayessSetIsSet,
-  jayessSetSize
+  jayessSetSize,
+  jayessSetValues
 } from "./set-primitives.hpp";
 
 export function create() {
@@ -30,6 +32,14 @@ export function clear(set) {
 
 export function size(set) {
   return jayessSetSize(set);
+}
+
+export function values(set) {
+  return jayessSetValues(set);
+}
+
+export function entries(set) {
+  return jayessSetEntries(set);
 }
 
 export function isSet(value) {

@@ -26,7 +26,11 @@ test("transpileFile writes runtime async helpers into the generated runtime", (t
 
   assert.match(headerSource, /struct async_state/);
   assert.match(headerSource, /value make_pending_async\(\);/);
+  assert.match(headerSource, /value async_all\(const value& handles\);/);
+  assert.match(headerSource, /value async_race\(const value& handles\);/);
   assert.match(cppSource, /value make_pending_async\(\)/);
+  assert.match(cppSource, /value async_all\(const value& handles\)/);
+  assert.match(cppSource, /value async_race\(const value& handles\)/);
   assert.match(cppSource, /void run_async_scheduler\(\)/);
 });
 
@@ -86,9 +90,17 @@ test("transpileFile writes runtime date helpers into the generated runtime", (t)
   assert.match(headerSource, /value make_date_from_unix_millis\(double millis\);/);
   assert.match(headerSource, /bool is_date_value\(const value& input\);/);
   assert.match(headerSource, /value date_to_unix_millis\(const value& input\);/);
+  assert.match(headerSource, /value date_to_iso_string\(const value& input\);/);
+  assert.match(headerSource, /value date_get_utc_year\(const value& input\);/);
+  assert.match(headerSource, /value date_add_millis\(const value& input, double amount\);/);
+  assert.match(headerSource, /value date_parse_iso_text\(const std::string& text\);/);
   assert.match(cppSource, /constexpr const char\* kJayessDateTagKey = "__jayess_date_tag";/);
   assert.match(cppSource, /value make_date_now\(\)/);
   assert.match(cppSource, /value date_to_unix_millis\(const value& input\)/);
+  assert.match(cppSource, /value date_to_iso_string\(const value& input\)/);
+  assert.match(cppSource, /value date_get_utc_year\(const value& input\)/);
+  assert.match(cppSource, /value date_add_millis\(const value& input, double amount\)/);
+  assert.match(cppSource, /value date_parse_iso_text\(const std::string& text\)/);
 });
 
 test("transpileFile writes runtime json helpers into the generated runtime", (t) => {
@@ -101,10 +113,15 @@ test("transpileFile writes runtime json helpers into the generated runtime", (t)
 
   assert.match(headerSource, /value json_parse_text\(const std::string& text\);/);
   assert.match(headerSource, /value json_stringify_value\(const value& input\);/);
+  assert.match(headerSource, /value json_stringify_pretty_value\(const value& input, int indentWidth\);/);
+  assert.match(headerSource, /value json_validate_text\(const std::string& text\);/);
   assert.match(headerSource, /bool is_json_text\(const std::string& text\);/);
+  assert.match(cppSource, /struct json_error : std::runtime_error/);
   assert.match(cppSource, /struct json_reader/);
   assert.match(cppSource, /value json_parse_text\(const std::string& text\)/);
   assert.match(cppSource, /value json_stringify_value\(const value& input\)/);
+  assert.match(cppSource, /value json_stringify_pretty_value\(const value& input, int indentWidth\)/);
+  assert.match(cppSource, /value json_validate_text\(const std::string& text\)/);
 });
 
 test("transpileFile writes runtime map helpers into the generated runtime", (t) => {
@@ -118,9 +135,47 @@ test("transpileFile writes runtime map helpers into the generated runtime", (t) 
   assert.match(headerSource, /struct map_value \{/);
   assert.match(headerSource, /value make_map\(\);/);
   assert.match(headerSource, /value map_set\(const value& map, const value& key, const value& assigned\);/);
+  assert.match(headerSource, /value map_keys\(const value& map\);/);
+  assert.match(headerSource, /value map_entries\(const value& map\);/);
   assert.match(cppSource, /value make_map\(\)/);
   assert.match(cppSource, /value map_get\(const value& map, const value& key\)/);
   assert.match(cppSource, /value map_size\(const value& map\)/);
+  assert.match(cppSource, /value map_keys\(const value& map\)/);
+  assert.match(cppSource, /value map_entries\(const value& map\)/);
+});
+
+test("transpileFile writes runtime object helpers into the generated runtime", (t) => {
+  const targetDir = createManagedTempDir(t, "runtime-object-output");
+  const fixture = path.resolve("test/fixtures/modules/main.js");
+  transpileFile(fixture, targetDir);
+
+  const headerSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.hpp"), "utf8");
+  const cppSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
+
+  assert.match(headerSource, /value object_keys\(const value& input\);/);
+  assert.match(headerSource, /value object_values\(const value& input\);/);
+  assert.match(headerSource, /value object_entries\(const value& input\);/);
+  assert.match(cppSource, /const std::unordered_map<std::string, value>& require_object_like_fields\(const value& input\)/);
+  assert.match(cppSource, /std::vector<std::string> sorted_object_like_keys\(const value& input\)/);
+  assert.match(cppSource, /value object_keys\(const value& input\)/);
+  assert.match(cppSource, /value object_values\(const value& input\)/);
+  assert.match(cppSource, /value object_entries\(const value& input\)/);
+});
+
+test("transpileFile writes runtime number helpers into the generated runtime", (t) => {
+  const targetDir = createManagedTempDir(t, "runtime-number-output");
+  const fixture = path.resolve("test/fixtures/modules/main.js");
+  transpileFile(fixture, targetDir);
+
+  const headerSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.hpp"), "utf8");
+  const cppSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
+
+  assert.match(headerSource, /value number_parse_int\(const value& input\);/);
+  assert.match(headerSource, /value number_parse_float\(const value& input\);/);
+  assert.match(cppSource, /std::string trim_number_input\(const std::string& input\)/);
+  assert.match(cppSource, /const std::string& require_number_parse_text\(const value& input\)/);
+  assert.match(cppSource, /value number_parse_int\(const value& input\)/);
+  assert.match(cppSource, /value number_parse_float\(const value& input\)/);
 });
 
 test("transpileFile writes runtime set helpers into the generated runtime", (t) => {
@@ -134,9 +189,13 @@ test("transpileFile writes runtime set helpers into the generated runtime", (t) 
   assert.match(headerSource, /struct set_value \{/);
   assert.match(headerSource, /value make_set\(\);/);
   assert.match(headerSource, /value set_add\(const value& input, const value& member\);/);
+  assert.match(headerSource, /value set_values\(const value& input\);/);
+  assert.match(headerSource, /value set_entries\(const value& input\);/);
   assert.match(cppSource, /value make_set\(\)/);
   assert.match(cppSource, /value set_has\(const value& input, const value& member\)/);
   assert.match(cppSource, /value set_size\(const value& input\)/);
+  assert.match(cppSource, /value set_values\(const value& input\)/);
+  assert.match(cppSource, /value set_entries\(const value& input\)/);
 });
 
 test("transpileFile writes runtime system-module helpers into the generated runtime", (t) => {
@@ -148,12 +207,60 @@ test("transpileFile writes runtime system-module helpers into the generated runt
   const cppSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
 
   assert.match(headerSource, /value fs_exists_path\(const std::string& pathText\);/);
+  assert.match(headerSource, /value fs_remove_path\(const std::string& pathText\);/);
+  assert.match(headerSource, /value fs_list_directory\(const std::string& pathText\);/);
+  assert.match(headerSource, /value fs_stat_path\(const std::string& pathText\);/);
   assert.match(headerSource, /value path_join_parts\(const std::vector<std::string>& parts\);/);
+  assert.match(headerSource, /value path_resolve_parts\(const std::vector<std::string>& parts\);/);
+  assert.match(headerSource, /value path_is_absolute\(const std::string& pathText\);/);
   assert.match(headerSource, /value process_current_working_directory\(\);/);
+  assert.match(headerSource, /value process_get_argv\(\);/);
   assert.match(cppSource, /std::filesystem::path require_filesystem_path\(const std::string& pathText\)/);
   assert.match(cppSource, /value fs_read_text_file\(const std::string& pathText\)/);
+  assert.match(cppSource, /value fs_list_directory\(const std::string& pathText\)/);
+  assert.match(cppSource, /value fs_stat_path\(const std::string& pathText\)/);
   assert.match(cppSource, /value path_normalize\(const std::string& pathText\)/);
+  assert.match(cppSource, /value path_resolve_parts\(const std::vector<std::string>& parts\)/);
+  assert.match(cppSource, /value process_get_argv\(\)/);
   assert.match(cppSource, /void process_exit_with_code\(int code\)/);
+});
+
+test("transpileFile copies expanded system-module native bridge headers into output", (t) => {
+  const targetDir = createManagedTempDir(t, "native-system-output");
+  const fixture = path.resolve("test/fixtures/modules/system-modules-main.js");
+  transpileFile(fixture, targetDir);
+
+  const fsHeader = fs.readFileSync(path.join(targetDir, "native", "fs-primitives.hpp"), "utf8");
+  const pathHeader = fs.readFileSync(path.join(targetDir, "native", "path-primitives.hpp"), "utf8");
+  const processHeader = fs.readFileSync(path.join(targetDir, "native", "process-primitives.hpp"), "utf8");
+
+  assert.match(fsHeader, /jayessFsRemove/);
+  assert.match(fsHeader, /jayessFsList/);
+  assert.match(fsHeader, /jayessFsRename/);
+  assert.match(fsHeader, /jayessFsStat/);
+  assert.match(pathHeader, /jayessPathResolve/);
+  assert.match(pathHeader, /jayessPathRelative/);
+  assert.match(pathHeader, /jayessPathIsAbsolute/);
+  assert.match(processHeader, /jayessProcessArgv/);
+});
+
+test("transpileFile writes runtime regex helpers into the generated runtime", (t) => {
+  const targetDir = createManagedTempDir(t, "runtime-regex-output");
+  const fixture = path.resolve("test/fixtures/modules/main.js");
+  transpileFile(fixture, targetDir);
+
+  const headerSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.hpp"), "utf8");
+  const cppSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
+
+  assert.match(headerSource, /value regex_create\(const value& pattern\);/);
+  assert.match(headerSource, /bool is_regex_value\(const value& input\);/);
+  assert.match(headerSource, /value regex_test\(const value& regexValue, const value& text\);/);
+  assert.match(headerSource, /value regex_exec\(const value& regexValue, const value& text\);/);
+  assert.match(cppSource, /constexpr const char\* kJayessRegexTagKey = "__jayess_regex_tag";/);
+  assert.match(cppSource, /std::regex require_compiled_regex\(const value& input\)/);
+  assert.match(cppSource, /value regex_create\(const value& pattern\)/);
+  assert.match(cppSource, /value regex_test\(const value& regexValue, const value& text\)/);
+  assert.match(cppSource, /value regex_exec\(const value& regexValue, const value& text\)/);
 });
 
 test("transpileFile resolves built-in Jayess date modules into generated output", (t) => {
@@ -162,8 +269,18 @@ test("transpileFile resolves built-in Jayess date modules into generated output"
   const result = transpileFile(fixture, targetDir);
 
   assert.ok(result.files.some((file) => file.endsWith("date_main_js.cpp")));
-  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_date_index_js.cpp")));
+  const modulePath = result.files.find((file) => file.includes("stdlib_jayess_date_index_js.cpp"));
+  assert.ok(modulePath);
   assert.ok(fs.existsSync(path.join(targetDir, "native", "date-primitives.hpp")));
+  const nativeHeader = fs.readFileSync(path.join(targetDir, "native", "date-primitives.hpp"), "utf8");
+  const moduleSource = fs.readFileSync(modulePath, "utf8");
+  assert.match(nativeHeader, /jayessDateToIsoString/);
+  assert.match(nativeHeader, /jayessDateParseIso/);
+  assert.match(moduleSource, /jayessDateToIsoString/);
+  assert.match(moduleSource, /jayessDateGetUtcYear/);
+  assert.match(moduleSource, /jayessDateAddMillis/);
+  assert.match(moduleSource, /jayessDateDiffMillis/);
+  assert.match(moduleSource, /jayessDateParseIso/);
 });
 
 test("transpileFile resolves built-in Jayess json modules into generated output", (t) => {
@@ -172,8 +289,15 @@ test("transpileFile resolves built-in Jayess json modules into generated output"
   const result = transpileFile(fixture, targetDir);
 
   assert.ok(result.files.some((file) => file.endsWith("json_main_js.cpp")));
-  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_json_index_js.cpp")));
+  const modulePath = result.files.find((file) => file.includes("stdlib_jayess_json_index_js.cpp"));
+  assert.ok(modulePath);
   assert.ok(fs.existsSync(path.join(targetDir, "native", "json-primitives.hpp")));
+  const nativeHeader = fs.readFileSync(path.join(targetDir, "native", "json-primitives.hpp"), "utf8");
+  const moduleSource = fs.readFileSync(modulePath, "utf8");
+  assert.match(nativeHeader, /jayessJsonStringifyPretty/);
+  assert.match(nativeHeader, /jayessJsonValidate/);
+  assert.match(moduleSource, /jayessJsonStringifyPretty/);
+  assert.match(moduleSource, /jayessJsonValidate/);
 });
 
 test("transpileFile resolves built-in Jayess map modules into generated output", (t) => {
@@ -182,8 +306,16 @@ test("transpileFile resolves built-in Jayess map modules into generated output",
   const result = transpileFile(fixture, targetDir);
 
   assert.ok(result.files.some((file) => file.endsWith("map_main_js.cpp")));
-  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_collections_map_index_js.cpp")));
+  const modulePath = result.files.find((file) => file.includes("stdlib_jayess_collections_map_index_js.cpp"));
+  assert.ok(modulePath);
   assert.ok(fs.existsSync(path.join(targetDir, "native", "map-primitives.hpp")));
+  const nativeHeader = fs.readFileSync(path.join(targetDir, "native", "map-primitives.hpp"), "utf8");
+  const moduleSource = fs.readFileSync(modulePath, "utf8");
+  assert.match(nativeHeader, /jayessMapKeys/);
+  assert.match(nativeHeader, /jayessMapEntries/);
+  assert.match(moduleSource, /jayessMapKeys/);
+  assert.match(moduleSource, /jayessMapValues/);
+  assert.match(moduleSource, /jayessMapEntries/);
 });
 
 test("transpileFile resolves built-in Jayess set modules into generated output", (t) => {
@@ -192,8 +324,55 @@ test("transpileFile resolves built-in Jayess set modules into generated output",
   const result = transpileFile(fixture, targetDir);
 
   assert.ok(result.files.some((file) => file.endsWith("set_main_js.cpp")));
-  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_collections_set_index_js.cpp")));
+  const modulePath = result.files.find((file) => file.includes("stdlib_jayess_collections_set_index_js.cpp"));
+  assert.ok(modulePath);
   assert.ok(fs.existsSync(path.join(targetDir, "native", "set-primitives.hpp")));
+  const nativeHeader = fs.readFileSync(path.join(targetDir, "native", "set-primitives.hpp"), "utf8");
+  const moduleSource = fs.readFileSync(modulePath, "utf8");
+  assert.match(nativeHeader, /jayessSetValues/);
+  assert.match(nativeHeader, /jayessSetEntries/);
+  assert.match(moduleSource, /jayessSetValues/);
+  assert.match(moduleSource, /jayessSetEntries/);
+});
+
+test("transpileFile resolves built-in Jayess object modules into generated output", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-object-output");
+  const fixture = path.resolve("test/fixtures/modules/object-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  assert.ok(result.files.some((file) => file.endsWith("object_main_js.cpp")));
+  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_object_index_js.cpp")));
+  assert.ok(fs.existsSync(path.join(targetDir, "native", "object-primitives.hpp")));
+});
+
+test("transpileFile resolves built-in Jayess number modules into generated output", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-number-output");
+  const fixture = path.resolve("test/fixtures/modules/number-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  assert.ok(result.files.some((file) => file.endsWith("number_main_js.cpp")));
+  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_number_index_js.cpp")));
+  assert.ok(fs.existsSync(path.join(targetDir, "native", "number-primitives.hpp")));
+});
+
+test("transpileFile resolves built-in Jayess async modules into generated output", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-async-output");
+  const fixture = path.resolve("test/fixtures/modules/async-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  assert.ok(result.files.some((file) => file.endsWith("async_main_js.cpp")));
+  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_async_index_js.cpp")));
+  assert.ok(fs.existsSync(path.join(targetDir, "native", "async-primitives.hpp")));
+});
+
+test("transpileFile resolves built-in Jayess regex modules into generated output", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-regex-output");
+  const fixture = path.resolve("test/fixtures/modules/regex-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  assert.ok(result.files.some((file) => file.endsWith("regex_main_js.cpp")));
+  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_regex_index_js.cpp")));
+  assert.ok(fs.existsSync(path.join(targetDir, "native", "regex-primitives.hpp")));
 });
 
 test("transpileFile resolves built-in Jayess system modules into generated output", (t) => {
@@ -202,12 +381,28 @@ test("transpileFile resolves built-in Jayess system modules into generated outpu
   const result = transpileFile(fixture, targetDir);
 
   assert.ok(result.files.some((file) => file.endsWith("system_modules_main_js.cpp")));
-  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_fs_index_js.cpp")));
-  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_path_index_js.cpp")));
-  assert.ok(result.files.some((file) => file.includes("stdlib_jayess_process_index_js.cpp")));
+  const fsModulePath = result.files.find((file) => file.includes("stdlib_jayess_fs_index_js.cpp"));
+  const pathModulePath = result.files.find((file) => file.includes("stdlib_jayess_path_index_js.cpp"));
+  const processModulePath = result.files.find((file) => file.includes("stdlib_jayess_process_index_js.cpp"));
+  assert.ok(fsModulePath);
+  assert.ok(pathModulePath);
+  assert.ok(processModulePath);
   assert.ok(fs.existsSync(path.join(targetDir, "native", "fs-primitives.hpp")));
   assert.ok(fs.existsSync(path.join(targetDir, "native", "path-primitives.hpp")));
   assert.ok(fs.existsSync(path.join(targetDir, "native", "process-primitives.hpp")));
+
+  const fsModuleSource = fs.readFileSync(fsModulePath, "utf8");
+  const pathModuleSource = fs.readFileSync(pathModulePath, "utf8");
+  const processModuleSource = fs.readFileSync(processModulePath, "utf8");
+
+  assert.match(fsModuleSource, /jayessFsList/);
+  assert.match(fsModuleSource, /jayessFsRemove/);
+  assert.match(fsModuleSource, /jayessFsRename/);
+  assert.match(fsModuleSource, /jayessFsStat/);
+  assert.match(pathModuleSource, /jayessPathResolve/);
+  assert.match(pathModuleSource, /jayessPathRelative/);
+  assert.match(pathModuleSource, /jayessPathIsAbsolute/);
+  assert.match(processModuleSource, /jayessProcessArgv/);
 });
 
 test("transpileFile copies native headers into target", (t) => {

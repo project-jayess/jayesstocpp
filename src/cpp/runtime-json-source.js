@@ -1,14 +1,41 @@
 export function getJsonRuntimeHeaderFragment() {
   return `value json_parse_text(const std::string& text);
 value json_stringify_value(const value& input);
+value json_stringify_pretty_value(const value& input, int indentWidth);
+value json_validate_text(const std::string& text);
 bool is_json_text(const std::string& text);`;
 }
 
 export function getJsonRuntimeCppFragment() {
   return `namespace {
+struct json_error : std::runtime_error {
+  std::size_t line;
+  std::size_t column;
+
+  json_error(const std::string& message, std::size_t line, std::size_t column)
+    : std::runtime_error(message),
+      line(line),
+      column(column) {
+  }
+};
+
 struct json_reader {
   const std::string& text;
   std::size_t index = 0;
+
+  [[noreturn]] void fail(const std::string& message) const {
+    std::size_t line = 1;
+    std::size_t column = 1;
+    for (std::size_t current = 0; current < index && current < text.size(); current += 1) {
+      if (text[current] == '\\n') {
+        line += 1;
+        column = 1;
+      } else {
+        column += 1;
+      }
+    }
+    throw json_error(message, line, column);
+  }
 
   void skip_whitespace() {
     while (index < text.size() && std::isspace(static_cast<unsigned char>(text[index]))) {
@@ -28,14 +55,14 @@ struct json_reader {
   char peek() {
     skip_whitespace();
     if (index >= text.size()) {
-      throw std::runtime_error("Unexpected end of JSON input");
+      fail("Unexpected end of JSON input");
     }
     return text[index];
   }
 
   void expect(char expected) {
     if (!consume(expected)) {
-      throw std::runtime_error("Malformed JSON input");
+      fail("Malformed JSON input");
     }
   }
 
@@ -43,7 +70,7 @@ struct json_reader {
     skip_whitespace();
     for (std::size_t offset = 0; keyword[offset] != '\\0'; offset += 1) {
       if (index + offset >= text.size() || text[index + offset] != keyword[offset]) {
-        throw std::runtime_error("Malformed JSON input");
+        fail("Malformed JSON input");
       }
     }
     index += std::char_traits<char>::length(keyword);
@@ -63,7 +90,7 @@ struct json_reader {
       }
 
       if (index >= text.size()) {
-        throw std::runtime_error("Malformed JSON string escape");
+        fail("Malformed JSON string escape");
       }
 
       const char escaped = text[index++];
@@ -89,11 +116,11 @@ struct json_reader {
           result.push_back('\\t');
           break;
         default:
-          throw std::runtime_error("Unsupported JSON string escape");
+          fail("Unsupported JSON string escape");
       }
     }
 
-    throw std::runtime_error("Unterminated JSON string");
+    fail("Unterminated JSON string");
   }
 
   value parse_number() {
@@ -103,7 +130,7 @@ struct json_reader {
       index += 1;
     }
     if (index >= text.size() || !std::isdigit(static_cast<unsigned char>(text[index]))) {
-      throw std::runtime_error("Malformed JSON number");
+      fail("Malformed JSON number");
     }
     if (text[index] == '0') {
       index += 1;
@@ -115,7 +142,7 @@ struct json_reader {
     if (index < text.size() && text[index] == '.') {
       index += 1;
       if (index >= text.size() || !std::isdigit(static_cast<unsigned char>(text[index]))) {
-        throw std::runtime_error("Malformed JSON number");
+        fail("Malformed JSON number");
       }
       while (index < text.size() && std::isdigit(static_cast<unsigned char>(text[index]))) {
         index += 1;
@@ -127,7 +154,7 @@ struct json_reader {
         index += 1;
       }
       if (index >= text.size() || !std::isdigit(static_cast<unsigned char>(text[index]))) {
-        throw std::runtime_error("Malformed JSON number");
+        fail("Malformed JSON number");
       }
       while (index < text.size() && std::isdigit(static_cast<unsigned char>(text[index]))) {
         index += 1;
@@ -163,7 +190,7 @@ struct json_reader {
     while (true) {
       skip_whitespace();
       if (peek() != '"') {
-        throw std::runtime_error("JSON object keys must be strings");
+        fail("JSON object keys must be strings");
       }
       const auto key = parse_string();
       expect(':');
@@ -233,7 +260,11 @@ std::string json_escape_string(const std::string& input) {
   return stream.str();
 }
 
-std::string json_stringify_impl(const value& input) {
+std::string json_indent_prefix(int level, int indentWidth) {
+  return std::string(static_cast<std::size_t>(level * indentWidth), ' ');
+}
+
+std::string json_stringify_impl(const value& input, int indentWidth, int level) {
   if (std::holds_alternative<std::monostate>(input)) {
     return "null";
   }
@@ -254,13 +285,31 @@ std::string json_stringify_impl(const value& input) {
   }
   if (std::holds_alternative<array_ptr>(input)) {
     const auto& items = std::get<array_ptr>(input)->items;
+    if (items.empty()) {
+      return "[]";
+    }
+
     std::ostringstream stream;
+    const bool pretty = indentWidth >= 0;
+    const auto childLevel = level + 1;
     stream << "[";
+    if (pretty) {
+      stream << "\\n";
+    }
     for (std::size_t index = 0; index < items.size(); index += 1) {
       if (index > 0) {
         stream << ",";
+        if (pretty) {
+          stream << "\\n";
+        }
       }
-      stream << json_stringify_impl(items[index]);
+      if (pretty) {
+        stream << json_indent_prefix(childLevel, indentWidth);
+      }
+      stream << json_stringify_impl(items[index], indentWidth, childLevel);
+    }
+    if (pretty) {
+      stream << "\\n" << json_indent_prefix(level, indentWidth);
     }
     stream << "]";
     return stream.str();
@@ -272,15 +321,37 @@ std::string json_stringify_impl(const value& input) {
     }
     std::sort(keys.begin(), keys.end());
 
+    if (keys.empty()) {
+      return "{}";
+    }
+
     std::ostringstream stream;
+    const bool pretty = indentWidth >= 0;
+    const auto childLevel = level + 1;
     stream << "{";
+    if (pretty) {
+      stream << "\\n";
+    }
     bool first = true;
     for (const auto& key : keys) {
       if (!first) {
         stream << ",";
+        if (pretty) {
+          stream << "\\n";
+        }
       }
       first = false;
-      stream << "\\"" << json_escape_string(key) << "\\":" << json_stringify_impl(std::get<object_ptr>(input)->fields.at(key));
+      if (pretty) {
+        stream << json_indent_prefix(childLevel, indentWidth);
+      }
+      stream << "\\"" << json_escape_string(key) << "\\":";
+      if (pretty) {
+        stream << " ";
+      }
+      stream << json_stringify_impl(std::get<object_ptr>(input)->fields.at(key), indentWidth, childLevel);
+    }
+    if (pretty) {
+      stream << "\\n" << json_indent_prefix(level, indentWidth);
     }
     stream << "}";
     return stream.str();
@@ -295,13 +366,39 @@ value json_parse_text(const std::string& text) {
   auto parsed = reader.parse_value();
   reader.skip_whitespace();
   if (reader.index != text.size()) {
-    throw std::runtime_error("Unexpected trailing JSON input");
+    reader.fail("Unexpected trailing JSON input");
   }
   return parsed;
 }
 
 value json_stringify_value(const value& input) {
-  return json_stringify_impl(input);
+  return json_stringify_impl(input, -1, 0);
+}
+
+value json_stringify_pretty_value(const value& input, int indentWidth) {
+  if (indentWidth < 0) {
+    throw std::runtime_error("Jayess JSON pretty indent must be non-negative");
+  }
+  return json_stringify_impl(input, indentWidth, 0);
+}
+
+value json_validate_text(const std::string& text) {
+  try {
+    static_cast<void>(json_parse_text(text));
+    return value(std::monostate{});
+  } catch (const json_error& error) {
+    return make_object({
+      {"message", std::string(error.what())},
+      {"line", static_cast<double>(error.line)},
+      {"column", static_cast<double>(error.column)}
+    });
+  } catch (const std::exception& error) {
+    return make_object({
+      {"message", std::string(error.what())},
+      {"line", value(std::monostate{})},
+      {"column", value(std::monostate{})}
+    });
+  }
 }
 
 bool is_json_text(const std::string& text) {

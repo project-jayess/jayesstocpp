@@ -1,7 +1,11 @@
 import {
   jayessFsCreateDirectories,
   jayessFsExists,
+  jayessFsList,
   jayessFsReadText,
+  jayessFsRemove,
+  jayessFsRename,
+  jayessFsStat,
   jayessFsWriteText
 } from "./fs-primitives.hpp";
 
@@ -19,4 +23,20 @@ export function writeText(path, text) {
 
 export function createDirectories(path) {
   return jayessFsCreateDirectories(path);
+}
+
+export function remove(path) {
+  return jayessFsRemove(path);
+}
+
+export function list(path) {
+  return jayessFsList(path);
+}
+
+export function rename(fromPath, toPath) {
+  return jayessFsRename(fromPath, toPath);
+}
+
+export function stat(path) {
+  return jayessFsStat(path);
 }

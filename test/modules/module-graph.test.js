@@ -64,6 +64,30 @@ test("module graph resolves repository-owned built-in set modules", () => {
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
 });
 
+test("module graph resolves repository-owned built-in object modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/object-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+});
+
+test("module graph resolves repository-owned built-in number modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/number-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+});
+
+test("module graph resolves repository-owned built-in async modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/async-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+});
+
+test("module graph resolves repository-owned built-in regex modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/regex-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+});
+
 test("module graph resolves repository-owned system modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/system-modules-main.js"));
   assert.equal(graph.modules.length, 4);
@@ -121,6 +145,28 @@ test("module graph rejects re-exports of missing exported names", () => {
 test("module graph resolves export-all surfaces for downstream imports", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/export-all-main.js"));
   assert.equal(graph.modules.length, 3);
+});
+
+test("module graph resolves mixed named re-export and export-all graphs", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/mixed-reexport-main.js"));
+  assert.equal(graph.modules.length, 4);
+});
+
+test("module graph keeps export-all from forwarding default exports", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/modules/export-all-default-main.js")),
+    (error) => error instanceof JayessError && /does not export 'default'/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects packages that expose only unsupported conditional exports", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/conditional-only-package.js")),
+    (error) =>
+      error instanceof JayessError
+      && /unsupported package\.json exports mapping/.test(error.diagnostics[0].message)
+      && /conditional-only-lib/.test(error.diagnostics[0].message)
+  );
 });
 
 test("module graph accepts import and export clauses with trailing commas", () => {

@@ -12,7 +12,11 @@ function addScopedBinding(scope, diagnostics, sourceText, node, name, binding) {
   }
 }
 
-function registerExport(exports, exportedName, localName, kind, source = null) {
+function registerExport(exports, diagnostics, sourceText, node, exportedName, localName, kind, source = null) {
+  if (exportedName !== "*" && exports.some((entry) => entry.exportedName === exportedName)) {
+    diagnostics.push(createSemanticDiagnostic(sourceText, node, `Duplicate export '${exportedName}'`));
+    return;
+  }
   exports.push({ exportedName, localName, kind, source });
 }
 
@@ -66,6 +70,35 @@ function validateImportBindings(sourceText, statement, classification, diagnosti
   }
 }
 
+function unsupportedBuiltinIdentifierMessage(name) {
+  switch (name) {
+    case "parseInt":
+      return "Jayess does not expose ambient global 'parseInt'; import { parseInt } from 'jayess:number' instead";
+    case "parseFloat":
+      return "Jayess does not expose ambient global 'parseFloat'; import { parseFloat } from 'jayess:number' instead";
+    case "Object":
+      return "Jayess does not expose ambient global 'Object'; import { keys, values, entries } from 'jayess:object' instead";
+    case "Date":
+      return "Jayess does not expose ambient global 'Date'; import helpers from 'jayess:date' instead";
+    case "JSON":
+      return "Jayess does not expose ambient global 'JSON'; import helpers from 'jayess:json' instead";
+    case "Map":
+      return "Jayess does not expose ambient global 'Map'; import helpers from 'jayess:collections/map' instead";
+    case "Set":
+      return "Jayess does not expose ambient global 'Set'; import helpers from 'jayess:collections/set' instead";
+    case "Promise":
+      return "Jayess does not expose JavaScript 'Promise'; use Jayess async/await and Jayess-owned 'jayess:async' helpers instead";
+    case "RegExp":
+      return "Jayess does not expose ambient global 'RegExp'; import helpers from 'jayess:regex' instead";
+    case "eval":
+      return "Jayess does not support ambient global 'eval'; runtime source evaluation is unsupported by design in Jayess";
+    case "Function":
+      return "Jayess does not support the JavaScript 'Function' constructor; runtime source evaluation is unsupported by design in Jayess";
+    default:
+      return null;
+  }
+}
+
 function scopeBelongsToFunction(scope, functionScope) {
   let current = scope;
   while (current != null) {
@@ -83,14 +116,23 @@ function getSupportedBuiltinProperty(node) {
   }
 
   if (node.object.type === "ArrayExpression") {
-    if (node.property.name === "length" || node.property.name === "push" || node.property.name === "pop" || node.property.name === "join") {
+    if (node.property.name === "length" || node.property.name === "push" || node.property.name === "pop" || node.property.name === "join" || node.property.name === "includes") {
       return { receiver: "array", property: node.property.name };
     }
     return { receiver: "array", property: node.property.name, unsupported: true };
   }
 
   if (node.object.type === "Literal" && node.object.kind === "string") {
-    if (node.property.name === "length" || node.property.name === "toString" || node.property.name === "slice" || node.property.name === "substring" || node.property.name === "startsWith") {
+    if (
+      node.property.name === "length"
+      || node.property.name === "toString"
+      || node.property.name === "slice"
+      || node.property.name === "substring"
+      || node.property.name === "startsWith"
+      || node.property.name === "includes"
+      || node.property.name === "indexOf"
+      || node.property.name === "endsWith"
+    ) {
       return { receiver: "string", property: node.property.name };
     }
     return { receiver: "string", property: node.property.name, unsupported: true };
@@ -190,45 +232,47 @@ function validateFinallyControlFlow(node, diagnostics, sourceText) {
   }
 }
 
-function reportGeneratorExpressionNotImplemented(node, diagnostics, sourceText) {
-  diagnostics.push(
-    createSemanticDiagnostic(
-      sourceText,
-      node,
-      "Jayess does not support generator function expressions yet; the first generator slice starts with generator declarations only"
-    )
-  );
-}
-
 function currentClassLabel(currentClass) {
   return currentClass?.id?.name != null ? `class '${currentClass.id.name}'` : "the current class";
 }
 
-function initializePrivateFieldMap(classNode, diagnostics, sourceText) {
-  if (classNode.privateFieldMap != null) {
-    return classNode.privateFieldMap;
+function privateMemberKindLabel(member) {
+  if (member.type === "ClassFieldDefinition") {
+    return "field";
+  }
+  if (member.type === "MethodDefinition") {
+    return "method";
+  }
+  return "member";
+}
+
+function initializePrivateMemberMap(classNode, diagnostics, sourceText) {
+  if (classNode.privateMemberMap != null) {
+    return classNode.privateMemberMap;
   }
 
-  const privateFieldMap = new Map();
+  const privateMemberMap = new Map();
   for (const member of classNode.methods) {
-    if (member.type !== "ClassFieldDefinition" || member.key.type !== "PrivateIdentifier") {
+    if (member.key?.type !== "PrivateIdentifier") {
       continue;
     }
-    if (privateFieldMap.has(member.key.name)) {
+
+    if (privateMemberMap.has(member.key.name)) {
+      const existing = privateMemberMap.get(member.key.name);
       diagnostics.push(
         createSemanticDiagnostic(
           sourceText,
           member.key,
-          `Duplicate private field '#${member.key.name}' in ${currentClassLabel(classNode)}`
+          `Duplicate private ${privateMemberKindLabel(member)} '#${member.key.name}' conflicts with existing private ${privateMemberKindLabel(existing)} in ${currentClassLabel(classNode)}`
         )
       );
       continue;
     }
-    privateFieldMap.set(member.key.name, member.key);
+    privateMemberMap.set(member.key.name, member);
   }
 
-  classNode.privateFieldMap = privateFieldMap;
-  return privateFieldMap;
+  classNode.privateMemberMap = privateMemberMap;
+  return privateMemberMap;
 }
 
 function validatePrivateMemberAccess(node, currentClass, diagnostics, sourceText) {
@@ -241,19 +285,19 @@ function validatePrivateMemberAccess(node, currentClass, diagnostics, sourceText
       createSemanticDiagnostic(
         sourceText,
         node.property,
-        "Jayess private field access is only valid inside methods or field initializers of the declaring class"
+        "Jayess private member access is only valid inside methods or field initializers of the declaring class"
       )
     );
     return;
   }
 
-  const privateFieldMap = currentClass.privateFieldMap ?? new Map();
-  if (!privateFieldMap.has(node.property.name)) {
+  const privateMemberMap = currentClass.privateMemberMap ?? new Map();
+  if (!privateMemberMap.has(node.property.name)) {
     diagnostics.push(
       createSemanticDiagnostic(
         sourceText,
         node.property,
-        `Private field '#${node.property.name}' is not declared in ${currentClassLabel(currentClass)}`
+        `Private member '#${node.property.name}' is not declared in ${currentClassLabel(currentClass)}`
       )
     );
   }
@@ -270,7 +314,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
     const binding = { name, kind, node, exported, ...metadata };
     addScopedBinding(moduleScope, diagnostics, sourceText, node, name, binding);
     if (exported) {
-      registerExport(exports, name, name, kind);
+      registerExport(exports, diagnostics, sourceText, node, name, name, kind);
     }
     return binding;
   }
@@ -365,7 +409,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
 
       if (statement.source == null) {
         for (const specifier of statement.specifiers) {
-          registerExport(exports, specifier.exportedName, specifier.localName, "local-export");
+          registerExport(exports, diagnostics, sourceText, specifier, specifier.exportedName, specifier.localName, "local-export");
           localExportsToValidate.push(specifier);
         }
         continue;
@@ -383,7 +427,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
       });
 
       for (const specifier of statement.specifiers) {
-        registerExport(exports, specifier.exportedName, specifier.localName, "re-export", statement.source);
+        registerExport(exports, diagnostics, sourceText, specifier, specifier.exportedName, specifier.localName, "re-export", statement.source);
       }
       continue;
     }
@@ -395,7 +439,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
         kind: classification.kind,
         specifiers: []
       });
-      registerExport(exports, "*", "*", "export-all", statement.source);
+      registerExport(exports, diagnostics, sourceText, statement, "*", "*", "export-all", statement.source);
       continue;
     }
 
@@ -408,14 +452,20 @@ export function analyzeModule(ast, sourceText, options = {}) {
           addModuleBinding(statement.declaration.id, statement.declaration.id.name, "class");
         }
       }
-      registerExport(exports, "default", "__default_export__", "default");
+      registerExport(exports, diagnostics, sourceText, statement, "default", "__default_export__", "default");
     }
   }
 
   function resolveIdentifier(node, activeScope, functionScope = null, functionNode = null) {
     const binding = resolveBinding(activeScope, node.name);
     if (binding == null || binding.node?.start > node.start) {
-      diagnostics.push(createSemanticDiagnostic(sourceText, node, `Undefined identifier '${node.name}'`));
+      diagnostics.push(
+        createSemanticDiagnostic(
+          sourceText,
+          node,
+          unsupportedBuiltinIdentifierMessage(node.name) ?? `Undefined identifier '${node.name}'`
+        )
+      );
       return null;
     }
     if (
@@ -431,6 +481,133 @@ export function analyzeModule(ast, sourceText, options = {}) {
       functionNode.captures = [...captures].sort();
     }
     return binding;
+  }
+
+  function walkBindingPattern(
+    node,
+    activeScope,
+    loopDepth,
+    switchDepth,
+    functionScope,
+    functionNode,
+    inAsyncFunction,
+    inGeneratorFunction,
+    currentClass,
+    currentMethod,
+    declarationMode
+  ) {
+    if (node == null) {
+      return;
+    }
+
+    if (node.type === "Identifier") {
+      if (!declarationMode) {
+        const binding = resolveIdentifier(node, activeScope, functionScope, functionNode);
+        if (binding?.kind === "const") {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node, `Cannot reassign const '${node.name}'`));
+        }
+      }
+      return;
+    }
+
+    if (node.type === "RestElement") {
+      walkBindingPattern(
+        node.argument,
+        activeScope,
+        loopDepth,
+        switchDepth,
+        functionScope,
+        functionNode,
+        inAsyncFunction,
+        inGeneratorFunction,
+        currentClass,
+        currentMethod,
+        declarationMode
+      );
+      return;
+    }
+
+    if (node.type === "AssignmentPattern") {
+      walk(
+        node.right,
+        activeScope,
+        loopDepth,
+        switchDepth,
+        functionScope,
+        functionNode,
+        inAsyncFunction,
+        inGeneratorFunction,
+        currentClass,
+        currentMethod
+      );
+      walkBindingPattern(
+        node.left,
+        activeScope,
+        loopDepth,
+        switchDepth,
+        functionScope,
+        functionNode,
+        inAsyncFunction,
+        inGeneratorFunction,
+        currentClass,
+        currentMethod,
+        declarationMode
+      );
+      return;
+    }
+
+    if (node.type === "ArrayPattern") {
+      for (const element of node.elements) {
+        walkBindingPattern(
+          element,
+          activeScope,
+          loopDepth,
+          switchDepth,
+          functionScope,
+          functionNode,
+          inAsyncFunction,
+          inGeneratorFunction,
+          currentClass,
+          currentMethod,
+          declarationMode
+        );
+      }
+      return;
+    }
+
+    if (node.type === "ObjectPattern") {
+      for (const property of node.properties) {
+        if (property.type === "RestElement") {
+          walkBindingPattern(
+            property,
+            activeScope,
+            loopDepth,
+            switchDepth,
+            functionScope,
+            functionNode,
+            inAsyncFunction,
+            inGeneratorFunction,
+            currentClass,
+            currentMethod,
+            declarationMode
+          );
+          continue;
+        }
+        walkBindingPattern(
+          property.value,
+          activeScope,
+          loopDepth,
+          switchDepth,
+          functionScope,
+          functionNode,
+          inAsyncFunction,
+          inGeneratorFunction,
+          currentClass,
+          currentMethod,
+          declarationMode
+        );
+      }
+    }
   }
 
   function walk(
@@ -499,7 +676,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
             }
           }
         }
-        initializePrivateFieldMap(node, diagnostics, sourceText);
+        initializePrivateMemberMap(node, diagnostics, sourceText);
         const classScope = createScope(activeScope, "class");
         for (const method of node.methods) {
           if (method.type === "MethodDefinition" && method.static && method.key.name === "constructor") {
@@ -556,9 +733,6 @@ export function analyzeModule(ast, sourceText, options = {}) {
       }
       case "FunctionExpression": {
         node.captures = [];
-        if (node.generator) {
-          reportGeneratorExpressionNotImplemented(node, diagnostics, sourceText);
-        }
         const nestedFunctionScope = createScope(activeScope, "function");
         if (node.id != null) {
           addScopedBinding(nestedFunctionScope, diagnostics, sourceText, node.id, node.id.name, {
@@ -594,6 +768,21 @@ export function analyzeModule(ast, sourceText, options = {}) {
       }
       case "VariableDeclaration":
         for (const declaration of node.declarations) {
+          if (isBindingPattern(declaration.id) || declaration.id.type === "AssignmentPattern") {
+            walkBindingPattern(
+              declaration.id,
+              activeScope,
+              loopDepth,
+              switchDepth,
+              functionScope,
+              functionNode,
+              inAsyncFunction,
+              inGeneratorFunction,
+              currentClass,
+              currentMethod,
+              true
+            );
+          }
           walk(declaration.init, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
         return;
@@ -610,6 +799,23 @@ export function analyzeModule(ast, sourceText, options = {}) {
         walk(node.expression, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "AssignmentExpression": {
+        if (isBindingPattern(node.left) || node.left.type === "AssignmentPattern") {
+          walkBindingPattern(
+            node.left,
+            activeScope,
+            loopDepth,
+            switchDepth,
+            functionScope,
+            functionNode,
+            inAsyncFunction,
+            inGeneratorFunction,
+            currentClass,
+            currentMethod,
+            false
+          );
+          walk(node.right, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
+          return;
+        }
         if (node.left.type === "MemberExpression") {
           validatePrivateMemberAccess(node.left, currentClass, diagnostics, sourceText);
           walk(node.left.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
@@ -740,6 +946,15 @@ export function analyzeModule(ast, sourceText, options = {}) {
               )
             );
           }
+          if (builtin?.property === "includes" && node.arguments.length !== 1) {
+            diagnostics.push(
+              createSemanticDiagnostic(
+                sourceText,
+                node.callee.property,
+                `${builtin.receiver} method '${builtin.property}' requires exactly one argument`
+              )
+            );
+          }
           if ((builtin?.property === "slice" || builtin?.property === "substring") && (node.arguments.length < 1 || node.arguments.length > 2)) {
             diagnostics.push(
               createSemanticDiagnostic(
@@ -750,6 +965,15 @@ export function analyzeModule(ast, sourceText, options = {}) {
             );
           }
           if (builtin?.property === "startsWith" && node.arguments.length !== 1) {
+            diagnostics.push(
+              createSemanticDiagnostic(
+                sourceText,
+                node.callee.property,
+                `${builtin.receiver} method '${builtin.property}' requires exactly one argument`
+              )
+            );
+          }
+          if ((builtin?.property === "includes" || builtin?.property === "indexOf" || builtin?.property === "endsWith") && builtin.receiver === "string" && node.arguments.length !== 1) {
             diagnostics.push(
               createSemanticDiagnostic(
                 sourceText,
@@ -878,15 +1102,6 @@ export function analyzeModule(ast, sourceText, options = {}) {
         const loopScope = createScope(activeScope, "loop");
         if (node.init?.type === "VariableDeclaration") {
           for (const declaration of node.init.declarations) {
-            if (isBindingPattern(declaration.id)) {
-              diagnostics.push(
-                createSemanticDiagnostic(
-                  sourceText,
-                  declaration.id,
-                  "Destructuring declarations are not yet supported in for-loop initializers"
-                )
-              );
-            }
             for (const identifier of collectBindingIdentifiers(declaration.id)) {
               addScopedBinding(loopScope, diagnostics, sourceText, identifier, identifier.name, {
                 name: identifier.name,

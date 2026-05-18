@@ -9,7 +9,9 @@ value set_add(const value& input, const value& member);
 value set_has(const value& input, const value& member);
 value set_delete(const value& input, const value& member);
 value set_clear(const value& input);
-value set_size(const value& input);`;
+value set_size(const value& input);
+value set_values(const value& input);
+value set_entries(const value& input);`;
 }
 
 export function getSetRuntimeCppFragment() {
@@ -75,5 +77,25 @@ value set_clear(const value& input) {
 value set_size(const value& input) {
   const auto& set = require_set_value(input);
   return static_cast<double>(set->entries.size());
+}
+
+value set_values(const value& input) {
+  const auto& set = require_set_value(input);
+  std::vector<value> items;
+  items.reserve(set->entries.size());
+  for (const auto& entry : set->entries) {
+    items.push_back(entry);
+  }
+  return make_array(std::move(items));
+}
+
+value set_entries(const value& input) {
+  const auto& set = require_set_value(input);
+  std::vector<value> items;
+  items.reserve(set->entries.size());
+  for (const auto& entry : set->entries) {
+    items.push_back(make_array({entry, entry}));
+  }
+  return make_array(std::move(items));
 }`;
 }

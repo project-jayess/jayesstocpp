@@ -2,8 +2,11 @@ import {
   jayessPathBasename,
   jayessPathDirname,
   jayessPathExtname,
+  jayessPathIsAbsolute,
   jayessPathJoin,
-  jayessPathNormalize
+  jayessPathNormalize,
+  jayessPathRelative,
+  jayessPathResolve
 } from "./path-primitives.hpp";
 
 export function join(...parts) {
@@ -24,4 +27,16 @@ export function extname(path) {
 
 export function normalize(path) {
   return jayessPathNormalize(path);
+}
+
+export function resolve(...parts) {
+  return jayessPathResolve(...parts);
+}
+
+export function relative(fromPath, toPath) {
+  return jayessPathRelative(fromPath, toPath);
+}
+
+export function isAbsolute(path) {
+  return jayessPathIsAbsolute(path);
 }

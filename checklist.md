@@ -1,149 +1,87 @@
 # Jayess to C++ Transpiler Checklist
 
-This file contains the active remaining milestones for the Jayess transpiler. Completed milestones through section 85 were moved to `archived-checklist.md` to keep the working checklist small and focused.
+This file contains the active remaining milestones for the Jayess transpiler.
 
-See [archived-checklist.md](./archived-checklist.md) for completed baseline and earlier milestone history.
+Completed milestones through section 105 were moved to [archived-checklist.md](./archived-checklist.md) to keep the working checklist small and focused.
 
-## 86. Remaining Language And Library Buildout
+## 106. Regex Expansion
 
-- [x] Create a new implementation milestone policy that treats the remaining language/runtime gaps as active build work.
-- [x] Keep explicit parser/semantic diagnostics for not-yet-implemented features until each feature slice is actually shipped.
-- [x] Document which remaining slices are expected to land through Jayess-written core modules, C++ runtime primitives, or a mixed approach.
-- [x] Add a contributor note that new feature work should prefer Jayess-owned modules over ambient JavaScript/Node emulation.
+- [ ] Define the next approved `jayess:regex` slice explicitly: replacement helpers, flags policy, literal-syntax policy, and result-shape policy as separate tasks.
+- [ ] Decide whether the next regex slice stays module-only or adds any parser syntax at all.
+- [ ] Add only the primitive/runtime support needed for the next approved regex helper family.
+- [ ] Implement the next approved `jayess:regex` helpers in Jayess source where practical.
+- [ ] Add semantic diagnostics for unsupported ambient/global regex forms that still remain outside the approved slice.
+- [ ] Add API, runtime, module-resolution, and compile-validation tests for the next regex slice.
+- [ ] Update regex docs after the next slice lands.
 
-## 87. Async And Promise System
+## 107. Generator Follow-Up
 
-- [x] Add a focused async architecture doc section that defines the first supported `async` surface.
-- [x] Define the runtime representation of an async result in the C++ runtime.
-- [x] Define whether the result type is one Jayess async value kind or a wrapper over existing callable/object storage.
-- [x] Define suspension-safe lifetime rules for locals and captured bindings across `await`.
-- [x] Define how `try` / `catch` / `finally` interact with suspended async frames.
-- [x] Add AST support for async function declarations.
-- [x] Keep async function expressions and async arrow functions outside the first shipped slice with explicit diagnostics.
-- [x] Add parser support for `async function`.
-- [x] Add parser support for `await expr`.
-- [x] Restrict `await` legality to approved async contexts with focused diagnostics.
-- [x] Extend semantic analysis for async-function flags and `await` legality.
-- [x] Add runtime primitives for async result storage and scheduling.
-- [x] Add backend lowering for async function entry, suspension points, and completion.
-- [x] Add backend lowering for `await` with single-evaluation semantics.
-- [x] Introduce a Jayess-owned async core module surface instead of ambient `Promise` globals.
-- [x] Define the first Jayess async library API shape, such as `jayess:async` or equivalent repo-owned modules.
-- [x] Add parser, semantic, runtime, and compile-validation tests for supported async functions.
-- [x] Add tests for rejection of unsupported async forms outside the first shipped slice.
-- [x] Update overview, limitations, semantics, and library architecture docs after the first async slice lands.
+- [ ] Define whether generator methods are the next approved generator slice or remain deferred.
+- [ ] Define the next approved broader `yield` positions explicitly instead of leaving them as a vague later bucket.
+- [ ] Define whether `yield` inside `try` / `catch` / `finally` belongs in the next slice or remains deferred.
+- [ ] Add AST/parser support only for the approved next generator forms.
+- [ ] Extend semantic analysis so `yield` legality and diagnostics match the approved next generator contexts exactly.
+- [ ] Extend generator lowering/runtime only for the approved next `yield` positions, keeping one generator-frame model.
+- [ ] Add parser, semantic, runtime, and compile-validation tests for each generator follow-up sub-slice.
+- [ ] Update generator docs after the next follow-up slice lands.
 
-## 88. Generators And Iteration Runtime
+## 108. Async Follow-Up
 
-- [x] Define the first supported generator surface: `function*`, `yield`, and `yield*` scope.
-- [x] Define suspension-safe lifetime behavior for locals, temporaries, and captured bindings across `yield`.
-- [x] Define the runtime representation of a generator frame and resumable state.
-- [x] Define how generator completion values and yielded values map into Jayess runtime values.
-- [x] Add AST support for generator functions.
-- [x] Add AST support for `yield` and `yield*`.
-- [x] Add parser support for generator declarations and expressions.
-- [x] Restrict `yield` legality to generator contexts with focused diagnostics.
-- [x] Extend semantic analysis for generator flags and `yield` legality.
-- [x] Add backend lowering for generator state machines.
-- [x] Add runtime primitives for generator frame storage and resume/next behavior.
-- [x] Decide whether the first slice exposes generators through a Jayess-owned iterator module or direct callable protocol.
-- [x] Add parser, semantic, runtime, and compile-validation tests for supported generator behavior.
-- [x] Update overview, limitations, semantics, and library architecture docs after the first generator slice lands.
+- [ ] Define whether async methods are the next approved async class-model slice or remain deferred.
+- [ ] Define whether `await` inside `try` / `catch` / `finally` needs a broader explicit async-lowering slice.
+- [ ] Define whether any module-level async initialization work becomes active or remains deferred with top-level `await` unsupported.
+- [ ] Add AST/parser support only for the approved next async forms.
+- [ ] Extend semantic and lifetime analysis only where the approved next async slice requires it.
+- [ ] Extend async lowering/runtime only where the approved next async slice requires it, without creating a second async-result model.
+- [ ] Add parser, semantic, runtime, and compile-validation tests for the next async follow-up slice.
+- [ ] Update async docs after the next follow-up slice lands.
 
-## 89. Inheritance And `super`
+## 109. Standard-Library Breadth: Arrays, Strings, Numbers, And Objects
 
-- [x] Define the first inheritance slice as single inheritance or broader support explicitly.
-- [x] Define whether the first slice allows only Jayess class bases.
-- [x] Define base-field initialization order relative to derived field initializers and constructor bodies.
-- [x] Define `super(...)` constructor-call semantics.
-- [x] Define `super.method(...)` lookup and `this` binding semantics.
-- [x] Define whether static inheritance is part of the first shipped slice.
-- [x] Add AST support for `extends` clauses.
-- [x] Add AST support for `super` constructor calls and member lookups.
-- [x] Add parser support for derived classes.
-- [x] Add semantic validation for legal base classes and legal `super` use sites.
-- [x] Add runtime/class-model support for base-class links and method lookup through a base chain.
-- [x] Add backend lowering for constructor chaining and inherited method dispatch.
-- [x] Add tests for initialization order, `super(...)`, inherited methods, and invalid `super` usage.
-- [x] Update overview, limitations, semantics, and class-model docs after inheritance lands.
+- [ ] Define the next approved array helper family explicitly instead of broad “more array methods”.
+- [ ] Define the next approved string helper family explicitly instead of broad “more string methods”.
+- [ ] Define the next approved `jayess:number` helper family explicitly instead of ambient/global numeric growth.
+- [ ] Define the next approved `jayess:object` helper family explicitly instead of broad `Object.*` compatibility.
+- [ ] Add the approved next array runtime/module helpers one family at a time.
+- [ ] Add the approved next string runtime/module helpers one family at a time.
+- [ ] Add the approved next number runtime/module helpers one family at a time.
+- [ ] Add the approved next object runtime/module helpers one family at a time.
+- [ ] Extend semantic diagnostics for still-unsupported built-in names and methods.
+- [ ] Add API, runtime, module-resolution, and compile-validation tests for each built-in family slice separately.
+- [ ] Update stdlib docs after each family slice lands.
 
-## 90. Private Members
+## 110. Built-In Modules Follow-Up: Date, JSON, Map, And Set
 
-- [x] Define the first private-member slice: private instance fields only, or fields plus methods/static fields.
-- [x] Define private-name identity rules per class.
-- [x] Define duplicate private-name validation rules.
-- [x] Define how private access behaves across inheritance once inheritance exists.
-- [x] Define whether private storage uses hidden runtime keys, class-owned slots, or another explicit mechanism.
-- [x] Add AST support for private identifiers and private field declarations.
-- [x] Add AST support for private member access expressions.
-- [x] Add parser support for `#field` syntax in class bodies and member access.
-- [x] Extend semantic analysis for private-name visibility and illegal external access.
-- [x] Add runtime support for non-public private storage.
-- [x] Add backend lowering that keeps private access separate from ordinary property lookup.
-- [x] Add tests for private initialization, same-class access, invalid external access, and duplicate names.
-- [x] Update overview, limitations, semantics, and class-model docs after the first private-member slice lands.
+- [ ] Define the next approved `jayess:date` slice explicitly: formatting expansion, parsing expansion, arithmetic helpers, and timezone policy as separate tasks.
+- [ ] Define the next approved `jayess:json` slice explicitly: replacement/transform policy, richer validation, and formatting helpers as separate tasks.
+- [ ] Define the next approved `jayess:collections/map` slice explicitly: bulk construction, bulk updates, and iteration/data helpers as separate tasks.
+- [ ] Define the next approved `jayess:collections/set` slice explicitly: bulk construction, pure set operations, and iteration/data helpers as separate tasks.
+- [ ] Add only the primitive/runtime support needed for the approved next built-in-module helpers.
+- [ ] Implement the approved next module-level helpers in Jayess source where practical.
+- [ ] Add API, runtime, module-resolution, and compile-validation tests for each new built-in-module slice separately.
+- [ ] Update built-in module docs after each next slice lands.
 
-## 91. Computed Class Members And Static Initialization Blocks
+## 111. System Modules Follow-Up
 
-- [x] Define computed class key evaluation timing.
-- [x] Define static initialization block ordering relative to static fields.
-- [x] Define how computed keys interact with inheritance and class-side initialization.
-- [x] Add AST support for computed class member names.
-- [x] Add AST support for static initialization blocks.
-- [x] Add parser support for computed class members and static blocks.
-- [x] Extend semantic analysis for class-side initialization scope and ordering.
-- [x] Add backend lowering for computed key evaluation with deterministic ordering.
-- [x] Add backend lowering for static initialization blocks without leaking statements into unrelated scopes.
-- [x] Add tests for evaluation order, static initialization order, and invalid forms.
-- [x] Update overview, limitations, semantics, and class-model docs after these class features land.
+- [ ] Define whether `jayess:os`, `jayess:url`, or `jayess:timers` becomes the next approved system-module slice.
+- [ ] Define the next approved `jayess:fs` helper family explicitly beyond the current file/list/stat slice.
+- [ ] Define the next approved `jayess:path` helper family explicitly beyond the current path-shaping slice.
+- [ ] Define the next approved `jayess:process` helper family explicitly, keeping env mutation and subprocess policy separate.
+- [ ] Add only the minimal native adapter primitives needed for the approved next system-module slice.
+- [ ] Implement the approved next Jayess system-module wrappers in Jayess source where practical.
+- [ ] Keep unsupported raw `node:*` and non-approved host APIs rejected with focused diagnostics.
+- [ ] Add module-resolution, API, runtime, and compile-validation tests for each next system-module slice separately.
+- [ ] Update system-module docs after each next slice lands.
 
-## 92. Jayess Standard Library Modules: `Date`, `JSON`, `Map`, `Set`
+## 112. Class System And Inheritance Follow-Up
 
-- [x] Create a repository-owned built-in module path policy for standard-library modules such as `jayess:date`, `jayess:json`, and `jayess:collections`.
-- [x] Define how these modules resolve through the normal Jayess module graph in `transpileFile()`.
-- [x] Define how these modules resolve or diagnose in `transpile()` string mode.
-- [x] Create a bootstrap directory/layout for Jayess-written standard-library modules inside the repository.
-
-### 92.1 `Date`
-
-- [x] Define the first Jayess date/time API surface.
-- [x] Decide which primitives need C++ runtime support and which wrappers can live in Jayess modules.
-- [x] Implement the minimal C++ date/time primitive layer if required.
-- [x] Implement the first Jayess date module in Jayess source.
-- [x] Add compile-validation and API tests for the first `Date` slice.
-
-### 92.2 `JSON`
-
-- [x] Define the first Jayess JSON API surface.
-- [x] Decide whether parsing/serialization primitives need C++ runtime support or a small native helper.
-- [x] Implement the minimal primitive layer if required.
-- [x] Implement the first Jayess JSON module in Jayess source.
-- [x] Add compile-validation and API tests for the first `JSON` slice.
-
-### 92.3 `Map`
-
-- [x] Define whether `Map` needs a new runtime value kind or a wrapper over lower-level primitives.
-- [x] Define the first Jayess `Map` API surface.
-- [x] Implement the minimal C++ primitive layer if required.
-- [x] Implement the first Jayess `Map` module in Jayess source.
-- [x] Add compile-validation and API tests for the first `Map` slice.
-
-### 92.4 `Set`
-
-- [x] Define whether `Set` needs a new runtime value kind or a wrapper over lower-level primitives.
-- [x] Define the first Jayess `Set` API surface.
-- [x] Implement the minimal C++ primitive layer if required.
-- [x] Implement the first Jayess `Set` module in Jayess source.
-- [x] Add compile-validation and API tests for the first `Set` slice.
-
-## 93. Jayess System Modules For Filesystem, Path, And Process
-
-- [x] Define the first Jayess-owned system-module namespace, such as `jayess:fs`, `jayess:path`, and `jayess:process`.
-- [x] Define how these modules differ from ambient `node:*` imports.
-- [x] Decide which features are pure Jayess wrappers and which require native adapter primitives.
-- [x] Add resolver support for approved Jayess system modules.
-- [x] Keep raw `node:*` imports rejected with a focused migration diagnostic once Jayess system modules exist.
-- [x] Implement the minimal native adapter layer required for the first filesystem/path/process slice.
-- [x] Implement the first Jayess system modules in Jayess source where practical.
-- [x] Add compile-validation, API, and module-resolution tests for Jayess system modules.
-- [x] Update overview, limitations, module-resolution docs, and standard-library docs after the first system-module slice lands.
+- [ ] Define whether private static fields are the next approved private-member slice or remain deferred.
+- [ ] Define whether private static methods are approved separately from private static fields.
+- [ ] Define whether static inheritance becomes an active approved slice or remains deferred.
+- [ ] Define whether any broader `super` forms become active approved slices or remain deferred.
+- [ ] Add AST/parser support only for the approved next class-system forms.
+- [ ] Extend semantic analysis only for the approved next private/class/inheritance slice.
+- [ ] Extend runtime/class-model support only for the approved next forms, keeping one class-chain model.
+- [ ] Extend lowering only for the approved next forms without broadening unrelated class behavior.
+- [ ] Add parser, semantic, runtime, and compile-validation tests for each class follow-up slice separately.
+- [ ] Update class-model docs after each next slice lands.

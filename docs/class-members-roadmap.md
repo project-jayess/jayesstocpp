@@ -55,3 +55,14 @@ Remaining follow-up direction:
 - do not add static inheritance through ad hoc emitter-only shortcuts
 - do not add broader class-side `this` or `super` semantics without defining them explicitly first
 - keep later extensions aligned with the class-definition ordering rules above
+
+## Follow-Up Policy
+
+The current class-side follow-up policy is:
+
+- static blocks keep ordinary class-name access such as `Point.value`
+- static blocks do not gain a special class-side `this` binding in the next slice
+- broader static inheritance remains separate from static-block semantics
+- no additional class-side lowering work is active for static inheritance until that slice is explicitly approved
+
+This keeps class-side execution explicit and avoids introducing ambiguous class-construction-time `this` semantics before static inheritance and richer class-side dispatch rules are defined.

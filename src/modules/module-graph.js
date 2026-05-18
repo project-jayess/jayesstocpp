@@ -63,6 +63,16 @@ function throwPackageResolutionFailure(source, failure) {
     ]);
   }
 
+  if (failure?.reason === "package-export-unsupported") {
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        source,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' uses an unsupported package.json exports mapping for '${failure.exportKey}'. Jayess currently supports only direct transpileable string targets or narrow import/default targets`,
+        source
+      )
+    ]);
+  }
+
   if (failure?.reason === "package-entry-not-found") {
     throwDiagnostics([
       createModuleFileDiagnostic(

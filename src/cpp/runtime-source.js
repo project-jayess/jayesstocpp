@@ -4,8 +4,12 @@ import { getDateRuntimeCppFragment, getDateRuntimeHeaderFragment } from "./runti
 import { getGeneratorRuntimeCppFragment, getGeneratorRuntimeHeaderFragment } from "./runtime-generator-source.js";
 import { getJsonRuntimeCppFragment, getJsonRuntimeHeaderFragment } from "./runtime-json-source.js";
 import { getMapRuntimeCppFragment, getMapRuntimeHeaderFragment } from "./runtime-map-source.js";
+import { getNumberRuntimeCppFragment, getNumberRuntimeHeaderFragment } from "./runtime-number-source.js";
+import { getObjectRuntimeCppFragment, getObjectRuntimeHeaderFragment } from "./runtime-object-source.js";
 import { getPrivateRuntimeCppFragment, getPrivateRuntimeHeaderFragment } from "./runtime-private-source.js";
+import { getRegexRuntimeCppFragment, getRegexRuntimeHeaderFragment } from "./runtime-regex-source.js";
 import { getSetRuntimeCppFragment, getSetRuntimeHeaderFragment } from "./runtime-set-source.js";
+import { getStringRuntimeCppFragment, getStringRuntimeHeaderFragment } from "./runtime-string-source.js";
 import { getSystemRuntimeCppFragment, getSystemRuntimeHeaderFragment } from "./runtime-system-source.js";
 
 export function getRuntimeHeaderSource() {
@@ -60,7 +64,11 @@ ${getDateRuntimeHeaderFragment()}
 ${getGeneratorRuntimeHeaderFragment()}
 ${getJsonRuntimeHeaderFragment()}
 ${getMapRuntimeHeaderFragment()}
+${getNumberRuntimeHeaderFragment()}
+${getObjectRuntimeHeaderFragment()}
+${getRegexRuntimeHeaderFragment()}
 ${getSetRuntimeHeaderFragment()}
+${getStringRuntimeHeaderFragment()}
 ${getSystemRuntimeHeaderFragment()}
 ${getPrivateRuntimeHeaderFragment()}
 
@@ -114,9 +122,7 @@ value not_equal(const value& left, const value& right);
 value get_length(const value& input);
 value array_pop(const value& input);
 value array_join(const value& input, const std::vector<value>& args);
-value string_slice(const value& input, const std::vector<value>& args);
-value string_substring(const value& input, const std::vector<value>& args);
-value string_starts_with(const value& input, const std::vector<value>& args);
+value array_includes(const value& input, const std::vector<value>& args);
 value get_property(const value& input, const std::string& key);
 value get_index(const value& input, const value& key);
 value destructure_property(const value& input, const std::string& key);
@@ -164,9 +170,12 @@ export function getRuntimeCppSource() {
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <ctime>
 #include <deque>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
+#include <regex>
 #include <stdexcept>
 
 namespace jayess {
@@ -176,6 +185,9 @@ ${getDateRuntimeCppFragment()}
 ${getGeneratorRuntimeCppFragment()}
 ${getJsonRuntimeCppFragment()}
 ${getMapRuntimeCppFragment()}
+${getNumberRuntimeCppFragment()}
+${getObjectRuntimeCppFragment()}
+${getRegexRuntimeCppFragment()}
 ${getSetRuntimeCppFragment()}
 ${getSystemRuntimeCppFragment()}
 ${getPrivateRuntimeCppFragment()}
@@ -319,6 +331,8 @@ value to_string_value(const value& input) {
   return stringify_value(input);
 }
 
+${getStringRuntimeCppFragment()}
+
 void throw_value(value input) {
   throw thrown_value(std::move(input));
 }
@@ -432,17 +446,6 @@ value get_length(const value& input) {
   return get_property(input, "length");
 }
 
-std::size_t clamp_string_index(double raw, std::size_t size) {
-  if (raw <= 0.0) {
-    return 0;
-  }
-  const auto index = static_cast<std::size_t>(raw);
-  if (index > size) {
-    return size;
-  }
-  return index;
-}
-
 value array_pop(const value& input) {
   if (!std::holds_alternative<array_ptr>(input)) {
     throw std::runtime_error("Unsupported pop receiver");
@@ -479,53 +482,22 @@ value array_join(const value& input, const std::vector<value>& args) {
   return result;
 }
 
-value string_slice(const value& input, const std::vector<value>& args) {
-  if (!std::holds_alternative<std::string>(input)) {
-    throw std::runtime_error("Unsupported slice receiver");
+value array_includes(const value& input, const std::vector<value>& args) {
+  if (!std::holds_alternative<array_ptr>(input)) {
+    throw std::runtime_error("Unsupported includes receiver");
   }
 
-  const auto& text = std::get<std::string>(input);
-  const auto start = clamp_string_index(std::get<double>(args[0]), text.size());
-  const auto end = args.size() > 1
-    ? clamp_string_index(std::get<double>(args[1]), text.size())
-    : text.size();
-
-  if (end <= start) {
-    return std::string("");
+  if (args.size() != 1) {
+    throw std::runtime_error("array.includes expects exactly one argument");
   }
 
-  return text.substr(start, end - start);
-}
-
-value string_substring(const value& input, const std::vector<value>& args) {
-  if (!std::holds_alternative<std::string>(input)) {
-    throw std::runtime_error("Unsupported substring receiver");
+  const auto& array = std::get<array_ptr>(input);
+  for (const auto& item : array->items) {
+    if (std::get<bool>(equal(item, args[0]))) {
+      return true;
+    }
   }
-
-  const auto& text = std::get<std::string>(input);
-  auto start = clamp_string_index(std::get<double>(args[0]), text.size());
-  auto end = args.size() > 1
-    ? clamp_string_index(std::get<double>(args[1]), text.size())
-    : text.size();
-
-  if (end < start) {
-    std::swap(start, end);
-  }
-
-  return text.substr(start, end - start);
-}
-
-value string_starts_with(const value& input, const std::vector<value>& args) {
-  if (!std::holds_alternative<std::string>(input)) {
-    throw std::runtime_error("Unsupported startsWith receiver");
-  }
-
-  const auto& text = std::get<std::string>(input);
-  const auto prefix = stringify_value(args[0]);
-  if (prefix.size() > text.size()) {
-    return false;
-  }
-  return text.compare(0, prefix.size(), prefix) == 0;
+  return false;
 }
 
 value get_property(const value& input, const std::string& key) {
@@ -533,7 +505,7 @@ value get_property(const value& input, const std::string& key) {
     const auto& callable = std::get<callable_ptr>(input);
     const auto iterator = callable->fields.find(key);
     if (iterator == callable->fields.end()) {
-      throw std::runtime_error("Missing callable property");
+      return value(std::monostate{});
     }
     return iterator->second;
   }
@@ -546,7 +518,7 @@ value get_property(const value& input, const std::string& key) {
   if (!std::holds_alternative<std::monostate>(classValue)) {
     return bind_method(input, find_class_method(classValue, key));
   }
-  throw std::runtime_error("Missing object property");
+  return value(std::monostate{});
 }
 
 value get_index(const value& input, const value& key) {
@@ -554,7 +526,7 @@ value get_index(const value& input, const value& key) {
     const auto& array = std::get<array_ptr>(input);
     const auto index = static_cast<std::size_t>(std::get<double>(key));
     if (index >= array->items.size()) {
-      throw std::runtime_error("Array index out of bounds");
+      return value(std::monostate{});
     }
     return array->items[index];
   }
@@ -563,7 +535,7 @@ value get_index(const value& input, const value& key) {
     return get_property(input, property_key_string(key));
   }
 
-  throw std::runtime_error("Unsupported indexed access");
+  return value(std::monostate{});
 }
 
 value destructure_property(const value& input, const std::string& key) {

@@ -63,14 +63,25 @@ test("transpile emits declaration destructuring through focused runtime helpers"
   const cpp = transpile('function run(values, data) { var [left, right] = values; const { name, score: total } = data; return left + right + total; }', { moduleName: "destructure_case" });
   assert.match(cpp, /jayess_destructure_0/);
   assert.match(cpp, /jayess::destructure_index\(jayess_destructure_0, jayess::value\(static_cast<double>\(0\)\)\)/);
-  assert.match(cpp, /jayess::destructure_property\(jayess_destructure_1, "name"\)/);
-  assert.match(cpp, /jayess::destructure_property\(jayess_destructure_1, "score"\)/);
+  assert.match(cpp, /jayess::destructure_property\(jayess_destructure_[0-9]+, "name"\)/);
+  assert.match(cpp, /jayess::destructure_property\(jayess_destructure_[0-9]+, "score"\)/);
 });
 
 test("transpile emits rest bindings through focused destructuring helpers", () => {
   const cpp = transpile("function run(values, data) { var [head, ...tail] = values; const { name, ...rest } = data; return tail; }", { moduleName: "destructure_rest_case" });
   assert.match(cpp, /jayess::destructure_rest_array\(jayess_destructure_0, 1\)/);
-  assert.match(cpp, /jayess::destructure_rest_object\(jayess_destructure_1, \{"name"\}\)/);
+  assert.match(cpp, /jayess::destructure_rest_object\(jayess_destructure_[0-9]+, \{"name"\}\)/);
+});
+
+test("transpile emits nested, defaulted, assignment, and for-loop destructuring through focused helpers", () => {
+  const cpp = transpile('function run(values, data, fallback, pair, info) { var [head = 1, { value, nested: [left = 2, ...tail] } = fallback] = values; var name = null; var total = null; ({ meta: { name = "Jayess" } = info, score: total = 0 } = data); for (var [current, ...rest] = values; current; current = current - 1) { value = current; } return left + total; }', { moduleName: "destructure_expanded_case" });
+  assert.match(cpp, /if \(jayess::is_null\(jayess_destructure_/);
+  assert.match(cpp, /jayess::destructure_property\(jayess_destructure_[0-9]+, "nested"\)/);
+  assert.match(cpp, /jayess::destructure_rest_array\(jayess_destructure_[0-9]+, 1\)/);
+  assert.match(cpp, /\(\[&\]\(\) -> jayess::value \{/);
+  assert.match(cpp, /return jayess_destructure_[0-9]+;/);
+  assert.match(cpp, /\{\s+jayess::value jayess_destructure_[0-9]+ = values;/s);
+  assert.match(cpp, /for \(; jayess::truthy\(current\); \(current = jayess::subtract/);
 });
 
 test("transpile emits boolean literals", () => {
@@ -82,6 +93,18 @@ test("transpile emits boolean literals", () => {
 test("transpile emits null literals", () => {
   const cpp = transpile("var value = null;", { moduleName: "null_case" });
   assert.match(cpp, /jayess::value\(std::monostate\{\}\)/);
+});
+
+test("transpile emits Jayess null for implicit function completion and uninitialized vars", () => {
+  const cpp = transpile("var value; function run() { value; }", { moduleName: "null_fallthrough_case" });
+  assert.match(cpp, /jayess::value value = jayess::value\(std::monostate\{\}\);/);
+  assert.match(cpp, /return jayess::value\(std::monostate\{\}\);/);
+});
+
+test("transpile emits plain member and index reads through null-returning runtime helpers", () => {
+  const cpp = transpile("function run(data, index) { return data.value ?? data[index]; }", { moduleName: "null_lookup_case" });
+  assert.match(cpp, /jayess::get_property\(data, "value"\)/);
+  assert.match(cpp, /jayess::get_index\(data, index\)/);
 });
 
 test("transpile emits unary logical not", () => {
@@ -154,6 +177,19 @@ test("transpile emits async functions through Jayess async handles and await hel
   assert.match(cpp, /jayess::async_reject\(jayess_async_result, jayess::exception_to_value\(jayess_error\)\);/);
 });
 
+test("transpile emits async function expressions and async arrows through the shared async callable path", () => {
+  const cpp = transpile(
+    "function build(step) { var declared = async function run(value) { return await value + step; }; var arrow = async (value = step) => await value + step; return [declared, arrow]; }",
+    { moduleName: "async_expression_case" }
+  );
+  assert.match(cpp, /jayess::make_callable\(\[step\]\(const std::vector<jayess::value>& jayess_args\) -> jayess::value \{/);
+  assert.match(cpp, /jayess::value jayess_async_result = jayess::make_pending_async\(\);/);
+  assert.match(cpp, /jayess::value jayess_async_input = value;/);
+  assert.match(cpp, /return jayess::await_sync\(jayess_async_input\);/);
+  assert.match(cpp, /jayess::async_resolve\(jayess_async_result, jayess::add\(/);
+  assert.match(cpp, /if \(!jayess::has_argument\(jayess_args, 0\)\) \{\s*value = step;/);
+});
+
 test("transpile emits generator declarations through Jayess generator handles and state slots", () => {
   const cpp = transpile("function* run(value) { yield value; return value; }", { moduleName: "generator_case" });
   assert.match(cpp, /jayess::value jayess_generator = jayess::make_generator_handle\(\);/);
@@ -162,6 +198,15 @@ test("transpile emits generator declarations through Jayess generator handles an
   assert.match(cpp, /jayess::generator_yield\(jayess_generator, 1, value\);/);
   assert.match(cpp, /case 1:/);
   assert.match(cpp, /jayess::generator_complete\(jayess_generator, value\);/);
+});
+
+test("transpile emits generator function expressions through the shared generator handle path", () => {
+  const cpp = transpile("function build(step) { var make = function* named(value) { yield value; return step; }; return make; }", { moduleName: "generator_expression_case" });
+  assert.match(cpp, /jayess::make_callable\(\[step\]\(const std::vector<jayess::value>& jayess_args\) -> jayess::value \{/);
+  assert.match(cpp, /jayess::value jayess_generator = jayess::make_generator_handle\(\);/);
+  assert.match(cpp, /jayess::generator_set_resume\(jayess_generator,/);
+  assert.match(cpp, /jayess::generator_yield\(jayess_generator, 1, value\);/);
+  assert.match(cpp, /jayess::generator_complete\(jayess_generator, step\);/);
 });
 
 test("transpile locks current truthiness and equality helper usage", () => {
@@ -251,11 +296,15 @@ test("transpile emits primitive toString built-ins through focused runtime helpe
 });
 
 test("transpile emits array and string method built-ins through focused runtime helpers", () => {
-  const cpp = transpile('function run(values, text) { var last = values.pop(); var joined = values.join("-"); var sliced = text.slice(1, 3); var sub = text.substring(2); return text.startsWith("Ja"); }', { moduleName: "array_string_methods_case" });
+  const cpp = transpile('function run(values, text) { var last = values.pop(); var joined = values.join("-"); var found = values.includes(2); var sliced = text.slice(1, 3); var sub = text.substring(2); var hasMid = text.includes("aye"); var firstIndex = text.indexOf("ye"); var hasSuffix = text.endsWith("ss"); return text.startsWith("Ja"); }', { moduleName: "array_string_methods_case" });
   assert.match(cpp, /return jayess::array_pop\(jayess_object\);/);
   assert.match(cpp, /return jayess::array_join\(jayess_object, jayess_args\);/);
+  assert.match(cpp, /return jayess::array_includes\(jayess_object, jayess_args\);/);
   assert.match(cpp, /return jayess::string_slice\(jayess_object, jayess_args\);/);
   assert.match(cpp, /return jayess::string_substring\(jayess_object, jayess_args\);/);
+  assert.match(cpp, /return jayess::string_includes\(jayess_object, jayess_args\);/);
+  assert.match(cpp, /return jayess::string_index_of\(jayess_object, jayess_args\);/);
+  assert.match(cpp, /return jayess::string_ends_with\(jayess_object, jayess_args\);/);
   assert.match(cpp, /return jayess::string_starts_with\(jayess_object, jayess_args\);/);
 });
 
@@ -272,6 +321,13 @@ test("transpile emits private fields through dedicated private-storage helpers",
   assert.match(cpp, /jayess::set_private_field\(other, class_value, "value", next\)/);
   assert.match(cpp, /jayess::set_private_field\(jayess_object, class_value, "value", jayess_next\)/);
   assert.doesNotMatch(cpp, /jayess::get_property\(other, "value"\)/);
+});
+
+test("transpile emits private instance methods through hidden private callables", () => {
+  const cpp = transpile("class Box { #value() { return 1; } call(other) { return other.#value(); } }", { moduleName: "private_method_case" });
+  assert.match(cpp, /jayess::set_private_field\(this_value, class_value, "value", jayess::make_callable/);
+  assert.match(cpp, /return jayess::call\(jayess::get_private_field\(other, class_value, "value"\)\);/);
+  assert.doesNotMatch(cpp, /jayess::define_class_method\(class_value, "value"/);
 });
 
 test("transpile emits callable closures with captured bindings", () => {

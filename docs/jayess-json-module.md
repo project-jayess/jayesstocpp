@@ -1,6 +1,6 @@
 # Jayess JSON Module
 
-This document defines the first intended API surface for the repository-owned `jayess:json` module.
+This document defines the current shipped API surface for the repository-owned `jayess:json` module.
 
 ## Module Identity
 
@@ -10,17 +10,19 @@ The first JSON surface belongs to:
 
 It is a Jayess standard-library module, not an ambient global `JSON` object.
 
-## First-Slice API
+## Current Shipped API
 
-The first shipped `jayess:json` slice should stay narrow and explicit.
+The shipped `jayess:json` slice stays narrow and explicit.
 
-Planned exports:
+Current exports:
 
 - `parse(text)`
 - `stringify(value)`
+- `stringifyPretty(value, indent?)`
+- `validate(text)`
 - `isJsonText(text)`
 
-## First-Slice Semantics
+## Current Semantics
 
 ### `parse(text)`
 
@@ -35,6 +37,18 @@ Planned exports:
 - expects one supported Jayess value
 - returns one string result
 - rejects unsupported Jayess values such as callables, async handles, generator handles, and class values
+
+### `stringifyPretty(value, indent?)`
+
+- serializes one supported Jayess value into formatted JSON text
+- accepts one required value and one optional numeric indent width
+- keeps the same supported-value and key-ordering rules as `stringify(value)`
+
+### `validate(text)`
+
+- returns `null` when `text` is valid for the shipped parser contract
+- returns one small Jayess object when invalid
+- the invalid-result object currently uses `message`, `line`, and `column`
 
 ### `isJsonText(text)`
 
@@ -105,10 +119,12 @@ The first primitive layer now uses runtime-native helper entry points:
 
 The first slice should keep the Jayess module thin and let it forward into a small native helper.
 
-## Explicit First-Slice Direction
+## Current Primitive Direction
 
 - `parse(text)` is the primary ingestion path
 - `stringify(value)` is the primary emission path
+- `stringifyPretty(value, indent?)` is the shipped formatting extension path
+- `validate(text)` is the shipped validation/diagnostics helper
 - `isJsonText(text)` exists as a small validation helper over the same parser contract
 - the public `jayess:json` module file should be written in Jayess
 - the parse/stringify substrate should land as a small native helper instead of a broad runtime-wide compatibility layer
@@ -117,5 +133,6 @@ The first slice should keep the Jayess module thin and let it forward into a sma
 
 Later work still needs to decide:
 
-- which Jayess value shapes are accepted by the first `stringify(value)` slice
+- reviver/replacer-like transforms as separate later helpers instead of direct JavaScript callback compatibility
+- any broader diagnostics surface beyond `validate(text)`
 - where parse/stringify argument validation belongs between the Jayess module and the primitive layer

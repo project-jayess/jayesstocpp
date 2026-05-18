@@ -1,26 +1,28 @@
 # Generators Implementation Plan
 
-Jayess does not currently support generators or `yield` end to end, but the feature is planned work rather than indefinite postponement.
+Jayess now supports a narrow first shipped generator slice, and broader generator work should proceed as explicit follow-up slices rather than one large catch-all feature.
 
-The repo now includes syntax and semantic groundwork:
+The repo now includes:
 
-- generator declarations and generator function expressions parse
-- `yield expr` and `yield* expr` parse
-- `yield` legality is checked against generator-function context
-- generator declarations and generator expressions still fail with explicit semantic diagnostics until lowering/runtime support lands
-- the shared Jayess runtime now includes a dedicated generator handle kind plus focused frame/resume helpers for later lowering work
+- generator declarations with end-to-end lowering
+- generator function expressions with the same generator-frame/runtime model
+- `yield expr` and `yield* expr` inside supported generator declaration bodies
+- `yield` legality checks against generator-function context
+- a dedicated Jayess runtime generator handle kind plus focused frame/resume helpers
+- explicit diagnostics for broader generator forms that remain outside the shipped slice
 
-This document defines the first shipped generator contract that later runtime and backend work must target.
+This document defines the shipped generator contract and the remaining later slices that runtime and backend work must target.
 
 ## First Supported Surface
 
-The first shipped generator slice should stay intentionally narrow:
+The shipped generator slice should stay intentionally narrow:
 
 - support `function* name(...) { ... }` generator declarations
+- support `function* (...) { ... }` generator function expressions
 - support `yield expr`
 - support `yield* expr`
 - support generator calls that return Jayess-owned generator handles
-- keep generator function expressions, generator methods, async generators, and generator arrow forms outside the first shipped slice unless later implementation work requires them
+- keep generator methods, async generators, and generator arrow forms outside the shipped slice unless later implementation work requires them
 
 The first slice should also keep consumption explicit:
 
@@ -36,19 +38,41 @@ Generator support is not just parser work. It would require a coherent answer fo
 - interaction between suspended frames and Jayess scope cleanup
 - closure capture across suspension points
 - resumable state machines in generated C++
+
+## Shipped Generator Expression Follow-Up
+
+The next approved generator follow-up slice was:
+
+- generator function expressions
+
+That slice is now shipped because it can reuse the current generator handle kind, `yield` legality rules, and state-machine lowering model without expanding the class model at the same time.
+
+Generator methods should remain a separate later slice instead of being bundled into generator function expressions. They touch class method tables, class-side parsing, and `this`/`super` interaction, so they should land only after the non-class generator-expression path is stable.
+
+There is no active implementation milestone for generator methods in the current checklist; they remain a later class-model follow-up.
+
+Async generators should also remain a separate later milestone. They combine the generator frame/state model with the async-handle completion model, and should not be bundled into ordinary generator follow-up work.
+
+Broader `yield` positions beyond the current direct generator-body forms should remain a separate later slice as well. The current policy is to expand generator contexts one step at a time:
+
+- generator function expressions first
+- generator methods later
+- broader nested/control-flow `yield` positions later
+- async generators last
 - interaction with `try` / `catch` / `finally`
 - interaction with any future async/runtime iteration design
 
 The feature should land as a real runtime-backed slice, not as parser-only support.
 
+There is also no active implementation milestone for broader `yield` positions beyond the current direct forms while that later slice remains deferred.
+
 ## Current Repository Rule
 
 The current policy is:
 
-- keep fake generator lowering out of the backend until the runtime model exists
-- keep generator declarations blocked with explicit semantic diagnostics until state-machine lowering lands
-- keep generator function expressions outside the first shipped slice with explicit diagnostics
-- build generators through deliberate state-machine and lifetime work
+- keep generator methods, async generators, and broader `yield` positions rejected with explicit diagnostics until their own slices are approved
+- treat generator declarations plus generator function expressions as the current shipped generator surface
+- build generator follow-up work through deliberate state-machine and lifetime integration instead of ad hoc callable special cases
 
 ## Suspension-Safe Lifetime Rules
 
@@ -80,7 +104,7 @@ That runtime shape should include:
 - storage for yielded value, final completion value, and failure payload
 - frame-owned storage for locals that survive across `yield`
 
-The first backend slice should lower generator bodies to explicit resumable state machines over that frame representation.
+The current backend already lowers declaration-only generator bodies to explicit resumable state machines over that frame representation. Generator follow-up work should reuse that same representation rather than creating a second generator runtime path.
 
 ## Yielded Values And Completion Values
 
@@ -137,11 +161,11 @@ The runtime now includes the first generator-specific primitive layer:
 
 This keeps generator work out of the ordinary callable/object path and gives the backend a narrow runtime target for upcoming state-machine emission.
 
-The backend now also lowers declaration-only generator functions through explicit state-slot resume lambdas. The current lowering slice supports:
+The backend now lowers declaration-only generator functions through explicit state-slot resume lambdas. The current lowering slice supports:
 
 - generator declarations
 - direct `yield expr`
 - direct `yield* expr`
 - final completion through `return expr` or falling off the end
 
-More complex yield nesting and broader generator forms still belong to later generator slices.
+More complex yield nesting and broader generator forms still belong to later generator slices. The next intended implementation step is not another broad generator rewrite; it is the narrower follow-up work for generator methods or broader approved `yield` positions, if and when those slices are approved.

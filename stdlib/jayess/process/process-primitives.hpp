@@ -11,6 +11,10 @@ inline jayess::value jayessProcessGetEnv(const std::vector<jayess::value>& jayes
   return jayess::process_get_env(std::get<std::string>(key));
 }
 
+inline jayess::value jayessProcessArgv(const std::vector<jayess::value>&) {
+  return jayess::process_get_argv();
+}
+
 inline jayess::value jayessProcessExit(const std::vector<jayess::value>& jayessArgs) {
   const auto code = jayess::argument_at(jayessArgs, 0);
   jayess::process_exit_with_code(static_cast<int>(std::get<double>(code)));

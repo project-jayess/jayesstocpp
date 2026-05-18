@@ -51,6 +51,20 @@ compileTest("transpile destructuring rest output compiles with the available C++
   assert.ok(true);
 });
 
+compileTest("transpile expanded destructuring output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "destructuring-expanded-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile('function run(values, data, fallback, pair, info) { var [head = 1, { value, nested: [left = 2, ...tail] } = fallback] = values; var name = null; var total = null; ({ meta: { name = "Jayess" } = info, score: total = 0 } = data); for (var [current, ...rest] = values; current; current = current - 1) { value = current; } return left + total; }', { moduleName: "destructuring_expanded_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
 compileTest("transpile array spread output compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "array-spread-compile");
   const runtimeCppPath = writeRuntime(targetDir);
@@ -261,6 +275,23 @@ compileTest("transpile async function output compiles with the available C++ com
   assert.ok(true);
 });
 
+compileTest("transpile async function expression and async arrow output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "async-expression-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile(
+      "function build(step) { var declared = async function run(value) { return await value + step; }; var arrow = async (value = step) => await value + step; return [declared, arrow]; } function run(input) { var pair = build(1); return pair; }",
+      { moduleName: "async_expression_module" }
+    ),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
 compileTest("transpile generator output compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "generator-compile");
   const runtimeCppPath = writeRuntime(targetDir);
@@ -268,6 +299,20 @@ compileTest("transpile generator output compiles with the available C++ compiler
   fs.writeFileSync(
     cppPath,
     transpile("function* inner(value) { yield value; return value; } function* outer(value) { yield* inner(value); return value; }", { moduleName: "generator_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile generator function expression output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "generator-expression-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("function build(step) { var make = function* named(value) { yield value; return step; }; return make; } function run() { return build(1); }", { moduleName: "generator_expression_module" }),
     "utf8"
   );
 
@@ -529,7 +574,7 @@ compileTest("transpile array and string method built-in output compiles with the
   const cppPath = path.join(targetDir, "module.cpp");
   fs.writeFileSync(
     cppPath,
-    transpile('function run(values, text) { var last = values.pop(); var joined = values.join("-"); var sliced = text.slice(1, 3); var sub = text.substring(2); return text.startsWith("Ja"); }', { moduleName: "array_string_methods_module" }),
+    transpile('function run(values, text) { var last = values.pop(); var joined = values.join("-"); var found = values.includes(2); var sliced = text.slice(1, 3); var sub = text.substring(2); var hasMid = text.includes("aye"); var firstIndex = text.indexOf("ye"); var hasSuffix = text.endsWith("ss"); return text.startsWith("Ja"); }', { moduleName: "array_string_methods_module" }),
     "utf8"
   );
 
@@ -587,9 +632,69 @@ compileTest("transpileFile built-in set module project compiles with the availab
   assert.ok(true);
 });
 
+compileTest("transpileFile built-in object module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-object-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/object-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in number module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-number-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/number-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in async module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-async-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/async-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in regex module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-regex-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/regex-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
 compileTest("transpileFile built-in system module project compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "builtin-system-project-compile");
   const fixture = path.resolve("test/fixtures/modules/system-modules-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile hardening project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "hardening-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/hardening-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile larger mixed module graph project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "graph-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/graph-main.js");
   const result = transpileFile(fixture, targetDir);
   const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
 
@@ -903,6 +1008,20 @@ compileTest("transpile private field initialization and same-class access output
   fs.writeFileSync(
     cppPath,
     transpile("class Box { #value = 1; #copy = this.#value; read() { return this.#copy; } write(next) { this.#value = next; return this.#value; } } function run() { var box = new Box(); return box.write(box.read()); }", { moduleName: "private_field_init_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile private instance method output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "private-method-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("class Box { #value() { return 1; } call(other) { return other.#value(); } } function run() { var box = new Box(); return box.call(box); }", { moduleName: "private_method_module" }),
     "utf8"
   );
 

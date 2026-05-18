@@ -17,6 +17,11 @@ export function forEachBindingIdentifier(node, visitor) {
     return;
   }
 
+  if (node.type === "AssignmentPattern") {
+    forEachBindingIdentifier(node.left, visitor);
+    return;
+  }
+
   if (node.type === "ArrayPattern") {
     for (const element of node.elements) {
       forEachBindingIdentifier(element, visitor);

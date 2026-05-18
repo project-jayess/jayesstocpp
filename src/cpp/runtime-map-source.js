@@ -15,7 +15,10 @@ value map_set(const value& map, const value& key, const value& assigned);
 value map_has(const value& map, const value& key);
 value map_delete(const value& map, const value& key);
 value map_clear(const value& map);
-value map_size(const value& map);`;
+value map_size(const value& map);
+value map_keys(const value& map);
+value map_values(const value& map);
+value map_entries(const value& map);`;
 }
 
 export function getMapRuntimeCppFragment() {
@@ -94,5 +97,35 @@ value map_clear(const value& map) {
 value map_size(const value& map) {
   const auto& storage = require_map_value(map);
   return static_cast<double>(storage->entries.size());
+}
+
+value map_keys(const value& map) {
+  const auto& storage = require_map_value(map);
+  std::vector<value> items;
+  items.reserve(storage->entries.size());
+  for (const auto& entry : storage->entries) {
+    items.push_back(entry.key);
+  }
+  return make_array(std::move(items));
+}
+
+value map_values(const value& map) {
+  const auto& storage = require_map_value(map);
+  std::vector<value> items;
+  items.reserve(storage->entries.size());
+  for (const auto& entry : storage->entries) {
+    items.push_back(entry.stored);
+  }
+  return make_array(std::move(items));
+}
+
+value map_entries(const value& map) {
+  const auto& storage = require_map_value(map);
+  std::vector<value> items;
+  items.reserve(storage->entries.size());
+  for (const auto& entry : storage->entries) {
+    items.push_back(make_array({entry.key, entry.stored}));
+  }
+  return make_array(std::move(items));
 }`;
 }

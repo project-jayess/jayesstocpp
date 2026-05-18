@@ -47,6 +47,10 @@ export function arrayPattern(elements, start, end) {
   return withRange("ArrayPattern", start, end, { elements });
 }
 
+export function assignmentPattern(left, right, start, end) {
+  return withRange("AssignmentPattern", start, end, { left, right });
+}
+
 export function objectExpression(properties, start, end) {
   return withRange("ObjectExpression", start, end, { properties });
 }

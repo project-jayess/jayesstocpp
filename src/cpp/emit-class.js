@@ -52,7 +52,7 @@ function renderBoundStaticMethodClosure(node, context, emitParameterInitializati
   const bodyLines = [];
   emitStatement(node.body, { ...context, thisAlias }, bodyLines, 1);
   lines.push(...bodyLines);
-  lines.push("  return 0.0;");
+  lines.push("  return jayess::value(std::monostate{});");
   lines.push("})");
   return lines.join("\n");
 }
@@ -70,7 +70,24 @@ function renderInstanceMethodClosure(node, context, emitParameterInitialization,
   const bodyLines = [];
   emitStatement(node.body, { ...context, thisAlias: "this_value" }, bodyLines, 1);
   lines.push(...bodyLines);
-  lines.push("  return 0.0;");
+  lines.push("  return jayess::value(std::monostate{});");
+  lines.push("})");
+  return lines.join("\n");
+}
+
+function renderPrivateInstanceMethodClosure(node, context, emitParameterInitialization, emitStatement, instanceExpr = "this_value") {
+  const captures = [context.classSelfAlias, instanceExpr].filter(Boolean);
+  const lines = [`jayess::make_callable([${captures.join(", ")}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  lines.push("  jayess::scope_cleanup_frame jayess_scope;");
+
+  for (const [index, param] of node.params.entries()) {
+    emitMethodParameterInitialization(param, index, { ...context, thisAlias: instanceExpr }, lines, emitParameterInitialization);
+  }
+
+  const bodyLines = [];
+  emitStatement(node.body, { ...context, thisAlias: instanceExpr }, bodyLines, 1);
+  lines.push(...bodyLines);
+  lines.push("  return jayess::value(std::monostate{});");
   lines.push("})");
   return lines.join("\n");
 }
@@ -80,6 +97,7 @@ function renderConstructorClosure(
   context,
   constructorMethod,
   instanceFieldList,
+  privateMethodList,
   emitParameterInitialization,
   emitStatement,
   renderExpression,
@@ -109,6 +127,10 @@ function renderConstructorClosure(
     } else {
       throw new Error("Derived constructors currently require 'super(...)' as their first statement");
     }
+  }
+
+  for (const method of privateMethodList) {
+    lines.push(`  ${renderPrivateFieldInitialization(method, renderPrivateInstanceMethodClosure(method, context, emitParameterInitialization, emitStatement), context, "this_value")};`);
   }
 
   for (const field of instanceFieldList) {
@@ -158,6 +180,7 @@ export function renderClassValue(
 ) {
   const constructorMethod = node.methods.find((method) => method.type === "MethodDefinition" && !method.static && method.kind === "constructor") ?? null;
   const instanceFieldList = [];
+  const privateMethodList = [];
   const classContext = node.id != null
     ? { ...context, classSelfName: node.id.name, classSelfAlias: "class_value" }
     : { ...context, classSelfAlias: "class_value" };
@@ -188,6 +211,10 @@ export function renderClassValue(
     }
 
     if (member.type === "MethodDefinition" && !member.static) {
+      if (isPrivateFieldKey(member.key)) {
+        privateMethodList.push(member);
+        continue;
+      }
       if (member.computed) {
         const keyAlias = nextComputedKeyAlias(localTempState);
         emitComputedKeyAlias(member, keyAlias, classContext, lines, renderExpression);
@@ -229,7 +256,7 @@ export function renderClassValue(
     }
   }
 
-  lines.push(`  jayess::set_class_constructor(class_value, ${renderConstructorClosure(node, classContext, constructorMethod, instanceFieldList, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushRenderedCallArguments)});`);
+  lines.push(`  jayess::set_class_constructor(class_value, ${renderConstructorClosure(node, classContext, constructorMethod, instanceFieldList, privateMethodList, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushRenderedCallArguments)});`);
   lines.push("  class_wrapper->fn = [class_value](const std::vector<jayess::value>& jayess_args) -> jayess::value {");
   lines.push("    jayess::scope_cleanup_frame jayess_scope;");
   lines.push("    jayess::value this_value = jayess::make_object({});");

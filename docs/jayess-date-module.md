@@ -1,6 +1,6 @@
 # Jayess Date Module
 
-This document defines the first intended API surface for the repository-owned `jayess:date` module.
+This document defines the current shipped API surface for the repository-owned `jayess:date` module.
 
 ## Module Identity
 
@@ -10,18 +10,29 @@ The first date/time surface belongs to:
 
 It is a Jayess standard-library module, not an ambient global constructor.
 
-## First-Slice API
+## Current Shipped API
 
-The first shipped `jayess:date` slice should stay narrow and explicit.
+The shipped `jayess:date` surface stays narrow and explicit.
 
-Planned exports:
+Current exports:
 
 - `now()`
 - `fromUnixMillis(value)`
 - `toUnixMillis(date)`
+- `toIsoString(date)`
+- `getUtcYear(date)`
+- `getUtcMonth(date)`
+- `getUtcDay(date)`
+- `getUtcHour(date)`
+- `getUtcMinute(date)`
+- `getUtcSecond(date)`
+- `getUtcMillisecond(date)`
+- `addMillis(date, amount)`
+- `diffMillis(left, right)`
+- `parseIso(text)`
 - `isDate(value)`
 
-## First-Slice Semantics
+## Current Semantics
 
 ### `now()`
 
@@ -37,6 +48,35 @@ Planned exports:
 
 - returns one numeric Unix timestamp in milliseconds from a Jayess date value
 - expects one Jayess date value
+
+### `toIsoString(date)`
+
+- returns one UTC ISO-8601 timestamp string
+- expects one Jayess date value
+
+### UTC Component Helpers
+
+- `getUtcYear(date)`
+- `getUtcMonth(date)`
+- `getUtcDay(date)`
+- `getUtcHour(date)`
+- `getUtcMinute(date)`
+- `getUtcSecond(date)`
+- `getUtcMillisecond(date)`
+
+These helpers each take one Jayess date value and return one numeric UTC component.
+
+### Arithmetic Helpers
+
+- `addMillis(date, amount)` returns one new Jayess date shifted by the given millisecond amount
+- `diffMillis(left, right)` returns one numeric millisecond difference
+
+### `parseIso(text)`
+
+- accepts one string argument
+- accepts the repository-defined UTC ISO-8601 text shape emitted by `toIsoString(date)`
+- returns a Jayess date on success
+- returns `null` for invalid text
 
 ### `isDate(value)`
 
@@ -124,3 +164,12 @@ Later work still needs to decide:
 - how much argument validation belongs in the Jayess module versus the primitive entry points
 - how the first Jayess module file should import or bind those primitives
 - whether later calendar or formatting helpers stay in Jayess or need more native support
+
+## Remaining Follow-Up
+
+The next `jayess:date` work is now narrower than before:
+
+- local-timezone or timezone-database behavior
+- broader parsing beyond the narrow ISO helper
+- richer calendar formatting
+- broader arithmetic policy beyond the current millisecond-centered helpers

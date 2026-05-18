@@ -1,8 +1,9 @@
-import { isJsonText, parse, stringify } from "jayess:json";
+import { isJsonText, parse, stringify, stringifyPretty, validate } from "jayess:json";
 
 export function run(text) {
   if (isJsonText(text)) {
-    return stringify(parse(text));
+    var value = parse(text);
+    return [stringify(value), stringifyPretty(value, 2), validate(text)];
   }
-  return "invalid";
+  return validate(text);
 }

@@ -82,6 +82,28 @@ test("parser reports unsupported export forms with specific guidance", () => {
   );
 });
 
+test("parser reports unsupported-by-design dynamic import clearly", () => {
+  const sourceText = createSourceText('var loader = import("jayess:date");', "bad-dynamic-import.js");
+  assert.throws(
+    () => parse(sourceText),
+    (error) => error instanceof JayessError
+      && /unsupported by design/.test(error.diagnostics[0].message)
+      && /dynamic import/.test(error.diagnostics[0].message)
+      && error.diagnostics[0].filename === "bad-dynamic-import.js"
+  );
+});
+
+test("parser reports unsupported-by-design with statements clearly", () => {
+  const sourceText = createSourceText("with (config) { value; }", "bad-with.js");
+  assert.throws(
+    () => parse(sourceText),
+    (error) => error instanceof JayessError
+      && /unsupported by design/.test(error.diagnostics[0].message)
+      && /'with'/.test(error.diagnostics[0].message)
+      && error.diagnostics[0].filename === "bad-with.js"
+  );
+});
+
 test("semantic diagnostics explain unsupported operator targets", () => {
   const sourceText = createSourceText("var total = 1; ++(total + 1);", "bad-update.js");
   const ast = parse(sourceText);

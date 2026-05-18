@@ -11,6 +11,8 @@ test("runtime truthiness semantics stay explicit", () => {
   assert.match(runtime, /std::holds_alternative<array_ptr>\(input\)\)\s*\{\s*return !std::get<array_ptr>\(input\)->items\.empty\(\);/);
   assert.match(runtime, /std::holds_alternative<object_ptr>\(input\)\)\s*\{\s*return !std::get<object_ptr>\(input\)->fields\.empty\(\);/);
   assert.match(runtime, /std::holds_alternative<callable_ptr>\(input\)\)\s*\{\s*return true;/);
+  assert.match(runtime, /std::holds_alternative<async_ptr>\(input\)\)\s*\{\s*return true;/);
+  assert.match(runtime, /std::holds_alternative<generator_ptr>\(input\)\)\s*\{\s*return true;/);
   assert.match(runtime, /std::holds_alternative<map_ptr>\(input\)\)\s*\{\s*return !std::get<map_ptr>\(input\)->entries\.empty\(\);/);
   assert.match(runtime, /std::holds_alternative<set_ptr>\(input\)\)\s*\{\s*return !std::get<set_ptr>\(input\)->entries\.empty\(\);/);
   assert.match(runtime, /return !std::get<std::string>\(input\)\.empty\(\);/);
@@ -32,6 +34,8 @@ test("runtime equality semantics stay exact-type and identity-based for composit
   assert.match(runtime, /if \(std::holds_alternative<array_ptr>\(left\)\) \{\s*return std::get<array_ptr>\(left\) == std::get<array_ptr>\(right\);/);
   assert.match(runtime, /if \(std::holds_alternative<object_ptr>\(left\)\) \{\s*return std::get<object_ptr>\(left\) == std::get<object_ptr>\(right\);/);
   assert.match(runtime, /if \(std::holds_alternative<callable_ptr>\(left\)\) \{\s*return std::get<callable_ptr>\(left\) == std::get<callable_ptr>\(right\);/);
+  assert.match(runtime, /if \(std::holds_alternative<async_ptr>\(left\)\) \{\s*return std::get<async_ptr>\(left\) == std::get<async_ptr>\(right\);/);
+  assert.match(runtime, /if \(std::holds_alternative<generator_ptr>\(left\)\) \{\s*return std::get<generator_ptr>\(left\) == std::get<generator_ptr>\(right\);/);
   assert.match(runtime, /if \(std::holds_alternative<map_ptr>\(left\)\) \{\s*return std::get<map_ptr>\(left\) == std::get<map_ptr>\(right\);/);
   assert.match(runtime, /if \(std::holds_alternative<set_ptr>\(left\)\) \{\s*return std::get<set_ptr>\(left\) == std::get<set_ptr>\(right\);/);
   assert.match(runtime, /return std::get<std::string>\(left\) == std::get<std::string>\(right\);/);
@@ -63,6 +67,23 @@ test("runtime thrown-value carrier stays explicit", () => {
   assert.match(header, /struct thrown_value : std::exception/);
   assert.match(runtime, /void throw_value\(value input\) \{\s*throw thrown_value\(std::move\(input\)\);/);
   assert.match(runtime, /value exception_to_value\(const thrown_value& error\) \{\s*return error\.payload;/);
+  assert.match(runtime, /value exception_to_value\(const std::exception& error\) \{\s*return std::string\(error\.what\(\)\);/);
+});
+
+test("runtime nullish and missing-value helpers stay null-only", () => {
+  const runtime = getRuntimeCppSource();
+
+  assert.match(runtime, /bool is_null\(const value& input\) \{\s*return std::holds_alternative<std::monostate>\(input\);/);
+  assert.doesNotMatch(runtime, /undefined/);
+  assert.match(runtime, /if \(index >= args\.size\(\)\) \{\s*return 0\.0;/);
+});
+
+test("runtime optional-style missing lookups short-circuit through Jayess null", () => {
+  const runtime = getRuntimeCppSource();
+
+  assert.match(runtime, /if \(iterator == object->fields\.end\(\)\) \{\s*return value\(std::monostate\{\}\);/);
+  assert.match(runtime, /if \(iterator == callable->fields\.end\(\)\) \{\s*return value\(std::monostate\{\}\);/);
+  assert.match(runtime, /if \(index >= array->items\.size\(\)\) \{\s*return value\(std::monostate\{\}\);/);
 });
 
 test("runtime array and string method helpers stay narrow", () => {
@@ -71,17 +92,29 @@ test("runtime array and string method helpers stay narrow", () => {
 
   assert.match(header, /value array_pop\(const value& input\);/);
   assert.match(header, /value array_join\(const value& input, const std::vector<value>& args\);/);
+  assert.match(header, /value array_includes\(const value& input, const std::vector<value>& args\);/);
   assert.match(header, /value string_slice\(const value& input, const std::vector<value>& args\);/);
   assert.match(header, /value string_substring\(const value& input, const std::vector<value>& args\);/);
   assert.match(header, /value string_starts_with\(const value& input, const std::vector<value>& args\);/);
+  assert.match(header, /value string_includes\(const value& input, const std::vector<value>& args\);/);
+  assert.match(header, /value string_index_of\(const value& input, const std::vector<value>& args\);/);
+  assert.match(header, /value string_ends_with\(const value& input, const std::vector<value>& args\);/);
   assert.match(runtime, /value array_pop\(const value& input\)/);
   assert.match(runtime, /if \(array->items\.empty\(\)\) \{\s*return value\(std::monostate\{\}\);/);
   assert.match(runtime, /value array_join\(const value& input, const std::vector<value>& args\)/);
   assert.match(runtime, /std::string separator = ",";/);
+  assert.match(runtime, /value array_includes\(const value& input, const std::vector<value>& args\)/);
+  assert.match(runtime, /if \(std::get<bool>\(equal\(item, args\[0\]\)\)\) \{/);
   assert.match(runtime, /value string_slice\(const value& input, const std::vector<value>& args\)/);
   assert.match(runtime, /value string_substring\(const value& input, const std::vector<value>& args\)/);
   assert.match(runtime, /if \(end < start\) \{\s*std::swap\(start, end\);/);
   assert.match(runtime, /value string_starts_with\(const value& input, const std::vector<value>& args\)/);
+  assert.match(runtime, /value string_includes\(const value& input, const std::vector<value>& args\)/);
+  assert.match(runtime, /text\.find\(stringify_value\(args\[0\]\)\) != std::string::npos/);
+  assert.match(runtime, /value string_index_of\(const value& input, const std::vector<value>& args\)/);
+  assert.match(runtime, /if \(found == std::string::npos\) \{\s*return static_cast<double>\(-1\);/);
+  assert.match(runtime, /value string_ends_with\(const value& input, const std::vector<value>& args\)/);
+  assert.match(runtime, /text\.compare\(text\.size\(\) - suffix\.size\(\), suffix\.size\(\), suffix\) == 0/);
 });
 
 test("runtime async helpers stay explicit and Jayess-owned", () => {
@@ -94,6 +127,8 @@ test("runtime async helpers stay explicit and Jayess-owned", () => {
   assert.match(header, /value make_pending_async\(\);/);
   assert.match(header, /value make_resolved_async\(value resolved\);/);
   assert.match(header, /value make_rejected_async\(value rejected\);/);
+  assert.match(header, /value async_all\(const value& handles\);/);
+  assert.match(header, /value async_race\(const value& handles\);/);
   assert.match(header, /void async_enqueue\(const value& input, std::function<void\(\)> continuation\);/);
   assert.match(header, /void run_async_scheduler\(\);/);
   assert.match(runtime, /std::deque<std::function<void\(\)>> queue;/);
@@ -101,6 +136,13 @@ test("runtime async helpers stay explicit and Jayess-owned", () => {
   assert.match(runtime, /state->status = async_status::resolved;/);
   assert.match(runtime, /state->status = async_status::rejected;/);
   assert.match(runtime, /bool is_async\(const value& input\) \{\s*return std::holds_alternative<async_ptr>\(input\);/);
+  assert.match(runtime, /const array_ptr& require_async_handle_array\(const value& input\)/);
+  assert.match(runtime, /value async_all\(const value& handles\) \{/);
+  assert.match(runtime, /if \(array->items\.empty\(\)\) \{\s*async_resolve\(result, make_array\(\{\}\)\);/);
+  assert.match(runtime, /if \(!is_async\(handle\)\) \{\s*throw std::runtime_error\("Jayess async composition requires async handles"\);/);
+  assert.match(runtime, /if \(async_is_rejected\(handle\)\) \{\s*\*settled = true;\s*async_reject\(result, async_result_value\(handle\)\);/);
+  assert.match(runtime, /value async_race\(const value& handles\) \{/);
+  assert.match(runtime, /async_reject\(result, value\(std::string\("Jayess async race requires at least one handle"\)\)\);/);
   assert.match(runtime, /value await_sync\(const value& input\) \{/);
   assert.match(runtime, /if \(!is_async\(input\)\) \{\s*return input;/);
   assert.match(runtime, /if \(async_is_pending\(input\)\) \{\s*run_async_scheduler\(\);/);
@@ -167,6 +209,15 @@ test("runtime class-chain helpers stay explicit and Jayess-owned", () => {
   assert.match(runtime, /throw std::runtime_error\("Missing class method"\);/);
 });
 
+test("runtime missing lookups now resolve through Jayess null", () => {
+  const runtime = getRuntimeCppSource();
+
+  assert.match(runtime, /if \(iterator == callable->fields\.end\(\)\) \{\s*return value\(std::monostate\{\}\);/);
+  assert.match(runtime, /return value\(std::monostate\{\}\);\s*\}\s*value get_index/);
+  assert.match(runtime, /if \(index >= array->items\.size\(\)\) \{\s*return value\(std::monostate\{\}\);/);
+  assert.match(runtime, /if \(std::holds_alternative<object_ptr>\(input\) \|\| std::holds_alternative<callable_ptr>\(input\)\) \{\s*return get_property/);
+});
+
 test("runtime private-field helpers stay non-public and class-owned", () => {
   const header = getRuntimeHeaderSource();
   const runtime = getRuntimeCppSource();
@@ -190,8 +241,16 @@ test("runtime date helpers stay explicit and use hidden timestamp storage", () =
   assert.match(header, /value make_date_from_unix_millis\(double millis\);/);
   assert.match(header, /bool is_date_value\(const value& input\);/);
   assert.match(header, /value date_to_unix_millis\(const value& input\);/);
+  assert.match(header, /value date_to_iso_string\(const value& input\);/);
+  assert.match(header, /value date_get_utc_year\(const value& input\);/);
+  assert.match(header, /value date_get_utc_millisecond\(const value& input\);/);
+  assert.match(header, /value date_add_millis\(const value& input, double amount\);/);
+  assert.match(header, /value date_diff_millis\(const value& left, const value& right\);/);
+  assert.match(header, /value date_parse_iso_text\(const std::string& text\);/);
   assert.match(runtime, /constexpr const char\* kJayessDateTagKey = "__jayess_date_tag";/);
   assert.match(runtime, /constexpr const char\* kJayessDateMillisKey = "__jayess_date_millis";/);
+  assert.match(runtime, /std::tm utc_tm_from_unix_millis\(long long millis\)/);
+  assert.match(runtime, /long long days_from_civil\(int year, unsigned month, unsigned day\)/);
   assert.match(runtime, /value make_date_now\(\) \{/);
   assert.match(runtime, /std::chrono::system_clock::now\(\);/);
   assert.match(runtime, /value make_date_from_unix_millis\(double millis\) \{/);
@@ -201,6 +260,15 @@ test("runtime date helpers stay explicit and use hidden timestamp storage", () =
   assert.match(runtime, /return false;/);
   assert.match(runtime, /value date_to_unix_millis\(const value& input\) \{/);
   assert.match(runtime, /throw std::runtime_error\("Jayess date is missing timestamp storage"\);/);
+  assert.match(runtime, /value date_to_iso_string\(const value& input\) \{/);
+  assert.match(runtime, /std::put_time\(&utcTm, "%Y-%m-%dT%H:%M:%S"\);/);
+  assert.match(runtime, /value date_get_utc_year\(const value& input\) \{/);
+  assert.match(runtime, /value date_get_utc_millisecond\(const value& input\) \{/);
+  assert.match(runtime, /value date_add_millis\(const value& input, double amount\) \{/);
+  assert.match(runtime, /value date_diff_millis\(const value& left, const value& right\) \{/);
+  assert.match(runtime, /value date_parse_iso_text\(const std::string& text\) \{/);
+  assert.match(runtime, /text\.size\(\) != 24/);
+  assert.match(runtime, /return value\(std::monostate\{\}\);/);
 });
 
 test("runtime json helpers stay explicit and use a narrow native helper path", () => {
@@ -209,15 +277,102 @@ test("runtime json helpers stay explicit and use a narrow native helper path", (
 
   assert.match(header, /value json_parse_text\(const std::string& text\);/);
   assert.match(header, /value json_stringify_value\(const value& input\);/);
+  assert.match(header, /value json_stringify_pretty_value\(const value& input, int indentWidth\);/);
+  assert.match(header, /value json_validate_text\(const std::string& text\);/);
   assert.match(header, /bool is_json_text\(const std::string& text\);/);
+  assert.match(runtime, /struct json_error : std::runtime_error/);
   assert.match(runtime, /struct json_reader/);
+  assert.match(runtime, /\[\[noreturn\]\] void fail\(const std::string& message\) const/);
   assert.match(runtime, /value json_parse_text\(const std::string& text\) \{/);
   assert.match(runtime, /return make_array\(std::move\(items\)\);/);
   assert.match(runtime, /return make_object\(std::move\(fields\)\);/);
   assert.match(runtime, /std::sort\(keys\.begin\(\), keys\.end\(\)\);/);
+  assert.match(runtime, /std::string json_indent_prefix\(int level, int indentWidth\)/);
+  assert.match(runtime, /value json_stringify_pretty_value\(const value& input, int indentWidth\) \{/);
+  assert.match(runtime, /throw std::runtime_error\("Jayess JSON pretty indent must be non-negative"\);/);
+  assert.match(runtime, /value json_validate_text\(const std::string& text\) \{/);
+  assert.match(runtime, /\{"message", std::string\(error\.what\(\)\)\}/);
+  assert.match(runtime, /\{"line", static_cast<double>\(error\.line\)\}/);
+  assert.match(runtime, /\{"column", static_cast<double>\(error\.column\)\}/);
   assert.match(runtime, /throw std::runtime_error\("Unsupported Jayess value for JSON stringify"\);/);
   assert.match(runtime, /bool is_json_text\(const std::string& text\) \{/);
   assert.match(runtime, /static_cast<void>\(json_parse_text\(text\)\);/);
+});
+
+test("runtime number helpers stay explicit and use narrow full-string parsing", () => {
+  const header = getRuntimeHeaderSource();
+  const runtime = getRuntimeCppSource();
+
+  assert.match(header, /value number_parse_int\(const value& input\);/);
+  assert.match(header, /value number_parse_float\(const value& input\);/);
+  assert.match(runtime, /std::string trim_number_input\(const std::string& input\)/);
+  assert.match(runtime, /const std::string& require_number_parse_text\(const value& input\)/);
+  assert.match(runtime, /throw std::runtime_error\("Jayess number parsing expects a string input"\);/);
+  assert.match(runtime, /const auto parsed = std::stoll\(trimmed, &consumed, 10\);/);
+  assert.match(runtime, /const auto parsed = std::stod\(trimmed, &consumed\);/);
+  assert.match(runtime, /if \(consumed != trimmed\.size\(\)\) \{\s*return value\(std::monostate\{\}\);/);
+});
+
+test("runtime system-module helpers stay explicit and bounded", () => {
+  const header = getRuntimeHeaderSource();
+  const runtime = getRuntimeCppSource();
+
+  assert.match(header, /value fs_remove_path\(const std::string& pathText\);/);
+  assert.match(header, /value fs_list_directory\(const std::string& pathText\);/);
+  assert.match(header, /value fs_rename_path\(const std::string& fromPathText, const std::string& toPathText\);/);
+  assert.match(header, /value fs_stat_path\(const std::string& pathText\);/);
+  assert.match(header, /value path_resolve_parts\(const std::vector<std::string>& parts\);/);
+  assert.match(header, /value path_relative_between\(const std::string& fromPathText, const std::string& toPathText\);/);
+  assert.match(header, /value path_is_absolute\(const std::string& pathText\);/);
+  assert.match(header, /void process_set_argv\(std::vector<std::string> args\);/);
+  assert.match(header, /value process_get_argv\(\);/);
+  assert.match(runtime, /std::vector<std::string> process_argv_storage;/);
+  assert.match(runtime, /value fs_remove_path\(const std::string& pathText\) \{/);
+  assert.match(runtime, /return std::filesystem::remove\(require_filesystem_path\(pathText\)\);/);
+  assert.match(runtime, /value fs_list_directory\(const std::string& pathText\) \{/);
+  assert.match(runtime, /for \(const auto& entry : std::filesystem::directory_iterator\(require_filesystem_path\(pathText\)\)\) \{/);
+  assert.match(runtime, /std::sort\(entryNames\.begin\(\), entryNames\.end\(\)\);/);
+  assert.match(runtime, /return make_array\(string_values\(entryNames\)\);/);
+  assert.match(runtime, /value fs_rename_path\(const std::string& fromPathText, const std::string& toPathText\) \{/);
+  assert.match(runtime, /std::filesystem::rename\(/);
+  assert.match(runtime, /return value\(std::monostate\{\}\);/);
+  assert.match(runtime, /value fs_stat_path\(const std::string& pathText\) \{/);
+  assert.match(runtime, /const auto exists = std::filesystem::exists\(pathValue, error\);/);
+  assert.match(runtime, /const auto isFile = exists && std::filesystem::is_regular_file\(pathValue, error\);/);
+  assert.match(runtime, /const auto isDirectory = exists && std::filesystem::is_directory\(pathValue, error\);/);
+  assert.match(runtime, /return make_object\(\{/);
+  assert.match(runtime, /\{"exists", exists\}/);
+  assert.match(runtime, /\{"size", sizeValue\}/);
+  assert.match(runtime, /value path_resolve_parts\(const std::vector<std::string>& parts\) \{/);
+  assert.match(runtime, /resolved = std::filesystem::current_path\(\) \/ part;/);
+  assert.match(runtime, /return path_string_value\(resolved\.lexically_normal\(\)\);/);
+  assert.match(runtime, /value path_relative_between\(const std::string& fromPathText, const std::string& toPathText\) \{/);
+  assert.match(runtime, /std::filesystem::relative\(/);
+  assert.match(runtime, /value path_is_absolute\(const std::string& pathText\) \{/);
+  assert.match(runtime, /return require_filesystem_path\(pathText\)\.is_absolute\(\);/);
+  assert.match(runtime, /void process_set_argv\(std::vector<std::string> args\) \{/);
+  assert.match(runtime, /process_argv_storage = std::move\(args\);/);
+  assert.match(runtime, /value process_get_argv\(\) \{/);
+  assert.match(runtime, /return make_array\(string_values\(process_argv_storage\)\);/);
+});
+
+test("runtime regex helpers stay explicit and use a narrow native helper layer", () => {
+  const header = getRuntimeHeaderSource();
+  const runtime = getRuntimeCppSource();
+
+  assert.match(header, /value regex_create\(const value& pattern\);/);
+  assert.match(header, /bool is_regex_value\(const value& input\);/);
+  assert.match(header, /value regex_test\(const value& regexValue, const value& text\);/);
+  assert.match(header, /value regex_exec\(const value& regexValue, const value& text\);/);
+  assert.match(runtime, /constexpr const char\* kJayessRegexTagKey = "__jayess_regex_tag";/);
+  assert.match(runtime, /constexpr const char\* kJayessRegexPatternKey = "__jayess_regex_pattern";/);
+  assert.match(runtime, /std::regex require_compiled_regex\(const value& input\)/);
+  assert.match(runtime, /throw std::runtime_error\("Jayess regex creation expects a string pattern"\);/);
+  assert.match(runtime, /throw std::runtime_error\("Jayess regex operations expect a string text input"\);/);
+  assert.match(runtime, /throw std::runtime_error\("Invalid Jayess regex pattern"\);/);
+  assert.match(runtime, /return std::regex_search\(input, compiled\);/);
+  assert.match(runtime, /std::smatch match;/);
+  assert.match(runtime, /items\.push_back\(entry\.str\(\)\);/);
 });
 
 test("runtime map helpers stay explicit and use a dedicated map carrier", () => {
@@ -235,6 +390,9 @@ test("runtime map helpers stay explicit and use a dedicated map carrier", () => 
   assert.match(header, /value map_delete\(const value& map, const value& key\);/);
   assert.match(header, /value map_clear\(const value& map\);/);
   assert.match(header, /value map_size\(const value& map\);/);
+  assert.match(header, /value map_keys\(const value& map\);/);
+  assert.match(header, /value map_values\(const value& map\);/);
+  assert.match(header, /value map_entries\(const value& map\);/);
   assert.match(runtime, /map_ptr require_map_value\(const value& input\)/);
   assert.match(runtime, /std::vector<map_entry>::iterator find_map_entry\(map_ptr& map, const value& key\)/);
   assert.match(runtime, /std::get<bool>\(equal\(entry\.key, key\)\)/);
@@ -245,6 +403,10 @@ test("runtime map helpers stay explicit and use a dedicated map carrier", () => 
   assert.match(runtime, /storage->entries\.erase\(iterator\);/);
   assert.match(runtime, /storage->entries\.clear\(\);/);
   assert.match(runtime, /return static_cast<double>\(storage->entries\.size\(\)\);/);
+  assert.match(runtime, /value map_keys\(const value& map\) \{/);
+  assert.match(runtime, /value map_values\(const value& map\) \{/);
+  assert.match(runtime, /value map_entries\(const value& map\) \{/);
+  assert.match(runtime, /items\.push_back\(make_array\(\{entry\.key, entry\.stored\}\)\);/);
 });
 
 test("runtime set helpers stay explicit and use a dedicated set carrier", () => {
@@ -260,6 +422,8 @@ test("runtime set helpers stay explicit and use a dedicated set carrier", () => 
   assert.match(header, /value set_delete\(const value& input, const value& member\);/);
   assert.match(header, /value set_clear\(const value& input\);/);
   assert.match(header, /value set_size\(const value& input\);/);
+  assert.match(header, /value set_values\(const value& input\);/);
+  assert.match(header, /value set_entries\(const value& input\);/);
   assert.match(runtime, /set_ptr require_set_value\(const value& input\)/);
   assert.match(runtime, /std::vector<value>::iterator find_set_entry\(set_ptr& set, const value& member\)/);
   assert.match(runtime, /std::get<bool>\(equal\(entry, member\)\)/);
@@ -270,6 +434,9 @@ test("runtime set helpers stay explicit and use a dedicated set carrier", () => 
   assert.match(runtime, /set->entries\.erase\(iterator\);/);
   assert.match(runtime, /set->entries\.clear\(\);/);
   assert.match(runtime, /return static_cast<double>\(set->entries\.size\(\)\);/);
+  assert.match(runtime, /value set_values\(const value& input\) \{/);
+  assert.match(runtime, /value set_entries\(const value& input\) \{/);
+  assert.match(runtime, /items\.push_back\(make_array\(\{entry, entry\}\)\);/);
 });
 
 test("runtime system-module helpers stay explicit and use a narrow native adapter layer", () => {

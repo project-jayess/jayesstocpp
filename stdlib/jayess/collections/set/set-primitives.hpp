@@ -34,6 +34,16 @@ inline jayess::value jayessSetSize(const std::vector<jayess::value>& jayessArgs)
   return jayess::set_size(set);
 }
 
+inline jayess::value jayessSetValues(const std::vector<jayess::value>& jayessArgs) {
+  const auto set = jayess::argument_at(jayessArgs, 0);
+  return jayess::set_values(set);
+}
+
+inline jayess::value jayessSetEntries(const std::vector<jayess::value>& jayessArgs) {
+  const auto set = jayess::argument_at(jayessArgs, 0);
+  return jayess::set_entries(set);
+}
+
 inline jayess::value jayessSetIsSet(const std::vector<jayess::value>& jayessArgs) {
   const auto value = jayess::argument_at(jayessArgs, 0);
   return jayess::value(jayess::is_set_value(value));

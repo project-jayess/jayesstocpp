@@ -43,6 +43,7 @@ export const keywords = new Set([
   "try",
   "false",
   "var",
+  "with",
   "while",
   "yield"
 ]);

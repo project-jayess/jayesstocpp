@@ -18,14 +18,12 @@ The first shipped async slice should stay intentionally narrow:
 - support `async function name(...) { ... }`
 - support `await expr` only inside approved async function bodies
 - treat async functions as ordinary Jayess callable values that return a Jayess async result handle
-- do not make ambient JavaScript `Promise` a language dependency
+- do not make ambient JavaScript `Promise` a language dependency or target surface
 
 The first slice should not try to ship every async-shaped form at once.
 
 Keep these for later slices unless they become necessary during implementation:
 
-- async function expressions
-- async arrow functions
 - async methods or constructors as a separate class-model slice
 - top-level `await`
 - async generators
@@ -38,10 +36,10 @@ This keeps the first implementation compatible with the current transpiler archi
 
 ## Required Build Areas
 
-`async` / `await` needs more than syntax support. Jayess would need a coherent answer for:
+`async` / `await` needs more than syntax support. Jayess needs a coherent answer for:
 
 - the runtime representation of an async result
-- whether that result is Promise-like, task-like, or a Jayess-specific abstraction
+- the Jayess-specific abstraction used for async results and composition
 - suspension and resumption points in generated C++
 - lifetime behavior for locals captured across suspension
 - interaction with `try` / `catch` / `finally`
@@ -55,9 +53,61 @@ The current policy is:
 
 - keep unsupported async forms rejected with explicit diagnostics
 - reject `await` outside approved async contexts with explicit diagnostics
-- keep async function expressions and async arrow functions outside the first shipped slice with explicit diagnostics
-- keep fake Promise semantics out of the language
+- keep async methods, async constructors, and top-level `await` rejected with explicit diagnostics until their own slices are approved
+- keep JavaScript Promise semantics and Promise-shaped APIs out of the language
 - implement the feature through Jayess-owned runtime and core-library layers
+
+Jayess async follow-up work should continue to treat JavaScript `Promise` as unsupported by design, not as pending compatibility work.
+
+## Next Approved Async Surface
+
+The next approved async syntax slice is:
+
+- async function expressions
+- async arrow functions
+
+These two forms should land together because they share the same closure/capture/runtime concerns and should reuse the same async-handle lowering path as async function declarations.
+
+That slice is now implemented end to end:
+
+- the parser accepts both forms
+- semantic analysis treats `await` inside them as async-scoped
+- capture and escape analysis reuse the ordinary function/arrow machinery
+- C++ lowering reuses the existing Jayess async-handle runtime path instead of introducing a second async representation
+
+## Async Methods
+
+Async methods are approved as a separate later slice, not as part of the next standalone async-expression work.
+
+That keeps the next implementation focused on:
+
+- ordinary function expressions
+- arrow functions
+- closure/lifetime behavior
+
+without mixing in class-model and method-table changes.
+
+There is no active implementation milestone for async methods in the current checklist. They remain a later class-model follow-up rather than current in-flight work.
+
+## Async Constructors
+
+Async constructors remain unsupported by design in the current Jayess direction.
+
+Jayess constructors should continue to behave as synchronous instance-initialization paths. If Jayess later needs async construction ergonomics, that should land through a separate Jayess-native factory pattern or class-side helper model, not through JavaScript-style async constructors.
+
+## Top-Level `await`
+
+Top-level `await` remains out of scope for the next async slice.
+
+The current policy is:
+
+- no top-level `await` support yet
+- if it ever lands, it should be module-only
+- it must come with an explicit module-initialization ordering model for async dependency graphs
+
+That means module-level async initialization is a separate later milestone, not part of the next async-expression implementation slice.
+
+There is no active implementation milestone for that module-level async-initialization work while top-level `await` remains unsupported.
 
 ## Runtime Result Model
 
@@ -166,9 +216,9 @@ This keeps the language model explicit:
 
 ## First Jayess Async Library API Shape
 
-The first `jayess:async` module should stay narrow and centered on composition over async handles, not on JavaScript compatibility.
+The first `jayess:async` module now ships as a narrow composition layer over async handles, not as JavaScript compatibility.
 
-The first API shape should be:
+The first shipped API shape is:
 
 - `resolved(value)`
   returns an already-completed Jayess async handle
@@ -181,9 +231,18 @@ The first API shape should be:
 - `isAsync(value)`
   reports whether a value is the Jayess async-result runtime kind
 
-This first shape intentionally avoids shipping a broad JavaScript-like `Promise` surface.
+The approved first composition semantics are:
 
-Leave these for later slices unless the runtime implementation proves they are needed immediately:
+- `resolved(value)` returns an already-resolved Jayess async handle
+- `rejected(error)` returns an already-failed Jayess async handle
+- `all(handles)` resolves when all inputs resolve and fails on the first failure
+- `race(handles)` completes with the first input completion, whether resolved or failed
+
+This first shipped composition surface uses function exports, not handle methods.
+
+This first shape intentionally avoids shipping any JavaScript `Promise` surface.
+
+Keep these out unless Jayess later defines a distinct Jayess-owned async-composition reason for them:
 
 - `then(...)`
 - `catch(...)`
@@ -195,4 +254,6 @@ The design goal is:
 
 - keep language-level `await` as the main consumption path
 - keep library composition explicit through `jayess:async`
-- avoid coupling Jayess semantics to ambient JavaScript Promise behavior
+- avoid coupling Jayess semantics to ambient JavaScript Promise behavior or Promise-first programming style
+
+The remaining section-100 follow-up work should therefore stay focused on verification and any strictly minimal runtime refinement rather than widening into Promise-shaped compatibility.

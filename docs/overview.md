@@ -17,8 +17,10 @@ This repository contains a small but working first milestone of the Jayess to C+
 - trailing commas in parameter lists, argument lists, array literals, object literals, import lists, and export lists
 - anonymous function expressions
 - named function expressions
+- async function expressions
 - closure capture of outer local bindings
 - lexical `this` capture in arrow functions
+- async arrow functions
 - class declarations
 - constructor methods
 - instance methods
@@ -31,6 +33,7 @@ This repository contains a small but working first milestone of the Jayess to C+
 - `super(...)` inside derived constructors
 - `super.method(...)` inside derived instance methods
 - private instance field declarations with `#field`
+- private instance methods with `#method()`
 - private reads and writes inside the declaring class body
 - `new` class construction
 - `this` inside class methods
@@ -45,6 +48,7 @@ This repository contains a small but working first milestone of the Jayess to C+
 - `async function` declarations
 - `await expr` inside async function bodies
 - generator declarations
+- generator function expressions
 - `yield expr` and `yield* expr` inside generator declaration bodies
 - `break` and `continue` inside loops
 - numeric and string literals
@@ -65,7 +69,7 @@ This repository contains a small but working first milestone of the Jayess to C+
 - exponentiation operator: `**`
 - array literals
 - object literals with identifier or string keys
-- declaration destructuring with simple array and object binding patterns, including final rest bindings
+- destructuring with nested array/object patterns, pattern defaults, final rest bindings, assignment destructuring into existing identifiers, and destructuring declarations in `for` initializers
 - call spread in ordinary calls, optional calls, and `new` argument lists
 - array spread in array literals
 - object spread in object literals
@@ -104,6 +108,21 @@ This repository contains a small but working first milestone of the Jayess to C+
 - full JavaScript compatibility
 - direct binary output from the transpiler
 
+## Unsupported By Design
+
+These JavaScript features are not treated as pending transpiler gaps. They are unsupported by Jayess language design:
+
+- `let`
+- JavaScript-style `undefined` as a separate first-class value distinct from `null`
+- JavaScript `Promise` as a language/runtime surface
+- dynamic `import()`
+- `eval(...)`
+- `Function(...)`
+- `with`
+- JavaScript-style hoisted/function-scoped `var`
+
+The general rule is that Jayess should not adopt JavaScript features that depend on runtime source evaluation, runtime source-module discovery/loading, broken lexical resolution, or legacy hoisting behavior that conflicts with deterministic compiled lowering.
+
 ## Standard Library Direction
 
 Jayess is intended to grow through a mix of:
@@ -115,6 +134,19 @@ When practical, standard-library and core-library behavior should be written in 
 
 The remaining larger language/runtime gaps are treated as active implementation work. Until a slice is actually shipped, the transpiler should keep explicit diagnostics rather than implying partial support.
 
+Jayess also has explicit permanent non-goals that come from being a compiled language rather than a runtime source-evaluation environment. `let` is not part of the language because Jayess `var` already fills that role, and Jayess does not support dynamic `import()`, `eval(...)`, `Function(...)`, or `with`.
+
+Jayess also does not aim to add a separate JavaScript-style `undefined` value. The current language direction is to keep `null` as the only built-in missing-value sentinel and keep equality/truthiness rules explicit rather than coercive.
+
+That same null-only rule is also the intended direction for implicit function completion, missing object properties, missing array elements, and optional-chaining short-circuit behavior.
+
+The current semantics direction is also explicit on truthiness and coercion:
+
+- empty arrays, empty objects, empty maps, and empty sets are falsey
+- equality is exact-type, with identity-based comparison for composites and runtime-handle values
+- JavaScript-style numeric coercion is intentionally absent
+
+See [../Jayess.md](../Jayess.md) for the current language-direction rules and explicit permanently unsupported JavaScript features.
 See [javascript-feature-gaps.md](./javascript-feature-gaps.md) for a broader list of unsupported or intentionally different JavaScript features.
 See [stdlib-and-core-model.md](./stdlib-and-core-model.md) for the intended split between low-level C++ runtime support and Jayess-written standard-library/core modules.
 See [semantics.md](./semantics.md) for the current truthiness, equality, and numeric-operator rules that Jayess implements today.
@@ -125,14 +157,20 @@ See [generators-roadmap.md](./generators-roadmap.md) for the implementation plan
 See [inheritance-roadmap.md](./inheritance-roadmap.md) for the current first-slice `extends` / `super` contract and remaining follow-up work.
 See [private-fields-roadmap.md](./private-fields-roadmap.md) for the current first-slice private-member contract and remaining follow-up work.
 See [class-members-roadmap.md](./class-members-roadmap.md) for the current first-slice contract and remaining follow-up work for computed class member names and static initialization blocks.
+See [destructuring-roadmap.md](./destructuring-roadmap.md) for the current destructuring semantics and the remaining intentionally unsupported destructuring forms.
 See [builtin-module-policy.md](./builtin-module-policy.md) for the repository-owned `jayess:*` namespace and built-in module resolution contract.
 See [jayess-date-module.md](./jayess-date-module.md) for the first intended `jayess:date` module surface.
 See [jayess-json-module.md](./jayess-json-module.md) for the first intended `jayess:json` module surface.
 See [jayess-map-module.md](./jayess-map-module.md) for the current first intended module surface and runtime-boundary decision for `jayess:collections/map`.
 See [jayess-set-module.md](./jayess-set-module.md) for the current runtime-boundary decision for `jayess:collections/set`.
-See [runtime-builtins-roadmap.md](./runtime-builtins-roadmap.md) for the implementation plan for larger built-ins like `Date`, `Promise`, `Map`, `Set`, and `JSON`.
+See [jayess-object-module.md](./jayess-object-module.md) for the first shipped `jayess:object` helper surface.
+See [jayess-number-module.md](./jayess-number-module.md) for the first shipped `jayess:number` parsing surface.
+See [jayess-regex-module.md](./jayess-regex-module.md) for the first shipped `jayess:regex` helper surface.
+See [regex-roadmap.md](./regex-roadmap.md) for the approved first direction for Jayess-owned regular-expression support.
+See [runtime-builtins-roadmap.md](./runtime-builtins-roadmap.md) for the implementation plan for larger built-ins like `Date`, `Map`, `Set`, and `JSON`.
 See [node-builtins-roadmap.md](./node-builtins-roadmap.md) for the implementation plan for Jayess-provided system modules instead of ambient Node compatibility.
 See [jayess-system-modules.md](./jayess-system-modules.md) for the current first-slice `jayess:fs`, `jayess:path`, and `jayess:process` surface and ownership split.
+See [module-resolution-roadmap.md](./module-resolution-roadmap.md) for the current hardening direction for `export *`, package-entry behavior, and later async module-initialization follow-up.
 
 ## Diagnostics Behavior
 
@@ -140,7 +178,7 @@ Public APIs throw `JayessError` when compilation fails.
 
 Internal analysis can also be used in recoverable mode with `throwOnError: false` when tests or tooling need structured diagnostics without throwing immediately.
 
-`export *` currently re-exports named bindings only. Default exports are not forwarded through export-all alias generation.
+`export *` currently re-exports named bindings only. Default exports are not forwarded through export-all alias generation, and that remains the approved Jayess rule rather than pending broader JavaScript compatibility.
 
 Current exception-handling note:
 
@@ -154,22 +192,28 @@ Current async note:
 - `async function` declarations and `await expr` are supported in the first shipped slice
 - async functions currently lower to Jayess-owned async handles with explicit runtime completion state
 - `await` currently lowers through a single-evaluation helper over Jayess async handles
-- async function expressions, async arrow functions, async methods/constructors, and top-level `await` are still outside the current slice
+- async function expressions and async arrow functions are now supported and lower through the same Jayess async-handle machinery as async function declarations
+- JavaScript `Promise` is unsupported by design; async composition stays Jayess-owned through `jayess:async`
+- the first shipped `jayess:async` composition surface is `resolved`, `rejected`, `all`, `race`, and `isAsync`
+- async methods remain a separate later class-model slice
+- async constructors remain unsupported by design
+- top-level `await` remains unsupported until Jayess defines explicit module-level async initialization ordering
 
 Current generator note:
 
-- generator declarations with direct `yield expr` and direct `yield* expr` are supported in the first shipped slice
+- generator declarations with direct `yield expr` and direct `yield* expr` are supported in the shipped slice
 - `yield` legality is checked against generator-function context
-- generator declarations lower to Jayess-owned generator handles with explicit state-slot resume lambdas
-- generator function expressions still stop with explicit diagnostics because the first shipped generator slice is declaration-only
-- more complex yield nesting and broader generator forms remain outside the current slice
+- generator declarations and generator function expressions lower to Jayess-owned generator handles with explicit state-slot resume lambdas
+- generator function expressions are supported in the current non-class generator slice
+- generator methods, async generators, and broader generator/yield forms remain outside the current slice for now
 
 Current private-member note:
 
 - private instance fields are supported in a narrow first slice
 - `#field` declarations lower through class-owned hidden runtime storage
-- private reads and writes are allowed only inside methods or field initializers of the declaring class
-- private methods, private static members, and broader private-member forms remain outside the current slice
+- private instance methods are supported in the current shipped slice
+- private reads, writes, and private method calls are allowed only inside methods or field initializers of the declaring class
+- private static fields and private static methods remain later separate class-side slices
 
 Current computed-class-member note:
 
@@ -182,8 +226,36 @@ Current computed-class-member note:
 Current system-module note:
 
 - Jayess-owned `jayess:fs`, `jayess:path`, and `jayess:process` modules are supported in a narrow first slice
+- `jayess:fs` currently exports `exists`, `readText`, `writeText`, `createDirectories`, `remove`, `list`, `rename`, and `stat`
+- `jayess:path` currently exports `join`, `dirname`, `basename`, `extname`, `normalize`, `resolve`, `relative`, and `isAbsolute`
+- `jayess:process` currently exports `argv`, `cwd`, `getEnv`, and `exit`
 - these modules resolve through the built-in module graph and lower through explicit native adapter primitives
 - ambient `node:*` imports remain explicitly unsupported
+- the current shipped follow-up work now includes `jayess:fs` `remove` / `list` / `rename` / narrow `stat`, `jayess:path` `resolve` / `relative` / `isAbsolute`, and `jayess:process` `argv()`
+- env mutation, subprocess spawning, and additional modules such as `jayess:os`, `jayess:url`, and `jayess:timers` remain separate later decisions
+
+Current module/export hardening note:
+
+- `export *` permanently excludes default exports; default forwarding must stay explicit
+- package `exports` support remains intentionally narrow rather than trying to emulate full Node conditional-exports behavior in the next slice
+- top-level `await` is still unsupported, so async module-initialization cycle rules remain a separate later milestone rather than an active resolver rule today
+- the next diagnostic-hardening work should distinguish missing packages, unsupported file types, and installed JavaScript-oriented packages that are not valid Jayess packages
+- mixed graphs that combine named re-exports and `export *` are supported in the current shipped hardening slice
+- duplicate exported names now fail explicitly
+- packages that expose only unsupported conditional export branches now fail with focused diagnostics
+
+Current regex note:
+
+- a narrow helper-only `jayess:regex` slice is now shipped
+- the shipped exports are `create`, `test`, `exec`, and `isRegex`
+- regex literals and ambient/global `RegExp` remain unsupported
+
+Current next-stdlib-slice note:
+
+- `jayess:date` now also ships UTC ISO formatting, UTC component extraction, millisecond arithmetic, and narrow ISO parsing; broader timezone/formatting work stays separate
+- `jayess:json` now also ships pretty-printing and small validation/failure-diagnostics helpers; reviver/replacer-like work stays separate
+- `jayess:collections/map` now also ships array-producing `keys` / `values` / `entries`; bulk construction and update helpers stay separate
+- `jayess:collections/set` now also ships array-producing `values` / `entries`; bulk construction and pure set-operation helpers stay separate
 
 ## Output Shape
 
@@ -200,6 +272,8 @@ Repository-defined Jayess standard-library/core modules may also be transpiled i
 
 The preferred future built-in-module direction is a Jayess-owned namespace such as `jayess:*`, kept distinct from `node:*` and `cpp:*`.
 
+See [standard-library-expansion-roadmap.md](./standard-library-expansion-roadmap.md) for the next approved built-in family slices beyond the currently shipped array/string helpers.
+
 The generated project is meant to be compiled later by an external compiler such as `clang++`.
 
 ## Current Composite Value Model
@@ -207,7 +281,7 @@ The generated project is meant to be compiled later by an external compiler such
 - arrays lower to Jayess runtime wrappers backed by C++ `std::vector`
 - objects lower to Jayess runtime wrappers backed by C++ `std::unordered_map`
 - current support includes literals, dot/bracket lookup, direct member assignment, array/string `.length`, array `.push(...)`, and primitive `.toString()`
-- current support also includes array `.pop()` / `.join(...)` and string `.slice(...)` / `.substring(...)` / `.startsWith(...)` through focused runtime helpers
+- current support also includes array `.pop()` / `.join(...)` / `.includes(...)` and string `.slice(...)` / `.substring(...)` / `.startsWith(...)` / `.includes(...)` / `.indexOf(...)` / `.endsWith(...)` through focused runtime helpers
 - spread arguments and array spread currently require Jayess arrays and flatten left-to-right through explicit temporary vectors
 - object spread currently copies fields from Jayess objects and callables through an explicit temporary field vector before final object construction
 - assignment into object properties and array indexes uses conservative escape marking for the assigned value
@@ -223,16 +297,27 @@ The generated project is meant to be compiled later by an external compiler such
   - array `.push(...)`
   - array `.pop()`
   - array `.join(separator?)`
+  - array `.includes(value)`
   - string `.slice(start, end?)`
   - string `.substring(start, end?)`
   - string `.startsWith(prefix)`
+  - string `.includes(value)`
+  - string `.indexOf(value)`
+  - string `.endsWith(value)`
   - primitive `.toString()` for strings, numbers, booleans, and null
+  - `jayess:object` module exports `keys(value)`, `values(value)`, and `entries(value)`
+  - `jayess:number` module exports `parseInt(text)` and `parseFloat(text)`
+  - `jayess:date` module exports `now()`, `fromUnixMillis(value)`, `toUnixMillis(date)`, `toIsoString(date)`, UTC component helpers, `addMillis(date, amount)`, `diffMillis(left, right)`, `parseIso(text)`, and `isDate(value)`
+  - `jayess:json` module exports `parse(text)`, `stringify(value)`, `stringifyPretty(value, indent?)`, `validate(text)`, and `isJsonText(text)`
+  - `jayess:collections/map` module exports `create`, `get`, `set`, `has`, `deleteKey`, `clear`, `size`, `keys`, `values`, `entries`, and `isMap`
+  - `jayess:collections/set` module exports `create`, `add`, `has`, `deleteValue`, `clear`, `size`, `values`, `entries`, and `isSet`
+  - `jayess:regex` module exports `create(pattern)`, `test(regex, text)`, `exec(regex, text)`, and `isRegex(value)`
 - still not implemented in the current slice:
-  - `parseInt`
-  - `parseFloat`
   - broad `Array.prototype` coverage
   - broad `String.prototype` coverage
-  - ambient `Date`, `Promise`, `Map`, `Set`, and `JSON` runtime support
+  - broader numeric helper coverage
+  - regex literal syntax
+  - ambient/global `Date`, `Map`, `Set`, and `JSON` compatibility
 
 ## Current Closure Model
 
@@ -266,3 +351,4 @@ The generated project is meant to be compiled later by an external compiler such
 - private instance fields use class-owned hidden runtime keys and do not participate in ordinary public property lookup
 - computed class-side writes currently reuse the same property/index runtime path as other class-value property writes
 - static inheritance is still outside the current slice
+- `super` property assignment forms remain unsupported

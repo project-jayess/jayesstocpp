@@ -132,6 +132,8 @@ That means:
 - `super.staticMethod(...)` in static contexts is not part of the initial implementation
 - class-side lookup can remain simpler while instance-side inheritance lands first
 
+The next class follow-up policy should keep static inheritance as a separate later slice rather than bundling it into the next inheritance expansion by default.
+
 ## Implementation Direction
 
 The first slice has already landed through an intentional expansion of the class runtime shape:
@@ -143,3 +145,15 @@ The first slice has already landed through an intentional expansion of the class
 - explicit base-method binding for `super.method(...)`
 
 The remaining work should preserve that model rather than reverting to eager method copying or JavaScript-emulation shortcuts.
+
+## Follow-Up Policy
+
+The current follow-up policy is:
+
+- keep static inheritance separate from instance-side inheritance follow-up work
+- keep computed `super[expr]` outside the next inheritance slice
+- keep `super` property assignment forms unsupported instead of treating them as pending parser work
+- keep non-identifier and non-local base expressions rejected for now, rather than widening the base-expression surface before the class model is ready
+- keep the current class backend unchanged for these forms until one of them is explicitly approved as a real shipped slice
+
+This keeps inheritance follow-up aligned with Jayess's explicit class runtime instead of drifting toward broad JavaScript class flexibility by accident.

@@ -152,15 +152,32 @@ test("parser handles async function declarations and await expressions", () => {
   assert.equal(ast.body[1].declaration.async, true);
 });
 
-test("parser rejects unsupported async expression forms clearly", () => {
-  assert.throws(
-    () => parse(createSourceText("var fn = async function run() { return 1; };")),
-    /Jayess does not support async function expressions yet; the first async slice starts with async function declarations only/
+test("parser handles async function expressions and async arrow functions", () => {
+  const ast = parse(
+    createSourceText("var declared = async function run(value) { return await value; }; var unary = async value => await value; var grouped = async (left, right = 1) => { return await left; };")
   );
 
+  assert.equal(ast.body[0].type, "VariableDeclaration");
+  assert.equal(ast.body[0].declarations[0].init.type, "FunctionExpression");
+  assert.equal(ast.body[0].declarations[0].init.async, true);
+  assert.equal(ast.body[0].declarations[0].init.id.name, "run");
+  assert.equal(ast.body[0].declarations[0].init.body.body[0].argument.type, "AwaitExpression");
+
+  assert.equal(ast.body[1].declarations[0].init.type, "ArrowFunctionExpression");
+  assert.equal(ast.body[1].declarations[0].init.async, true);
+  assert.equal(ast.body[1].declarations[0].init.params[0].name, "value");
+  assert.equal(ast.body[1].declarations[0].init.body.type, "AwaitExpression");
+
+  assert.equal(ast.body[2].declarations[0].init.type, "ArrowFunctionExpression");
+  assert.equal(ast.body[2].declarations[0].init.async, true);
+  assert.equal(ast.body[2].declarations[0].init.params[1].defaultValue.kind, "number");
+  assert.equal(ast.body[2].declarations[0].init.body.type, "BlockStatement");
+});
+
+test("parser rejects unsupported async forms clearly after the expression slice lands", () => {
   assert.throws(
-    () => parse(createSourceText("var fn = async value => value;")),
-    /Jayess does not support async arrow functions yet; the first async slice starts with async function declarations only/
+    () => parse(createSourceText("class Worker { async run(value) { return await value; } }")),
+    /Jayess does not support this async form yet|Expected ';' after class field|Expected identifier/
   );
 });
 
@@ -239,11 +256,12 @@ test("parser handles private fields and private member access", () => {
   assert.equal(declaration.methods[1].body.body[0].argument.computed, false);
 });
 
-test("parser rejects unsupported private class member forms clearly", () => {
-  assert.throws(
-    () => parse(createSourceText("class Point { #value() { return 1; } }")),
-    /Jayess does not support private methods yet; the first private-member slice starts with private instance fields only/
-  );
+test("parser handles private instance methods while keeping private static forms blocked", () => {
+  const ast = parse(createSourceText("class Point { #value() { return 1; } }"));
+  const declaration = ast.body[0];
+  assert.equal(declaration.methods[0].type, "MethodDefinition");
+  assert.equal(declaration.methods[0].key.type, "PrivateIdentifier");
+  assert.equal(declaration.methods[0].key.name, "value");
 
   assert.throws(
     () => parse(createSourceText("class Point { static #value = 1; }")),
@@ -334,6 +352,121 @@ test("parser handles rest bindings in declaration destructuring", () => {
   assert.equal(ast.body[0].declarations[0].id.elements[1].argument.name, "tail");
   assert.equal(ast.body[1].declarations[0].id.properties[1].type, "RestElement");
   assert.equal(ast.body[1].declarations[0].id.properties[1].argument.name, "rest");
+});
+
+test("parser handles nested declaration destructuring patterns", () => {
+  const ast = parse(
+    createSourceText('var [head, { value, nested: [left, right] }] = values; const { meta: { name }, "score": [first, ...rest] } = data;')
+  );
+
+  const firstPattern = ast.body[0].declarations[0].id;
+  assert.equal(firstPattern.type, "ArrayPattern");
+  assert.equal(firstPattern.elements[0].name, "head");
+  assert.equal(firstPattern.elements[1].type, "ObjectPattern");
+  assert.equal(firstPattern.elements[1].properties[0].value.name, "value");
+  assert.equal(firstPattern.elements[1].properties[1].value.type, "ArrayPattern");
+  assert.equal(firstPattern.elements[1].properties[1].value.elements[0].name, "left");
+  assert.equal(firstPattern.elements[1].properties[1].value.elements[1].name, "right");
+
+  const secondPattern = ast.body[1].declarations[0].id;
+  assert.equal(secondPattern.type, "ObjectPattern");
+  assert.equal(secondPattern.properties[0].value.type, "ObjectPattern");
+  assert.equal(secondPattern.properties[0].value.properties[0].value.name, "name");
+  assert.equal(secondPattern.properties[1].value.type, "ArrayPattern");
+  assert.equal(secondPattern.properties[1].value.elements[0].name, "first");
+  assert.equal(secondPattern.properties[1].value.elements[1].type, "RestElement");
+  assert.equal(secondPattern.properties[1].value.elements[1].argument.name, "rest");
+});
+
+test("parser handles default values inside declaration destructuring patterns", () => {
+  const ast = parse(
+    createSourceText('var [head = 1, { value = 2, nested: [left = 3, right] = pair }] = values; const { meta: { name = "Jayess" } = info, "score": total = 0 } = data;')
+  );
+
+  const firstPattern = ast.body[0].declarations[0].id;
+  assert.equal(firstPattern.elements[0].type, "AssignmentPattern");
+  assert.equal(firstPattern.elements[0].left.name, "head");
+  assert.equal(firstPattern.elements[0].right.kind, "number");
+  assert.equal(firstPattern.elements[1].type, "ObjectPattern");
+  assert.equal(firstPattern.elements[1].properties[0].value.type, "AssignmentPattern");
+  assert.equal(firstPattern.elements[1].properties[0].value.left.name, "value");
+  assert.equal(firstPattern.elements[1].properties[1].value.type, "AssignmentPattern");
+  assert.equal(firstPattern.elements[1].properties[1].value.left.type, "ArrayPattern");
+  assert.equal(firstPattern.elements[1].properties[1].value.left.elements[0].type, "AssignmentPattern");
+  assert.equal(firstPattern.elements[1].properties[1].value.left.elements[0].left.name, "left");
+  assert.equal(firstPattern.elements[1].properties[1].value.right.name, "pair");
+
+  const secondPattern = ast.body[1].declarations[0].id;
+  assert.equal(secondPattern.properties[0].value.type, "AssignmentPattern");
+  assert.equal(secondPattern.properties[0].value.left.type, "ObjectPattern");
+  assert.equal(secondPattern.properties[0].value.left.properties[0].value.type, "AssignmentPattern");
+  assert.equal(secondPattern.properties[0].value.left.properties[0].value.left.name, "name");
+  assert.equal(secondPattern.properties[0].value.right.name, "info");
+  assert.equal(secondPattern.properties[1].value.type, "AssignmentPattern");
+  assert.equal(secondPattern.properties[1].value.left.name, "total");
+  assert.equal(secondPattern.properties[1].value.right.kind, "number");
+});
+
+test("parser handles assignment destructuring patterns", () => {
+  const ast = parse(
+    createSourceText('[head = 1, { value, nested: [left = 2, ...rest] } = fallback] = values; ({ meta: { name = "Jayess" } = info, "score": total = 0 } = data);')
+  );
+
+  const firstAssignment = ast.body[0].expression;
+  assert.equal(firstAssignment.type, "AssignmentExpression");
+  assert.equal(firstAssignment.operator, "=");
+  assert.equal(firstAssignment.left.type, "ArrayPattern");
+  assert.equal(firstAssignment.left.elements[0].type, "AssignmentPattern");
+  assert.equal(firstAssignment.left.elements[0].left.name, "head");
+  assert.equal(firstAssignment.left.elements[1].type, "AssignmentPattern");
+  assert.equal(firstAssignment.left.elements[1].left.type, "ObjectPattern");
+  assert.equal(firstAssignment.left.elements[1].left.properties[0].value.name, "value");
+  assert.equal(firstAssignment.left.elements[1].left.properties[1].value.type, "ArrayPattern");
+  assert.equal(firstAssignment.left.elements[1].left.properties[1].value.elements[0].type, "AssignmentPattern");
+  assert.equal(firstAssignment.left.elements[1].left.properties[1].value.elements[0].left.name, "left");
+  assert.equal(firstAssignment.left.elements[1].left.properties[1].value.elements[1].type, "RestElement");
+  assert.equal(firstAssignment.left.elements[1].right.name, "fallback");
+
+  const secondAssignment = ast.body[1].expression;
+  assert.equal(secondAssignment.type, "AssignmentExpression");
+  assert.equal(secondAssignment.operator, "=");
+  assert.equal(secondAssignment.left.type, "ObjectPattern");
+  assert.equal(secondAssignment.left.properties[0].value.type, "AssignmentPattern");
+  assert.equal(secondAssignment.left.properties[0].value.left.type, "ObjectPattern");
+  assert.equal(secondAssignment.left.properties[0].value.left.properties[0].value.type, "AssignmentPattern");
+  assert.equal(secondAssignment.left.properties[0].value.left.properties[0].value.left.name, "name");
+  assert.equal(secondAssignment.left.properties[0].value.right.name, "info");
+  assert.equal(secondAssignment.left.properties[1].value.type, "AssignmentPattern");
+  assert.equal(secondAssignment.left.properties[1].value.left.name, "total");
+  assert.equal(secondAssignment.left.properties[1].value.right.kind, "number");
+});
+
+test("parser handles destructuring in for initializers", () => {
+  const ast = parse(
+    createSourceText('for (var [left = 1, { value, nested: [head, ...tail] }] = values; left; left = left - 1) { value; } for ({ meta: { name = "Jayess" } = info, "score": total = 0 } = data; total; total = total - 1) { name; }')
+  );
+
+  const firstLoop = ast.body[0];
+  assert.equal(firstLoop.type, "ForStatement");
+  assert.equal(firstLoop.init.type, "VariableDeclaration");
+  assert.equal(firstLoop.init.declarations[0].id.type, "ArrayPattern");
+  assert.equal(firstLoop.init.declarations[0].id.elements[0].type, "AssignmentPattern");
+  assert.equal(firstLoop.init.declarations[0].id.elements[0].left.name, "left");
+  assert.equal(firstLoop.init.declarations[0].id.elements[1].type, "ObjectPattern");
+  assert.equal(firstLoop.init.declarations[0].id.elements[1].properties[0].value.name, "value");
+  assert.equal(firstLoop.init.declarations[0].id.elements[1].properties[1].value.type, "ArrayPattern");
+  assert.equal(firstLoop.init.declarations[0].id.elements[1].properties[1].value.elements[1].type, "RestElement");
+
+  const secondLoop = ast.body[1];
+  assert.equal(secondLoop.type, "ForStatement");
+  assert.equal(secondLoop.init.type, "AssignmentExpression");
+  assert.equal(secondLoop.init.left.type, "ObjectPattern");
+  assert.equal(secondLoop.init.left.properties[0].value.type, "AssignmentPattern");
+  assert.equal(secondLoop.init.left.properties[0].value.left.type, "ObjectPattern");
+  assert.equal(secondLoop.init.left.properties[0].value.left.properties[0].value.type, "AssignmentPattern");
+  assert.equal(secondLoop.init.left.properties[0].value.left.properties[0].value.left.name, "name");
+  assert.equal(secondLoop.init.left.properties[1].value.type, "AssignmentPattern");
+  assert.equal(secondLoop.init.left.properties[1].value.left.name, "total");
 });
 
 test("parser handles boolean literals", () => {
@@ -534,11 +667,6 @@ test("parser rejects unsupported destructuring forms clearly", () => {
   assert.throws(
     () => parse(createSourceText("var [left, , right] = values;")),
     /Array destructuring elisions are not supported/
-  );
-
-  assert.throws(
-    () => parse(createSourceText("var [{ value }] = items;")),
-    /Nested destructuring patterns are not supported in this slice/
   );
 
   assert.throws(

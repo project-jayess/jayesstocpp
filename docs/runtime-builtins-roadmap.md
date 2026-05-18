@@ -1,6 +1,6 @@
 # Runtime Built-Ins Implementation Plan
 
-Jayess does not currently provide broad JavaScript runtime built-ins such as `Date`, `Promise`, `Map`, `Set`, or `JSON`.
+Jayess does not currently provide broad JavaScript runtime built-ins such as `Date`, `Map`, `Set`, or `JSON`.
 
 This reflects the current implementation state. The current Jayess runtime is still a small value/runtime layer aimed at predictable transpilation, explicit semantics, and scope-based lifetime behavior.
 
@@ -31,14 +31,12 @@ Decision:
 
 - future date/time support belongs in a `jayess:date` library/module layer, not in core language syntax or ambient globals
 - the first `jayess:date` slice should start with `now()`, `fromUnixMillis(value)`, `toUnixMillis(date)`, and `isDate(value)`
-
-### `Promise`
-
-Jayess currently rejects `async` and `await`, so adding a fake `Promise` surface first would create API expectations without a language/runtime execution model behind them.
-
-Decision:
-
-- implement `Promise` together with the async/await runtime/result model rather than as a standalone fake surface
+- the next bounded `jayess:date` follow-up should stay split into separate tasks for:
+  - UTC ISO formatting through `toIsoString(date)`
+  - UTC component extraction helpers
+  - millisecond arithmetic helpers
+  - explicit UTC-only timezone policy
+  - narrow ISO parsing through `parseIso(text)`
 
 ### `Map` and `Set`
 
@@ -71,16 +69,34 @@ Decision:
 - `JSON` should start as a small helper module surface such as `jayess:json` rather than a global object
 - the first `jayess:json` slice should start with `parse(text)`, `stringify(value)`, and `isJsonText(text)`
 - the first `jayess:json` slice should use a small native parse/stringify helper layer under a Jayess-owned module surface
+- the next bounded `jayess:json` follow-up should stay split into separate tasks for:
+  - pretty-print formatting through `stringifyPretty(value, indent?)`
+  - reviver/replacer-like transforms as separate later helpers instead of direct JavaScript compatibility
+  - validation/failure diagnostics through a small `validate(text)` helper
+
+### `Map` And `Set` Follow-Up
+
+The first shipped collection slices stay intentionally narrow. Their next work should stay split into separate module-level tasks instead of broad container compatibility pushes.
+
+Decision:
+
+- the next `jayess:collections/map` helpers should be:
+  - iteration helpers `keys(map)`, `values(map)`, and `entries(map)` that return Jayess arrays
+  - bulk construction through `fromEntries(entries)`
+  - update helpers `setAll(map, entries)` and `deleteAll(map, keys)`
+- the next `jayess:collections/set` helpers should be:
+  - iteration helpers `values(set)` and `entries(set)` that return Jayess arrays
+  - bulk construction through `fromValues(values)`
+  - set-operation helpers `union(left, right)`, `intersection(left, right)`, and `difference(left, right)`
 
 ## Planned Build Slices
 
 Future work, if approved, should be split into separate checklist milestones under the repository-owned `jayess:*` built-in module policy:
 
 1. `Date` module design
-2. `Promise` and async-result model, only after async/await is real
-3. `Map` runtime design
-4. `Set` runtime design
-5. `JSON` helper module design
+2. `Map` runtime design
+3. `Set` runtime design
+4. `JSON` helper module design
 
 ## Implementation Direction
 
