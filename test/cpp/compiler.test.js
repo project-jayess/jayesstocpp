@@ -320,6 +320,20 @@ compileTest("transpile generator function expression output compiles with the av
   assert.ok(true);
 });
 
+compileTest("transpile generator expression-yield output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "generator-expression-yield-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("function* run(value, use, target) { var sum = 1 + (yield value); use(yield sum); target.value = yield sum; return yield target.value; }", { moduleName: "generator_expression_yield_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
 compileTest("transpile generator local-state output compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "generator-local-state-compile");
   const runtimeCppPath = writeRuntime(targetDir);
@@ -327,6 +341,56 @@ compileTest("transpile generator local-state output compiles with the available 
   fs.writeFileSync(
     cppPath,
     transpile("function* run(input) { var first = yield input; yield* input; return first; }", { moduleName: "generator_local_state_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile generator nested control-flow output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "generator-control-flow-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile(
+      "function* run(flag, items) { if (flag) { yield items[0]; } else { yield items[1]; } var index = 0; while (index < 2) { yield index; index = index + 1; } for (var step = 0; step < 2; step = step + 1) { yield step; } }",
+      { moduleName: "generator_control_flow_module" }
+    ),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile generator destructuring output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "generator-destructuring-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("function* run(pair, record) { var [first, second] = pair; var { name } = record; yield first; yield second; return name; }", {
+      moduleName: "generator_destructuring_module"
+    }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile generator yield-star destructuring output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "generator-yield-star-destructuring-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile(
+      "function* run(source) { var [first, second] = yield* source; var { value } = yield* source; yield first; yield second; return value; }",
+      { moduleName: "generator_yield_star_destructuring_module" }
+    ),
     "utf8"
   );
 
@@ -453,6 +517,34 @@ compileTest("transpile method default parameter output compiles with the availab
   fs.writeFileSync(
     cppPath,
     transpile("class Greeter { constructor(name) { this.name = name; } greet(title = `Mx. ${this.name}`) { return title; } } function run() { var greeter = new Greeter(\"Jayess\"); return greeter.greet(); }", { moduleName: "default_param_method_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile async class method output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "async-class-method-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("class Worker { async run(value) { return await value; } } function run(value) { var worker = new Worker(); return worker.run(value); }", { moduleName: "async_class_method_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile generator class method output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "generator-class-method-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("class Worker { *items(value) { yield value; return value; } } function run(value) { var worker = new Worker(); return worker.items(value); }", { moduleName: "generator_class_method_module" }),
     "utf8"
   );
 
@@ -652,6 +744,66 @@ compileTest("transpileFile built-in number module project compiles with the avai
   assert.ok(true);
 });
 
+compileTest("transpileFile built-in math module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-math-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/math-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in iterator module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-iter-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/iter-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in path module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-path-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/path-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in filesystem module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-fs-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/fs-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in string module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-string-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/string-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in array module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-array-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/array-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
 compileTest("transpileFile built-in async module project compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "builtin-async-project-compile");
   const fixture = path.resolve("test/fixtures/modules/async-main.js");
@@ -675,6 +827,26 @@ compileTest("transpileFile built-in regex module project compiles with the avail
 compileTest("transpileFile built-in system module project compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "builtin-system-project-compile");
   const fixture = path.resolve("test/fixtures/modules/system-modules-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in jayess:system module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-system-alias-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/system-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in thread module project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-thread-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/thread-main.js");
   const result = transpileFile(fixture, targetDir);
   const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
 
@@ -1029,6 +1201,20 @@ compileTest("transpile private instance method output compiles with the availabl
   assert.ok(true);
 });
 
+compileTest("transpile private static member output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "private-static-member-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("class Box { static #value = 1; static #read() { return Box.#value; } static read() { return Box.#read(); } } function run() { return Box.read(); }", { moduleName: "private_static_member_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
 compileTest("transpile computed class members and static block output compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "computed-class-members-compile");
   const runtimeCppPath = writeRuntime(targetDir);
@@ -1060,6 +1246,20 @@ compileTest("transpile static class member output compiles with the available C+
   fs.writeFileSync(
     cppPath,
     transpile("class Point { static origin = 0; static make() { return new Point(); } x = Point.origin; } function run() { var point = Point.make(); return point.x; }", { moduleName: "static_class_module" }),
+    "utf8"
+  );
+
+  compileCppFiles([runtimeCppPath, cppPath], targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpile static inheritance output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "static-inheritance-compile");
+  const runtimeCppPath = writeRuntime(targetDir);
+  const cppPath = path.join(targetDir, "module.cpp");
+  fs.writeFileSync(
+    cppPath,
+    transpile("class Base { static label = 1; static read() { return Base.label; } } class Child extends Base { static label = 2; } class Grandchild extends Child {} function run() { return Grandchild.read() + Grandchild.label; }", { moduleName: "static_inheritance_module" }),
     "utf8"
   );
 

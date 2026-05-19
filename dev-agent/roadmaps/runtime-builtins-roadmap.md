@@ -76,15 +76,15 @@ Decision:
 
 ### `Map` And `Set` Follow-Up
 
-The first shipped collection slices stay intentionally narrow. Their next work should stay split into separate module-level tasks instead of broad container compatibility pushes.
+The shipped collection slices stay intentionally narrow. Follow-up work should continue to split module-level tasks instead of broad container compatibility pushes.
 
-Decision:
+Shipped follow-up:
 
-- the next `jayess:collections/map` helpers should be:
+- the shipped `jayess:collections/map` follow-up helpers are:
   - iteration helpers `keys(map)`, `values(map)`, and `entries(map)` that return Jayess arrays
   - bulk construction through `fromEntries(entries)`
   - update helpers `setAll(map, entries)` and `deleteAll(map, keys)`
-- the next `jayess:collections/set` helpers should be:
+- the shipped `jayess:collections/set` follow-up helpers are:
   - iteration helpers `values(set)` and `entries(set)` that return Jayess arrays
   - bulk construction through `fromValues(values)`
   - set-operation helpers `union(left, right)`, `intersection(left, right)`, and `difference(left, right)`

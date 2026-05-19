@@ -1,12 +1,9 @@
 import {
   arrayExpression,
-  arrayPattern,
-  assignmentPattern,
   arrowFunctionExpression,
   assignmentExpression,
   awaitExpression,
   binaryExpression,
-  bindingProperty,
   breakStatement,
   blockStatement,
   callExpression,
@@ -16,31 +13,24 @@ import {
   conditionalExpression,
   continueStatement,
   doWhileStatement,
-  exportAllDeclaration,
-  exportDefaultDeclaration,
-  exportNamedDeclaration,
   expressionStatement,
   forStatement,
   functionDeclaration,
   functionExpression,
   identifier,
   ifStatement,
-  importDeclaration,
-  importSpecifier,
   literal,
   memberExpression,
   methodDefinition,
   newExpression,
   objectExpression,
   objectProperty,
-  objectPattern,
   optionalCallExpression,
   optionalMemberExpression,
   parameter,
   privateIdentifier,
   program,
   returnStatement,
-  restElement,
   switchCase,
   switchStatement,
   templateLiteral,
@@ -62,36 +52,14 @@ import { createSyntaxDiagnostic } from "../diagnostics/syntax-diagnostic.js";
 import { lex } from "../lexer/lex.js";
 import { tokenTypes } from "../lexer/tokens.js";
 import { createSourceText } from "../source/source-text.js";
-
-const precedence = new Map([
-  ["||", 1],
-  ["&&", 2],
-  ["==", 3],
-  ["!=", 3],
-  ["===", 3],
-  ["!==", 3],
-  [">", 4],
-  ["<", 4],
-  [">=", 4],
-  ["<=", 4],
-  ["+", 5],
-  ["-", 5],
-  ["*", 6],
-  ["/", 6],
-  ["%", 6],
-  ["**", 7]
-]);
+import { createBindingPatternParser } from "./binding-patterns.js";
+import { createImportExportParser } from "./import-export.js";
+import { getBinaryOperatorPrecedence, hasBinaryOperatorPrecedence } from "./precedence.js";
+import { getUnsupportedStatementMessage } from "./unsupported-syntax.js";
 
 function parserError(sourceText, token, message) {
   throwDiagnostics([createSyntaxDiagnostic(sourceText, token.start, message)]);
 }
-
-const unsupportedStatementMessages = new Map([
-  ["catch", "Unexpected 'catch' without a matching try block"],
-  ["extends", "Jayess does not support 'extends' yet; inheritance depends on a future class-runtime design"],
-  ["finally", "Unexpected 'finally' without a matching try block"],
-  ["with", "Jayess does not support 'with'; it is unsupported by design because Jayess keeps lexical name resolution explicit"]
-]);
 
 export function parse(sourceText) {
   const tokens = lex(sourceText);
@@ -122,6 +90,44 @@ export function parse(sourceText) {
     }
     return advance();
   }
+
+  const {
+    parseArrayBindingPattern,
+    parseBindingTarget,
+    parseBindingTargetWithDefault,
+    parseObjectBindingPattern
+  } = createBindingPatternParser({
+    advance,
+    current,
+    expect,
+    match,
+    parseAssignment,
+    parseIdentifier,
+    parserError,
+    sourceText
+  });
+
+  const {
+    parseExportDeclaration,
+    parseImportDeclaration
+  } = createImportExportParser({
+    advance,
+    current,
+    expect,
+    isAsyncFunctionDeclarationStart,
+    lookahead,
+    match,
+    parseAnonymousClassDeclaration,
+    parseAsyncFunctionDeclaration,
+    parseClassDeclaration,
+    parseExpression,
+    parseFunctionDeclaration,
+    parseFunctionExpression,
+    parseIdentifier,
+    parseVariableDeclaration,
+    parserError,
+    sourceText
+  });
 
   function parseProgram() {
     const body = [];
@@ -156,8 +162,9 @@ export function parse(sourceText) {
     if (match(tokenTypes.keyword, "let")) {
       parserError(sourceText, current(), "Jayess does not support 'let'; it is unsupported by design in Jayess, so use 'var' or 'const'");
     }
-    if (match(tokenTypes.keyword) && unsupportedStatementMessages.has(current().value)) {
-      parserError(sourceText, current(), unsupportedStatementMessages.get(current().value));
+    const unsupportedStatementMessage = match(tokenTypes.keyword) ? getUnsupportedStatementMessage(current().value) : null;
+    if (unsupportedStatementMessage != null) {
+      parserError(sourceText, current(), unsupportedStatementMessage);
     }
     if (match(tokenTypes.keyword, "const") || match(tokenTypes.keyword, "var")) {
       return parseVariableDeclaration(false);
@@ -196,154 +203,6 @@ export function parse(sourceText) {
       return parseBlockStatement();
     }
     return parseExpressionStatement();
-  }
-
-  function parseImportDeclaration() {
-    const start = expect(tokenTypes.keyword, "import").start;
-
-    if (match(tokenTypes.string)) {
-      const sourceToken = advance();
-      const end = expect(tokenTypes.punctuator, ";", "Expected ';' after import").end;
-      return importDeclaration([], sourceToken.value, start, end);
-    }
-
-    const specifiers = [];
-    if (match(tokenTypes.identifier)) {
-      const local = parseIdentifier();
-      specifiers.push(importSpecifier("default", local.name, "default", local.start, local.end));
-      if (match(tokenTypes.punctuator, ",")) {
-        advance();
-      }
-    }
-
-    if (match(tokenTypes.operator, "*")) {
-      const startToken = advance();
-      expect(tokenTypes.keyword, "as", "Malformed namespace import: expected 'as' before the local namespace name");
-      const local = parseIdentifier();
-      specifiers.push(importSpecifier("*", local.name, "namespace", startToken.start, local.end));
-    }
-
-    if (match(tokenTypes.punctuator, "{")) {
-      advance();
-      while (!match(tokenTypes.punctuator, "}")) {
-        const imported = parseIdentifier();
-        let localName = imported.name;
-        if (match(tokenTypes.keyword, "as")) {
-          advance();
-          localName = parseIdentifier().name;
-        }
-        specifiers.push(importSpecifier(imported.name, localName, "named", imported.start, imported.end));
-        if (match(tokenTypes.punctuator, ",")) {
-          advance();
-        } else {
-          break;
-        }
-      }
-      expect(tokenTypes.punctuator, "}", "Malformed import clause: expected '}' to close the import specifier list");
-    }
-
-    expect(tokenTypes.keyword, "from", "Malformed import declaration: expected 'from' before the source string");
-    const sourceToken = expect(tokenTypes.string, null, "Malformed import declaration: expected a string source after 'from'");
-    const end = expect(tokenTypes.punctuator, ";", "Expected ';' after import").end;
-    return importDeclaration(specifiers, sourceToken.value, start, end);
-  }
-
-  function parseExportDeclaration() {
-    const start = expect(tokenTypes.keyword, "export").start;
-
-    if (match(tokenTypes.keyword, "default")) {
-      advance();
-      if (isAsyncFunctionDeclarationStart()) {
-        const declaration = parseAsyncFunctionDeclaration(true);
-        return exportDefaultDeclaration(declaration, start, declaration.end);
-      }
-      if (match(tokenTypes.keyword, "function")) {
-        const declaration = lookahead().type === tokenTypes.identifier
-          ? parseFunctionDeclaration(true)
-          : parseFunctionExpression();
-        return exportDefaultDeclaration(declaration, start, declaration.end);
-      }
-      if (match(tokenTypes.keyword, "class")) {
-        const declaration = lookahead().type === tokenTypes.identifier
-          ? parseClassDeclaration(true)
-          : parseAnonymousClassDeclaration(true);
-        return exportDefaultDeclaration(declaration, start, declaration.end);
-      }
-      const declaration = parseExpression();
-      const end = expect(tokenTypes.punctuator, ";", "Expected ';' after export default").end;
-      return exportDefaultDeclaration(declaration, start, end);
-    }
-
-    if (isAsyncFunctionDeclarationStart()) {
-      const declaration = parseAsyncFunctionDeclaration(true);
-      return exportNamedDeclaration(declaration, [], null, start, declaration.end);
-    }
-
-    if (match(tokenTypes.keyword, "function")) {
-      const declaration = parseFunctionDeclaration(true);
-      return exportNamedDeclaration(declaration, [], null, start, declaration.end);
-    }
-
-    if (match(tokenTypes.keyword, "class")) {
-      const declaration = parseClassDeclaration(true);
-      return exportNamedDeclaration(declaration, [], null, start, declaration.end);
-    }
-
-    if (match(tokenTypes.keyword, "const") || match(tokenTypes.keyword, "var")) {
-      const declaration = parseVariableDeclaration(true);
-      return exportNamedDeclaration(declaration, [], null, start, declaration.end);
-    }
-
-    if (match(tokenTypes.operator, "*")) {
-      advance();
-      expect(tokenTypes.keyword, "from", "Malformed export-all declaration: expected 'from' before the source string");
-      const sourceToken = expect(tokenTypes.string, null, "Malformed export declaration: expected a string source after 'from'");
-      const end = expect(tokenTypes.punctuator, ";", "Expected ';' after export *").end;
-      return exportAllDeclaration(sourceToken.value, start, end);
-    }
-
-    if (match(tokenTypes.punctuator, "{")) {
-      const specifiers = parseExportSpecifiers();
-      let source = null;
-      if (match(tokenTypes.keyword, "from")) {
-        advance();
-        source = expect(tokenTypes.string, null, "Expected export source string").value;
-      }
-      const end = expect(tokenTypes.punctuator, ";", "Expected ';' after export").end;
-      return exportNamedDeclaration(null, specifiers, source, start, end);
-    }
-
-    parserError(
-      sourceText,
-      current(),
-      "Jayess syntax does not support this export form; expected 'export default ...', 'export { ... }', 'export * from ...', or an exported declaration"
-    );
-  }
-
-  function parseExportSpecifiers() {
-    const specifiers = [];
-    expect(tokenTypes.punctuator, "{", "Malformed export clause: expected '{' to start the export specifier list");
-    while (!match(tokenTypes.punctuator, "}")) {
-      const local = parseIdentifier();
-      let exportedName = local.name;
-      if (match(tokenTypes.keyword, "as")) {
-        advance();
-        exportedName = parseIdentifier().name;
-      }
-      specifiers.push({
-        localName: local.name,
-        exportedName,
-        start: local.start,
-        end: local.end
-      });
-      if (match(tokenTypes.punctuator, ",")) {
-        advance();
-      } else {
-        break;
-      }
-    }
-    expect(tokenTypes.punctuator, "}", "Malformed export clause: expected '}' to close the export specifier list");
-    return specifiers;
   }
 
   function parseFunctionDeclaration(exported) {
@@ -416,28 +275,42 @@ export function parse(sourceText) {
 
   function parseClassMember() {
     let isStatic = false;
-    let { key, computed, start } = parseClassMemberKey();
+    let isAsync = false;
+    let isGenerator = false;
+    let member = parseClassMemberKeyOrGeneratorPrefix();
+    let { key, computed, start } = member;
+    isGenerator = member.generator;
     if (key.name === "static") {
       if (match(tokenTypes.punctuator, "{")) {
         const body = parseBlockStatement();
         return staticInitializationBlock(body, start, body.end);
       }
-      if (match(tokenTypes.identifier) || match(tokenTypes.privateIdentifier) || match(tokenTypes.punctuator, "[")) {
+      if (isClassMemberKeyStart() || match(tokenTypes.operator, "*")) {
         isStatic = true;
-        ({ key, computed, start } = parseClassMemberKey());
+        const member = parseClassMemberKeyOrGeneratorPrefix();
+        ({ key, computed, start } = member);
+        isGenerator = member.generator;
       }
     }
-    if (isStatic && key.type === "PrivateIdentifier") {
-      parserError(
-        sourceText,
-        current(),
-        "Jayess does not support private static fields yet; the first private-member slice starts with private instance fields only"
-      );
+    if (!computed && key.name === "async" && !match(tokenTypes.punctuator, "(") && (isClassMemberKeyStart() || match(tokenTypes.operator, "*"))) {
+      isAsync = true;
+      const member = parseClassMemberKeyOrGeneratorPrefix();
+      ({ key, computed, start } = member);
+      isGenerator = member.generator;
     }
     if (match(tokenTypes.punctuator, "(")) {
+      if (isAsync && !computed && key.name === "constructor") {
+        parserError(sourceText, key, "Jayess does not support async constructors");
+      }
+      if (isGenerator && !computed && key.name === "constructor") {
+        parserError(sourceText, key, "Jayess does not support generator constructors");
+      }
+      if (isAsync && isGenerator) {
+        parserError(sourceText, key, "Jayess does not support async generator methods");
+      }
       const { params, body } = parseFunctionSignatureAndBody();
       const kind = !computed && key.name === "constructor" ? "constructor" : "method";
-      return methodDefinition(key, params, body, start, body.end, kind, isStatic, computed);
+      return methodDefinition(key, params, body, start, body.end, kind, isStatic, computed, isAsync, isGenerator);
     }
 
     let init = null;
@@ -496,113 +369,6 @@ export function parse(sourceText) {
       parserError(sourceText, current(), "Rest parameters cannot have default values");
     }
     return parameter(id, null, start, id.end, true);
-  }
-
-  function parseBindingTarget() {
-    if (match(tokenTypes.identifier)) {
-      return parseIdentifier();
-    }
-    if (match(tokenTypes.punctuator, "[")) {
-      return parseArrayBindingPattern();
-    }
-    if (match(tokenTypes.punctuator, "{")) {
-      return parseObjectBindingPattern();
-    }
-    parserError(sourceText, current(), "Expected binding target");
-  }
-
-  function parseBindingTargetWithDefault() {
-    const target = parseBindingTarget();
-    if (!match(tokenTypes.operator, "=")) {
-      return target;
-    }
-    advance();
-    const defaultValue = parseAssignment();
-    return assignmentPattern(target, defaultValue, target.start, defaultValue.end);
-  }
-
-  function parseArrayBindingPattern() {
-    const start = expect(tokenTypes.punctuator, "[", "Expected '[' to start array binding pattern").start;
-    const elements = [];
-
-    while (!match(tokenTypes.punctuator, "]")) {
-      if (match(tokenTypes.punctuator, "...")) {
-        const restStart = advance().start;
-        if (match(tokenTypes.punctuator, "[") || match(tokenTypes.punctuator, "{")) {
-          parserError(sourceText, current(), "Rest bindings in destructuring must bind to a single identifier");
-        }
-        const argument = parseIdentifier();
-        elements.push(restElement(argument, restStart, argument.end));
-        if (match(tokenTypes.punctuator, ",")) {
-          parserError(sourceText, current(), "Rest bindings must be the last element in an array destructuring pattern");
-        }
-        break;
-      }
-      if (match(tokenTypes.punctuator, ",")) {
-        parserError(sourceText, current(), "Array destructuring elisions are not supported");
-      }
-      elements.push(parseBindingTargetWithDefault());
-      if (match(tokenTypes.punctuator, ",")) {
-        advance();
-      } else {
-        break;
-      }
-    }
-
-    const end = expect(tokenTypes.punctuator, "]", "Expected ']' after array binding pattern").end;
-    return arrayPattern(elements, start, end);
-  }
-
-  function parseObjectBindingPattern() {
-    const start = expect(tokenTypes.punctuator, "{", "Expected '{' to start object binding pattern").start;
-    const properties = [];
-
-    while (!match(tokenTypes.punctuator, "}")) {
-      if (match(tokenTypes.punctuator, "...")) {
-        const restStart = advance().start;
-        if (match(tokenTypes.punctuator, "[") || match(tokenTypes.punctuator, "{")) {
-          parserError(sourceText, current(), "Rest bindings in destructuring must bind to a single identifier");
-        }
-        const argument = parseIdentifier();
-        properties.push(restElement(argument, restStart, argument.end));
-        if (match(tokenTypes.punctuator, ",")) {
-          parserError(sourceText, current(), "Rest bindings must be the last property in an object destructuring pattern");
-        }
-        break;
-      }
-      let key = null;
-      let value = null;
-
-      if (match(tokenTypes.identifier)) {
-        key = parseIdentifier();
-        value = key;
-        if (match(tokenTypes.punctuator, ":")) {
-          advance();
-          value = parseBindingTargetWithDefault();
-        } else if (match(tokenTypes.operator, "=")) {
-          advance();
-          const defaultValue = parseAssignment();
-          value = assignmentPattern(value, defaultValue, value.start, defaultValue.end);
-        }
-      } else if (match(tokenTypes.string)) {
-        const token = advance();
-        key = literal("string", token.value, token.start, token.end);
-        expect(tokenTypes.punctuator, ":", "String-key object destructuring entries require a local binding");
-        value = parseBindingTargetWithDefault();
-      } else {
-        parserError(sourceText, current(), "Expected object binding property");
-      }
-
-      properties.push(bindingProperty(key, value, key.start, value.end));
-      if (match(tokenTypes.punctuator, ",")) {
-        advance();
-      } else {
-        break;
-      }
-    }
-
-    const end = expect(tokenTypes.punctuator, "}", "Expected '}' after object binding pattern").end;
-    return objectPattern(properties, start, end);
   }
 
   function parseArrowFunctionParameterList() {
@@ -1109,9 +875,9 @@ export function parse(sourceText) {
   function parseBinaryExpression(minPrecedence) {
     let left = parseUnaryExpression();
 
-    while (match(tokenTypes.operator) && precedence.has(current().value)) {
+    while (match(tokenTypes.operator) && hasBinaryOperatorPrecedence(current().value)) {
       const operator = current().value;
-      const operatorPrecedence = precedence.get(operator);
+      const operatorPrecedence = getBinaryOperatorPrecedence(operator);
       if (operatorPrecedence < minPrecedence) {
         break;
       }
@@ -1398,6 +1164,24 @@ export function parse(sourceText) {
     return privateIdentifier(token.value, token.start, token.end);
   }
 
+  function isClassMemberKeyStart() {
+    return match(tokenTypes.identifier)
+      || match(tokenTypes.keyword)
+      || match(tokenTypes.privateIdentifier)
+      || match(tokenTypes.punctuator, "[");
+  }
+
+  function parseClassMemberKeyOrGeneratorPrefix() {
+    if (!match(tokenTypes.operator, "*")) {
+      return { ...parseClassMemberKey(), generator: false };
+    }
+    const start = advance().start;
+    const member = parseClassMemberKey();
+    member.start = start;
+    member.generator = true;
+    return member;
+  }
+
   function parseClassMemberKey() {
     if (match(tokenTypes.punctuator, "[")) {
       const start = expect(tokenTypes.punctuator, "[", "Expected '[' to start computed class member name").start;
@@ -1407,6 +1191,11 @@ export function parse(sourceText) {
     }
     if (match(tokenTypes.privateIdentifier)) {
       const key = parsePrivateIdentifier();
+      return { key, computed: false, start: key.start, end: key.end };
+    }
+    if (match(tokenTypes.keyword)) {
+      const token = advance();
+      const key = identifier(token.value, token.start, token.end);
       return { key, computed: false, start: key.start, end: key.end };
     }
     const key = parseIdentifier();

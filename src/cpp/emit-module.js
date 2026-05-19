@@ -1,30 +1,24 @@
 import { collectBindingIdentifiers, isBindingPattern } from "../ast/binding-patterns.js";
 import { classifyImport } from "../modules/classify-import.js";
 import { emitAsyncFunction, renderAsyncCallableExpression, renderAwaitExpression } from "./emit-async.js";
+import { renderBinary } from "./emit-binary.js";
+import { isBuiltinLengthMember, renderBuiltinCallExpression } from "./emit-builtins.js";
 import { renderClassValue, renderSuperConstructorCall, renderSuperMemberExpression } from "./emit-class.js";
+import { emitDestructuringAssignments as emitSharedDestructuringAssignments } from "./emit-destructuring.js";
 import { renderExportAllAlias, renderLocalExportAlias, renderReExportAlias } from "./export-alias.js";
 import { emitGeneratorFunction, renderGeneratorCallableExpression } from "./emit-generator.js";
+import { renderLiteral } from "./emit-literals.js";
 import { toModuleNamespace } from "./module-names.js";
 import {
   isPrivateFieldKey,
   isPrivateMemberExpression,
+  isPrivateStaticAccessTarget,
   renderPrivateFieldReadFromExpressions,
   renderPrivateFieldWriteFromExpressions,
-  renderPrivateMemberExpression
+  renderPrivateMemberExpression,
+  renderPrivateStaticFieldReadFromExpression,
+  renderPrivateStaticFieldWriteFromExpression
 } from "./emit-private.js";
-
-function renderLiteral(node) {
-  if (node.kind === "null") {
-    return "jayess::value(std::monostate{})";
-  }
-  if (node.kind === "number") {
-    return `jayess::value(static_cast<double>(${Number(node.value)}))`;
-  }
-  if (node.kind === "boolean") {
-    return `jayess::value(${node.value ? "true" : "false"})`;
-  }
-  return `jayess::value(std::string(${JSON.stringify(node.value)}))`;
-}
 
 function renderNullValue() {
   return "jayess::value(std::monostate{})";
@@ -48,92 +42,6 @@ function renderTemplateLiteral(node, context) {
   }
 
   return `jayess::interpolate({${parts.join(", ")}})`;
-}
-
-function isBuiltinLengthMember(node) {
-  return node.type === "MemberExpression" && !node.computed && node.property.name === "length";
-}
-
-function isBuiltinArrayPushCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "push";
-}
-
-function isBuiltinArrayPopCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "pop";
-}
-
-function isBuiltinArrayJoinCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "join";
-}
-
-function isBuiltinArrayIncludesCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "includes";
-}
-
-function isBuiltinToStringCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "toString"
-    && node.arguments.length === 0;
-}
-
-function isBuiltinStringSliceCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "slice";
-}
-
-function isBuiltinStringSubstringCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "substring";
-}
-
-function isBuiltinStringStartsWithCall(node) {
-  return node.type === "CallExpression"
-    && node.callee.type === "MemberExpression"
-    && !node.callee.computed
-    && node.callee.property.name === "startsWith";
-}
-
-function getBuiltinStringMethodHelper(node) {
-  if (node.type !== "CallExpression" || node.callee.type !== "MemberExpression" || node.callee.computed) {
-    return null;
-  }
-
-  const helperByProperty = {
-    slice: "string_slice",
-    substring: "string_substring",
-    startsWith: "string_starts_with",
-    includes: "string_includes",
-    indexOf: "string_index_of",
-    endsWith: "string_ends_with"
-  };
-
-  const helperName = helperByProperty[node.callee.property.name];
-  if (helperName == null) {
-    return null;
-  }
-
-  return {
-    helperName,
-    propertyName: node.callee.property.name
-  };
 }
 
 function hasSpreadArgument(args) {
@@ -192,83 +100,6 @@ function renderObjectExpression(node, context) {
   return lines.join("\n");
 }
 
-function renderArrayPushCall(node, context) {
-  const lines = ["([&]() -> jayess::value {"];
-  lines.push(`  jayess::value jayess_object = ${renderExpression(node.callee.object, context)};`);
-  lines.push("  std::vector<jayess::value> jayess_args;");
-  pushRenderedCallArguments(node.arguments, context, lines);
-  lines.push("  if (std::holds_alternative<jayess::array_ptr>(jayess_object)) {");
-  lines.push("    return jayess::array_push(jayess_object, std::move(jayess_args));");
-  lines.push("  }");
-  lines.push('  return jayess::call_with_args(jayess::get_property(jayess_object, "push"), std::move(jayess_args));');
-  lines.push("})()");
-  return lines.join("\n");
-}
-
-function renderArrayPopCall(node, context) {
-  const lines = ["([&]() -> jayess::value {"];
-  lines.push(`  jayess::value jayess_object = ${renderExpression(node.callee.object, context)};`);
-  lines.push("  if (std::holds_alternative<jayess::array_ptr>(jayess_object)) {");
-  lines.push("    return jayess::array_pop(jayess_object);");
-  lines.push("  }");
-  lines.push('  return jayess::call(jayess::get_property(jayess_object, "pop"));');
-  lines.push("})()");
-  return lines.join("\n");
-}
-
-function renderArrayJoinCall(node, context) {
-  const lines = ["([&]() -> jayess::value {"];
-  lines.push(`  jayess::value jayess_object = ${renderExpression(node.callee.object, context)};`);
-  lines.push("  std::vector<jayess::value> jayess_args;");
-  pushRenderedCallArguments(node.arguments, context, lines);
-  lines.push("  if (std::holds_alternative<jayess::array_ptr>(jayess_object)) {");
-  lines.push("    return jayess::array_join(jayess_object, jayess_args);");
-  lines.push("  }");
-  lines.push('  return jayess::call_with_args(jayess::get_property(jayess_object, "join"), std::move(jayess_args));');
-  lines.push("})()");
-  return lines.join("\n");
-}
-
-function renderIncludesCall(node, context) {
-  const lines = ["([&]() -> jayess::value {"];
-  lines.push(`  jayess::value jayess_object = ${renderExpression(node.callee.object, context)};`);
-  lines.push("  std::vector<jayess::value> jayess_args;");
-  pushRenderedCallArguments(node.arguments, context, lines);
-  lines.push("  if (std::holds_alternative<jayess::array_ptr>(jayess_object)) {");
-  lines.push("    return jayess::array_includes(jayess_object, jayess_args);");
-  lines.push("  }");
-  lines.push("  if (std::holds_alternative<std::string>(jayess_object)) {");
-  lines.push("    return jayess::string_includes(jayess_object, jayess_args);");
-  lines.push("  }");
-  lines.push('  return jayess::call_with_args(jayess::get_property(jayess_object, "includes"), std::move(jayess_args));');
-  lines.push("})()");
-  return lines.join("\n");
-}
-
-function renderToStringCall(node, context) {
-  const lines = ["([&]() -> jayess::value {"];
-  lines.push(`  jayess::value jayess_object = ${renderExpression(node.callee.object, context)};`);
-  lines.push("  if (std::holds_alternative<jayess::object_ptr>(jayess_object) || std::holds_alternative<jayess::callable_ptr>(jayess_object)) {");
-  lines.push('    return jayess::call(jayess::get_property(jayess_object, "toString"));');
-  lines.push("  }");
-  lines.push("  return jayess::to_string_value(jayess_object);");
-  lines.push("})()");
-  return lines.join("\n");
-}
-
-function renderStringMethodCall(node, context, helperName, propertyName) {
-  const lines = ["([&]() -> jayess::value {"];
-  lines.push(`  jayess::value jayess_object = ${renderExpression(node.callee.object, context)};`);
-  lines.push("  std::vector<jayess::value> jayess_args;");
-  pushRenderedCallArguments(node.arguments, context, lines);
-  lines.push("  if (std::holds_alternative<std::string>(jayess_object)) {");
-  lines.push(`    return jayess::${helperName}(jayess_object, jayess_args);`);
-  lines.push("  }");
-  lines.push(`  return jayess::call_with_args(jayess::get_property(jayess_object, ${JSON.stringify(propertyName)}), std::move(jayess_args));`);
-  lines.push("})()");
-  return lines.join("\n");
-}
-
 function emitParameterInitialization(param, index, context, lines, indent = "  ", argsName = "jayess_args") {
   if (param.rest) {
     lines.push(`${indent}jayess::value ${param.name} = jayess::rest_arguments(${argsName}, ${index});`);
@@ -280,56 +111,6 @@ function emitParameterInitialization(param, index, context, lines, indent = "  "
     lines.push(`${indent}  ${param.name} = ${renderExpression(param.defaultValue, context)};`);
     lines.push(`${indent}}`);
   }
-}
-
-function renderBinary(operator, left, right) {
-  if (operator === "&&") {
-    return `([&]() -> jayess::value {
-  jayess::value jayess_left = ${left};
-  if (!jayess::truthy(jayess_left)) {
-    return jayess_left;
-  }
-  return ${right};
-})()`;
-  }
-
-  if (operator === "||") {
-    return `([&]() -> jayess::value {
-  jayess::value jayess_left = ${left};
-  if (jayess::truthy(jayess_left)) {
-    return jayess_left;
-  }
-  return ${right};
-})()`;
-  }
-
-  if (operator === "??") {
-    return `([&]() -> jayess::value {
-  jayess::value jayess_left = ${left};
-  if (!jayess::is_null(jayess_left)) {
-    return jayess_left;
-  }
-  return ${right};
-})()`;
-  }
-
-  const helpers = {
-    "+": "add",
-    "-": "subtract",
-    "*": "multiply",
-    "/": "divide",
-    "%": "modulo",
-    "**": "power",
-    ">": "greater_than",
-    "<": "less_than",
-    ">=": "greater_than_equal",
-    "<=": "less_than_equal",
-    "==": "equal",
-    "!=": "not_equal",
-    "===": "equal",
-    "!==": "not_equal"
-  };
-  return `jayess::${helpers[operator]}(${left}, ${right})`;
 }
 
 function compoundBinaryOperator(operator) {
@@ -360,6 +141,12 @@ function renderCompoundAssignment(node, context) {
 
     if (isPrivateFieldKey(node.left.property)) {
       const classExpr = context.classSelfAlias;
+      if (isPrivateStaticAccessTarget(node.left.object, context)) {
+        return `([&]() -> jayess::value {
+  jayess::value jayess_next = ${renderBinary(binaryOperator, renderPrivateStaticFieldReadFromExpression(classExpr, node.left.property.name), right)};
+  return ${renderPrivateStaticFieldWriteFromExpression(classExpr, node.left.property.name, "jayess_next")};
+})()`;
+      }
       return `([&]() -> jayess::value {
   jayess::value jayess_object = ${renderExpression(node.left.object, context)};
   jayess::value jayess_next = ${renderBinary(binaryOperator, renderPrivateFieldReadFromExpressions("jayess_object", classExpr, node.left.property.name), right)};
@@ -407,6 +194,14 @@ function renderUpdateExpression(node, context) {
 
     if (isPrivateFieldKey(node.argument.property)) {
       const classExpr = context.classSelfAlias;
+      if (isPrivateStaticAccessTarget(node.argument.object, context)) {
+        return `([&]() -> jayess::value {
+  jayess::value jayess_before = ${renderPrivateStaticFieldReadFromExpression(classExpr, node.argument.property.name)};
+  jayess::value jayess_next = ${renderUpdatedValue(node.operator, "jayess_before")};
+  ${renderPrivateStaticFieldWriteFromExpression(classExpr, node.argument.property.name, "jayess_next")};
+  return ${node.prefix ? "jayess_next" : "jayess_before"};
+})()`;
+      }
       return `([&]() -> jayess::value {
   jayess::value jayess_object = ${renderExpression(node.argument.object, context)};
   jayess::value jayess_before = ${renderPrivateFieldReadFromExpressions("jayess_object", classExpr, node.argument.property.name)};
@@ -618,29 +413,16 @@ function renderExpression(node, context) {
       return renderAwaitExpression(renderExpression(node.argument, context));
     case "UpdateExpression":
       return renderUpdateExpression(node, context);
-    case "CallExpression":
-      if (isBuiltinArrayPushCall(node)) {
-        return renderArrayPushCall(node, context);
-      }
-      if (isBuiltinArrayPopCall(node)) {
-        return renderArrayPopCall(node, context);
-      }
-      if (isBuiltinArrayJoinCall(node)) {
-        return renderArrayJoinCall(node, context);
-      }
-      if (isBuiltinArrayIncludesCall(node)) {
-        return renderIncludesCall(node, context);
-      }
-      if (isBuiltinToStringCall(node)) {
-        return renderToStringCall(node, context);
-      }
-      {
-        const stringMethod = getBuiltinStringMethodHelper(node);
-        if (stringMethod != null) {
-          return renderStringMethodCall(node, context, stringMethod.helperName, stringMethod.propertyName);
-        }
+    case "CallExpression": {
+      const builtinCall = renderBuiltinCallExpression(node, context, {
+        renderExpression,
+        pushRenderedCallArguments
+      });
+      if (builtinCall != null) {
+        return builtinCall;
       }
       return renderCallLikeExpression(node.callee, node.arguments, context);
+    }
     case "OptionalCallExpression":
       return renderOptionalCallExpression(node, context);
     case "SpreadElement":
@@ -667,6 +449,9 @@ function renderExpression(node, context) {
           return `jayess::set_index(${object}, ${renderExpression(node.left.property, context)}, ${assigned})`;
         }
         if (isPrivateFieldKey(node.left.property)) {
+          if (isPrivateStaticAccessTarget(node.left.object, context)) {
+            return renderPrivateStaticFieldWriteFromExpression(context.classSelfAlias, node.left.property.name, assigned);
+          }
           return renderPrivateFieldWriteFromExpressions(object, context.classSelfAlias, node.left.property.name, assigned);
         }
         return `jayess::set_property(${object}, ${JSON.stringify(node.left.property.name)}, ${assigned})`;
@@ -742,80 +527,18 @@ function nextDestructureTempName(context) {
   return `jayess_destructure_${index}`;
 }
 
-function renderPatternKey(node) {
-  if (node.type === "Identifier") {
-    return JSON.stringify(node.name);
-  }
-  return JSON.stringify(node.value);
-}
-
 function nextSwitchLabel(context) {
   const index = context.tempState.nextSwitchIndex ?? 0;
   context.tempState.nextSwitchIndex = index + 1;
   return `jayess_switch_end_${index}`;
 }
 
-function collectObjectPatternKeys(pattern) {
-  const keys = [];
-  for (const property of pattern.properties) {
-    if (property.type === "RestElement") {
-      continue;
-    }
-    keys.push(renderPatternKey(property.key));
-  }
-  return keys;
-}
-
 function emitDestructuringAssignments(pattern, sourceExpr, context, lines, indent, declareBindings = true) {
-  if (pattern.type === "Identifier") {
-    const prefix = declareBindings ? "jayess::value " : "";
-    lines.push(`${indent}${prefix}${pattern.name} = ${sourceExpr};`);
-    return;
-  }
-
-  if (pattern.type === "AssignmentPattern") {
-    const valueTemp = nextDestructureTempName(context);
-    lines.push(`${indent}jayess::value ${valueTemp} = ${sourceExpr};`);
-    lines.push(`${indent}if (jayess::is_null(${valueTemp})) {`);
-    lines.push(`${indent}  ${valueTemp} = ${renderExpression(pattern.right, context)};`);
-    lines.push(`${indent}}`);
-    emitDestructuringAssignments(pattern.left, valueTemp, context, lines, indent, declareBindings);
-    return;
-  }
-
-  if (pattern.type === "ArrayPattern") {
-    for (const [index, element] of pattern.elements.entries()) {
-      if (element.type === "RestElement") {
-        const restTemp = nextDestructureTempName(context);
-        lines.push(`${indent}jayess::value ${restTemp} = jayess::destructure_rest_array(${sourceExpr}, ${index});`);
-        emitDestructuringAssignments(element.argument, restTemp, context, lines, indent, declareBindings);
-        continue;
-      }
-      const elementTemp = nextDestructureTempName(context);
-      lines.push(
-        `${indent}jayess::value ${elementTemp} = jayess::destructure_index(${sourceExpr}, jayess::value(static_cast<double>(${index})));`
-      );
-      emitDestructuringAssignments(element, elementTemp, context, lines, indent, declareBindings);
-    }
-    return;
-  }
-
-  if (pattern.type === "ObjectPattern") {
-    const excludedKeys = collectObjectPatternKeys(pattern);
-    for (const property of pattern.properties) {
-      if (property.type === "RestElement") {
-        const restTemp = nextDestructureTempName(context);
-        lines.push(`${indent}jayess::value ${restTemp} = jayess::destructure_rest_object(${sourceExpr}, {${excludedKeys.join(", ")}});`);
-        emitDestructuringAssignments(property.argument, restTemp, context, lines, indent, declareBindings);
-        continue;
-      }
-      const propertyTemp = nextDestructureTempName(context);
-      lines.push(
-        `${indent}jayess::value ${propertyTemp} = jayess::destructure_property(${sourceExpr}, ${renderPatternKey(property.key)});`
-      );
-      emitDestructuringAssignments(property.value, propertyTemp, context, lines, indent, declareBindings);
-    }
-  }
+  emitSharedDestructuringAssignments(pattern, sourceExpr, context, lines, indent, {
+    declareBindings,
+    nextTempName: nextDestructureTempName,
+    renderExpression
+  });
 }
 
 function renderVariableDeclaration(node, context) {

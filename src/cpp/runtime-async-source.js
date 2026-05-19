@@ -17,6 +17,8 @@ value make_rejected_async(value rejected);
 bool is_async(const value& input);
 value async_all(const value& handles);
 value async_race(const value& handles);
+value async_all_settled(const value& handles);
+value async_any(const value& handles);
 bool async_is_pending(const value& input);
 bool async_is_resolved(const value& input);
 bool async_is_rejected(const value& input);
@@ -51,6 +53,14 @@ const array_ptr& require_async_handle_array(const value& input) {
 
   return std::get<array_ptr>(input);
 }
+
+void require_async_handle_items(const array_ptr& array) {
+  for (const auto& handle : array->items) {
+    if (!is_async(handle)) {
+      throw std::runtime_error("Jayess async composition requires async handles");
+    }
+  }
+}
 } // namespace
 
 value make_pending_async() {
@@ -77,6 +87,7 @@ bool is_async(const value& input) {
 
 value async_all(const value& handles) {
   const auto& array = require_async_handle_array(handles);
+  require_async_handle_items(array);
   const auto result = make_pending_async();
   if (array->items.empty()) {
     async_resolve(result, make_array({}));
@@ -89,10 +100,6 @@ value async_all(const value& handles) {
 
   for (std::size_t index = 0; index < array->items.size(); index += 1) {
     const auto handle = array->items[index];
-    if (!is_async(handle)) {
-      throw std::runtime_error("Jayess async composition requires async handles");
-    }
-
     async_enqueue(handle, [result, remaining, settled, collected, handle, index]() mutable {
       if (*settled) {
         return;
@@ -118,6 +125,7 @@ value async_all(const value& handles) {
 
 value async_race(const value& handles) {
   const auto& array = require_async_handle_array(handles);
+  require_async_handle_items(array);
   const auto result = make_pending_async();
   if (array->items.empty()) {
     async_reject(result, value(std::string("Jayess async race requires at least one handle")));
@@ -126,10 +134,6 @@ value async_race(const value& handles) {
 
   auto settled = std::make_shared<bool>(false);
   for (const auto& handle : array->items) {
-    if (!is_async(handle)) {
-      throw std::runtime_error("Jayess async composition requires async handles");
-    }
-
     async_enqueue(handle, [result, settled, handle]() mutable {
       if (*settled) {
         return;
@@ -142,6 +146,81 @@ value async_race(const value& handles) {
       }
 
       async_resolve(result, async_result_value(handle));
+    });
+  }
+
+  return result;
+}
+
+value async_all_settled(const value& handles) {
+  const auto& array = require_async_handle_array(handles);
+  require_async_handle_items(array);
+  const auto result = make_pending_async();
+  if (array->items.empty()) {
+    async_resolve(result, make_array({}));
+    return result;
+  }
+
+  auto remaining = std::make_shared<std::size_t>(array->items.size());
+  auto collected = std::make_shared<std::vector<value>>(array->items.size(), value(std::monostate{}));
+
+  for (std::size_t index = 0; index < array->items.size(); index += 1) {
+    const auto handle = array->items[index];
+    async_enqueue(handle, [result, remaining, collected, handle, index]() mutable {
+      if (async_is_rejected(handle)) {
+        (*collected)[index] = make_object({
+          {"status", value(std::string("rejected"))},
+          {"reason", async_result_value(handle)}
+        });
+      } else {
+        (*collected)[index] = make_object({
+          {"status", value(std::string("resolved"))},
+          {"value", async_result_value(handle)}
+        });
+      }
+
+      *remaining -= 1;
+      if (*remaining == 0) {
+        async_resolve(result, make_array(std::move(*collected)));
+      }
+    });
+  }
+
+  return result;
+}
+
+value async_any(const value& handles) {
+  const auto& array = require_async_handle_array(handles);
+  require_async_handle_items(array);
+  const auto result = make_pending_async();
+  if (array->items.empty()) {
+    async_reject(result, value(std::string("Jayess async any requires at least one handle")));
+    return result;
+  }
+
+  auto remaining = std::make_shared<std::size_t>(array->items.size());
+  auto settled = std::make_shared<bool>(false);
+  auto rejections = std::make_shared<std::vector<value>>(array->items.size(), value(std::monostate{}));
+
+  for (std::size_t index = 0; index < array->items.size(); index += 1) {
+    const auto handle = array->items[index];
+    async_enqueue(handle, [result, remaining, settled, rejections, handle, index]() mutable {
+      if (*settled) {
+        return;
+      }
+
+      if (async_is_resolved(handle)) {
+        *settled = true;
+        async_resolve(result, async_result_value(handle));
+        return;
+      }
+
+      (*rejections)[index] = async_result_value(handle);
+      *remaining -= 1;
+      if (*remaining == 0) {
+        *settled = true;
+        async_reject(result, make_array(std::move(*rejections)));
+      }
     });
   }
 

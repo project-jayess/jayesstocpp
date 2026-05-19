@@ -1,25 +1,33 @@
 import { getAsyncRuntimeCppFragment, getAsyncRuntimeHeaderFragment } from "./runtime-async-source.js";
+import { getArrayRuntimeCppFragment, getArrayRuntimeHeaderFragment } from "./runtime-array-source.js";
 import { getClassRuntimeCppFragment, getClassRuntimeHeaderFragment } from "./runtime-class-source.js";
 import { getDateRuntimeCppFragment, getDateRuntimeHeaderFragment } from "./runtime-date-source.js";
+import { getFsRuntimeCppFragment, getFsRuntimeHeaderFragment } from "./runtime-fs-source.js";
 import { getGeneratorRuntimeCppFragment, getGeneratorRuntimeHeaderFragment } from "./runtime-generator-source.js";
+import { getIterRuntimeCppFragment, getIterRuntimeHeaderFragment } from "./runtime-iter-source.js";
 import { getJsonRuntimeCppFragment, getJsonRuntimeHeaderFragment } from "./runtime-json-source.js";
 import { getMapRuntimeCppFragment, getMapRuntimeHeaderFragment } from "./runtime-map-source.js";
+import { getMathRuntimeCppFragment, getMathRuntimeHeaderFragment } from "./runtime-math-source.js";
 import { getNumberRuntimeCppFragment, getNumberRuntimeHeaderFragment } from "./runtime-number-source.js";
 import { getObjectRuntimeCppFragment, getObjectRuntimeHeaderFragment } from "./runtime-object-source.js";
+import { getPathRuntimeCppFragment, getPathRuntimeHeaderFragment } from "./runtime-path-source.js";
 import { getPrivateRuntimeCppFragment, getPrivateRuntimeHeaderFragment } from "./runtime-private-source.js";
 import { getRegexRuntimeCppFragment, getRegexRuntimeHeaderFragment } from "./runtime-regex-source.js";
 import { getSetRuntimeCppFragment, getSetRuntimeHeaderFragment } from "./runtime-set-source.js";
 import { getStringRuntimeCppFragment, getStringRuntimeHeaderFragment } from "./runtime-string-source.js";
 import { getSystemRuntimeCppFragment, getSystemRuntimeHeaderFragment } from "./runtime-system-source.js";
+import { getThreadRuntimeCppFragment, getThreadRuntimeHeaderFragment } from "./runtime-thread-source.js";
 
 export function getRuntimeHeaderSource() {
   return `#pragma once
 #include <functional>
 #include <exception>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <sstream>
+#include <thread>
 #include <type_traits>
 #include <utility>
 #include <vector>
@@ -34,6 +42,7 @@ struct async_state;
 struct generator_state;
 struct map_value;
 struct set_value;
+struct thread_state;
 
 using array_ptr = std::shared_ptr<array_value>;
 using object_ptr = std::shared_ptr<object_value>;
@@ -42,7 +51,8 @@ using async_ptr = std::shared_ptr<async_state>;
 using generator_ptr = std::shared_ptr<generator_state>;
 using map_ptr = std::shared_ptr<map_value>;
 using set_ptr = std::shared_ptr<set_value>;
-using value = std::variant<std::monostate, double, bool, std::string, array_ptr, object_ptr, callable_ptr, async_ptr, generator_ptr, map_ptr, set_ptr>;
+using thread_ptr = std::shared_ptr<thread_state>;
+using value = std::variant<std::monostate, double, bool, std::string, array_ptr, object_ptr, callable_ptr, async_ptr, generator_ptr, map_ptr, set_ptr, thread_ptr>;
 
 struct array_value {
   std::vector<value> items;
@@ -59,17 +69,23 @@ struct callable_value {
 };
 
 ${getAsyncRuntimeHeaderFragment()}
+${getArrayRuntimeHeaderFragment()}
 ${getClassRuntimeHeaderFragment()}
 ${getDateRuntimeHeaderFragment()}
+${getFsRuntimeHeaderFragment()}
 ${getGeneratorRuntimeHeaderFragment()}
+${getIterRuntimeHeaderFragment()}
 ${getJsonRuntimeHeaderFragment()}
 ${getMapRuntimeHeaderFragment()}
+${getMathRuntimeHeaderFragment()}
 ${getNumberRuntimeHeaderFragment()}
 ${getObjectRuntimeHeaderFragment()}
+${getPathRuntimeHeaderFragment()}
 ${getRegexRuntimeHeaderFragment()}
 ${getSetRuntimeHeaderFragment()}
 ${getStringRuntimeHeaderFragment()}
 ${getSystemRuntimeHeaderFragment()}
+${getThreadRuntimeHeaderFragment()}
 ${getPrivateRuntimeHeaderFragment()}
 
 struct scope_cleanup_frame {
@@ -101,6 +117,7 @@ value argument_at(const std::vector<value>& args, std::size_t index);
 value rest_arguments(const std::vector<value>& args, std::size_t index);
 value make_array(std::vector<value> items);
 value make_object(std::vector<std::pair<std::string, value>> fields);
+std::string stringify_value(const value& input);
 value interpolate(std::vector<value> parts);
 value to_string_value(const value& input);
 [[noreturn]] void throw_value(value input);
@@ -175,21 +192,29 @@ export function getRuntimeCppSource() {
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <mutex>
 #include <regex>
 #include <stdexcept>
+#include <thread>
 
 namespace jayess {
 ${getAsyncRuntimeCppFragment()}
+${getArrayRuntimeCppFragment()}
 ${getClassRuntimeCppFragment()}
 ${getDateRuntimeCppFragment()}
+${getFsRuntimeCppFragment()}
 ${getGeneratorRuntimeCppFragment()}
+${getIterRuntimeCppFragment()}
 ${getJsonRuntimeCppFragment()}
 ${getMapRuntimeCppFragment()}
+${getMathRuntimeCppFragment()}
 ${getNumberRuntimeCppFragment()}
 ${getObjectRuntimeCppFragment()}
+${getPathRuntimeCppFragment()}
 ${getRegexRuntimeCppFragment()}
 ${getSetRuntimeCppFragment()}
 ${getSystemRuntimeCppFragment()}
+${getThreadRuntimeCppFragment()}
 ${getPrivateRuntimeCppFragment()}
 
 void scope_cleanup_frame::defer(std::function<void()> cleanup) {
@@ -252,6 +277,9 @@ bool truthy(const value& input) {
   if (std::holds_alternative<set_ptr>(input)) {
     return !std::get<set_ptr>(input)->entries.empty();
   }
+  if (std::holds_alternative<thread_ptr>(input)) {
+    return true;
+  }
   return !std::get<std::string>(input).empty();
 }
 
@@ -311,6 +339,9 @@ std::string stringify_value(const value& input) {
   }
   if (std::holds_alternative<std::string>(input)) {
     return std::get<std::string>(input);
+  }
+  if (std::holds_alternative<thread_ptr>(input)) {
+    throw std::runtime_error("Unsupported thread string conversion");
   }
   throw std::runtime_error("Unsupported template interpolation value");
 }
@@ -429,6 +460,9 @@ value equal(const value& left, const value& right) {
   if (std::holds_alternative<set_ptr>(left)) {
     return std::get<set_ptr>(left) == std::get<set_ptr>(right);
   }
+  if (std::holds_alternative<thread_ptr>(left)) {
+    return std::get<thread_ptr>(left) == std::get<thread_ptr>(right);
+  }
   return std::get<std::string>(left) == std::get<std::string>(right);
 }
 
@@ -502,12 +536,7 @@ value array_includes(const value& input, const std::vector<value>& args) {
 
 value get_property(const value& input, const std::string& key) {
   if (std::holds_alternative<callable_ptr>(input)) {
-    const auto& callable = std::get<callable_ptr>(input);
-    const auto iterator = callable->fields.find(key);
-    if (iterator == callable->fields.end()) {
-      return value(std::monostate{});
-    }
-    return iterator->second;
+    return find_static_class_member(input, key);
   }
   const auto& object = std::get<object_ptr>(input);
   const auto iterator = object->fields.find(key);

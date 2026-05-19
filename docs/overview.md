@@ -151,13 +151,7 @@ See [javascript-feature-gaps.md](./javascript-feature-gaps.md) for a broader lis
 See [stdlib-and-core-model.md](./stdlib-and-core-model.md) for the intended split between low-level C++ runtime support and Jayess-written standard-library/core modules.
 See [semantics.md](./semantics.md) for the current truthiness, equality, and numeric-operator rules that Jayess implements today.
 See [generated-project-shape.md](./generated-project-shape.md) for the current `transpileFile()` output layout and file naming rules.
-See [async-await-roadmap.md](./async-await-roadmap.md) for the implementation plan for `async` / `await`.
 See [jayess-async-module.md](./jayess-async-module.md) for the first planned `jayess:async` core-module surface.
-See [generators-roadmap.md](./generators-roadmap.md) for the implementation plan for generators and `yield`.
-See [inheritance-roadmap.md](./inheritance-roadmap.md) for the current first-slice `extends` / `super` contract and remaining follow-up work.
-See [private-fields-roadmap.md](./private-fields-roadmap.md) for the current first-slice private-member contract and remaining follow-up work.
-See [class-members-roadmap.md](./class-members-roadmap.md) for the current first-slice contract and remaining follow-up work for computed class member names and static initialization blocks.
-See [destructuring-roadmap.md](./destructuring-roadmap.md) for the current destructuring semantics and the remaining intentionally unsupported destructuring forms.
 See [builtin-module-policy.md](./builtin-module-policy.md) for the repository-owned `jayess:*` namespace and built-in module resolution contract.
 See [jayess-date-module.md](./jayess-date-module.md) for the first intended `jayess:date` module surface.
 See [jayess-json-module.md](./jayess-json-module.md) for the first intended `jayess:json` module surface.
@@ -166,11 +160,7 @@ See [jayess-set-module.md](./jayess-set-module.md) for the current runtime-bound
 See [jayess-object-module.md](./jayess-object-module.md) for the first shipped `jayess:object` helper surface.
 See [jayess-number-module.md](./jayess-number-module.md) for the first shipped `jayess:number` parsing surface.
 See [jayess-regex-module.md](./jayess-regex-module.md) for the first shipped `jayess:regex` helper surface.
-See [regex-roadmap.md](./regex-roadmap.md) for the approved first direction for Jayess-owned regular-expression support.
-See [runtime-builtins-roadmap.md](./runtime-builtins-roadmap.md) for the implementation plan for larger built-ins like `Date`, `Map`, `Set`, and `JSON`.
-See [node-builtins-roadmap.md](./node-builtins-roadmap.md) for the implementation plan for Jayess-provided system modules instead of ambient Node compatibility.
 See [jayess-system-modules.md](./jayess-system-modules.md) for the current first-slice `jayess:fs`, `jayess:path`, and `jayess:process` surface and ownership split.
-See [module-resolution-roadmap.md](./module-resolution-roadmap.md) for the current hardening direction for `export *`, package-entry behavior, and later async module-initialization follow-up.
 
 ## Diagnostics Behavior
 
@@ -193,27 +183,30 @@ Current async note:
 - async functions currently lower to Jayess-owned async handles with explicit runtime completion state
 - `await` currently lowers through a single-evaluation helper over Jayess async handles
 - async function expressions and async arrow functions are now supported and lower through the same Jayess async-handle machinery as async function declarations
+- async instance and static class methods are supported through the same Jayess async-handle machinery
 - JavaScript `Promise` is unsupported by design; async composition stays Jayess-owned through `jayess:async`
 - the first shipped `jayess:async` composition surface is `resolved`, `rejected`, `all`, `race`, and `isAsync`
-- async methods remain a separate later class-model slice
 - async constructors remain unsupported by design
 - top-level `await` remains unsupported until Jayess defines explicit module-level async initialization ordering
 
 Current generator note:
 
-- generator declarations with direct `yield expr` and direct `yield* expr` are supported in the shipped slice
+- generator declarations with direct `yield expr` and direct `yield* expr` are supported
+- direct `yield expr` can appear inside nested blocks, `if` / `else` branches, `while` loops, and `for` loops
+- selected expression-yield forms are supported, including `return yield value`, binary expressions, call arguments, and simple assignment right-hand sides
+- generator-local array and object destructuring declarations are supported
 - `yield` legality is checked against generator-function context
 - generator declarations and generator function expressions lower to Jayess-owned generator handles with explicit state-slot resume lambdas
-- generator function expressions are supported in the current non-class generator slice
-- generator methods, async generators, and broader generator/yield forms remain outside the current slice for now
+- generator function expressions and generator class methods are supported in the current generator slice
+- async generators and short-circuit expression-yield forms remain unsupported
 
 Current private-member note:
 
 - private instance fields are supported in a narrow first slice
 - `#field` declarations lower through class-owned hidden runtime storage
 - private instance methods are supported in the current shipped slice
+- private static fields and private static methods are supported through hidden class-side storage
 - private reads, writes, and private method calls are allowed only inside methods or field initializers of the declaring class
-- private static fields and private static methods remain later separate class-side slices
 
 Current computed-class-member note:
 
@@ -272,8 +265,6 @@ Repository-defined Jayess standard-library/core modules may also be transpiled i
 
 The preferred future built-in-module direction is a Jayess-owned namespace such as `jayess:*`, kept distinct from `node:*` and `cpp:*`.
 
-See [standard-library-expansion-roadmap.md](./standard-library-expansion-roadmap.md) for the next approved built-in family slices beyond the currently shipped array/string helpers.
-
 The generated project is meant to be compiled later by an external compiler such as `clang++`.
 
 ## Current Composite Value Model
@@ -309,9 +300,9 @@ The generated project is meant to be compiled later by an external compiler such
   - `jayess:number` module exports `parseInt(text)` and `parseFloat(text)`
   - `jayess:date` module exports `now()`, `fromUnixMillis(value)`, `toUnixMillis(date)`, `toIsoString(date)`, UTC component helpers, `addMillis(date, amount)`, `diffMillis(left, right)`, `parseIso(text)`, and `isDate(value)`
   - `jayess:json` module exports `parse(text)`, `stringify(value)`, `stringifyPretty(value, indent?)`, `validate(text)`, and `isJsonText(text)`
-  - `jayess:collections/map` module exports `create`, `get`, `set`, `has`, `deleteKey`, `clear`, `size`, `keys`, `values`, `entries`, and `isMap`
-  - `jayess:collections/set` module exports `create`, `add`, `has`, `deleteValue`, `clear`, `size`, `values`, `entries`, and `isSet`
-  - `jayess:regex` module exports `create(pattern)`, `test(regex, text)`, `exec(regex, text)`, and `isRegex(value)`
+  - `jayess:collections/map` module exports `create`, `get`, `set`, `has`, `deleteKey`, `clear`, `size`, `keys`, `values`, `entries`, `fromEntries`, `setAll`, `deleteAll`, and `isMap`
+  - `jayess:collections/set` module exports `create`, `add`, `has`, `deleteValue`, `clear`, `size`, `values`, `entries`, `fromValues`, `union`, `intersection`, `difference`, and `isSet`
+  - `jayess:regex` module exports `create(pattern)`, `test(regex, text)`, `exec(regex, text)`, `replaceFirst(regex, text, replacement)`, `replaceAll(regex, text, replacement)`, and `isRegex(value)`
 - still not implemented in the current slice:
   - broad `Array.prototype` coverage
   - broad `String.prototype` coverage
@@ -350,5 +341,5 @@ The generated project is meant to be compiled later by an external compiler such
 - `super.method(...)` lowers through explicit base-class lookup and binds the current derived instance as `this`
 - private instance fields use class-owned hidden runtime keys and do not participate in ordinary public property lookup
 - computed class-side writes currently reuse the same property/index runtime path as other class-value property writes
-- static inheritance is still outside the current slice
+- public static member lookup falls back through the base-class chain, with own static fields and methods taking precedence
 - `super` property assignment forms remain unsupported

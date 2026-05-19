@@ -11,7 +11,11 @@ value set_delete(const value& input, const value& member);
 value set_clear(const value& input);
 value set_size(const value& input);
 value set_values(const value& input);
-value set_entries(const value& input);`;
+value set_entries(const value& input);
+value set_from_values(const value& values);
+value set_union(const value& left, const value& right);
+value set_intersection(const value& left, const value& right);
+value set_difference(const value& left, const value& right);`;
 }
 
 export function getSetRuntimeCppFragment() {
@@ -33,6 +37,13 @@ std::vector<value>::const_iterator find_set_entry(const set_ptr& set, const valu
   return std::find_if(set->entries.begin(), set->entries.end(), [&member](const value& entry) {
     return std::get<bool>(equal(entry, member));
   });
+}
+
+array_ptr require_set_bulk_array(const value& input, const std::string& message) {
+  if (!std::holds_alternative<array_ptr>(input)) {
+    throw std::runtime_error(message);
+  }
+  return std::get<array_ptr>(input);
 }
 } // namespace
 
@@ -97,5 +108,51 @@ value set_entries(const value& input) {
     items.push_back(make_array({entry, entry}));
   }
   return make_array(std::move(items));
+}
+
+value set_from_values(const value& values) {
+  const auto& bulkValues = require_set_bulk_array(values, "Jayess set fromValues expects an array of values");
+  const auto result = make_set();
+  for (const auto& member : bulkValues->items) {
+    set_add(result, member);
+  }
+  return result;
+}
+
+value set_union(const value& left, const value& right) {
+  const auto& leftSet = require_set_value(left);
+  const auto& rightSet = require_set_value(right);
+  const auto result = make_set();
+  for (const auto& member : leftSet->entries) {
+    set_add(result, member);
+  }
+  for (const auto& member : rightSet->entries) {
+    set_add(result, member);
+  }
+  return result;
+}
+
+value set_intersection(const value& left, const value& right) {
+  const auto& leftSet = require_set_value(left);
+  const auto& rightSet = require_set_value(right);
+  const auto result = make_set();
+  for (const auto& member : leftSet->entries) {
+    if (find_set_entry(rightSet, member) != rightSet->entries.end()) {
+      set_add(result, member);
+    }
+  }
+  return result;
+}
+
+value set_difference(const value& left, const value& right) {
+  const auto& leftSet = require_set_value(left);
+  const auto& rightSet = require_set_value(right);
+  const auto result = make_set();
+  for (const auto& member : leftSet->entries) {
+    if (find_set_entry(rightSet, member) == rightSet->entries.end()) {
+      set_add(result, member);
+    }
+  }
+  return result;
 }`;
 }

@@ -9,7 +9,8 @@ value get_class_constructor(const value& classValue);
 value call_class_constructor(const value& classValue, const value& instance, std::vector<value> args);
 value set_instance_class(const value& instance, const value& classValue);
 value get_instance_class(const value& instance);
-value find_class_method(const value& classValue, const std::string& key);`;
+value find_class_method(const value& classValue, const std::string& key);
+value find_static_class_member(const value& classValue, const std::string& key);`;
 }
 
 export function getClassRuntimeCppFragment() {
@@ -146,5 +147,18 @@ value find_class_method(const value& classValue, const std::string& key) {
     current = get_base_class(current);
   }
   throw std::runtime_error("Missing class method");
+}
+
+value find_static_class_member(const value& classValue, const std::string& key) {
+  value current = classValue;
+  while (!std::holds_alternative<std::monostate>(current)) {
+    const auto& callable = require_class_value(current);
+    const auto iterator = callable->fields.find(key);
+    if (iterator != callable->fields.end()) {
+      return iterator->second;
+    }
+    current = get_base_class(current);
+  }
+  return value(std::monostate{});
 }`;
 }

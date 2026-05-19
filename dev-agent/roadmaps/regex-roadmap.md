@@ -50,10 +50,21 @@ This keeps the first slice centered on:
 - one explicit match-result operation
 - narrow runtime introspection
 
+The shipped replacement helper family is:
+
+- `replaceFirst(regex, text, replacement)`
+- `replaceAll(regex, text, replacement)`
+
+The replacement slice policy is:
+
+- stay module-only under `jayess:regex`
+- accept string replacement text only
+- do not add callback replacement yet
+- do not add JavaScript `String.prototype.replace` / `replaceAll` compatibility yet
+
 The following stay separate later tasks:
 
 - match-style convenience helpers over strings
-- replacement helpers
 - split helpers
 - flags/options beyond whatever the first helper layer explicitly chooses
 
@@ -83,6 +94,12 @@ The shipped `exec(regex, text)` shape is:
 - the full match at index `0`
 - captured groups in later indices
 
+Replacement helpers return one string. They do not return match metadata or mutate input text.
+
+## Current Flags And Literal Policy
+
+The current regex slice has no flag argument and no regex literal syntax. Patterns are created through `create(pattern)` only. Case-insensitive, multiline, global, sticky, and unicode-style flags remain separate later decisions.
+
 ## Why This Shape
 
 This first shape fits Jayess better because:
@@ -98,7 +115,8 @@ Keep these as separate later slices:
 
 - regex literal syntax approval
 - constructor-style creation approval
-- replacement helpers
 - match-array/result-shape policy
 - flags support policy
+- callback replacement policy
+- split helpers
 - broader string/regex interop

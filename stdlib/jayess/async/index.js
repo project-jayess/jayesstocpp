@@ -1,5 +1,7 @@
 import {
   jayessAsyncAll,
+  jayessAsyncAllSettled,
+  jayessAsyncAny,
   jayessAsyncIsAsync,
   jayessAsyncRace,
   jayessAsyncRejected,
@@ -16,6 +18,14 @@ export function rejected(error) {
 
 export function all(handles) {
   return jayessAsyncAll(handles);
+}
+
+export function allSettled(handles) {
+  return jayessAsyncAllSettled(handles);
+}
+
+export function any(handles) {
+  return jayessAsyncAny(handles);
 }
 
 export function race(handles) {

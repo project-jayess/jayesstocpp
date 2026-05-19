@@ -26,6 +26,9 @@ Current exports:
 - `keys(map)`
 - `values(map)`
 - `entries(map)`
+- `fromEntries(entries)`
+- `setAll(map, entries)`
+- `deleteAll(map, keys)`
 - `isMap(value)`
 
 ## First-Slice Semantics
@@ -72,6 +75,13 @@ Current exports:
 - `keys(map)` returns one Jayess array of keys in insertion order
 - `values(map)` returns one Jayess array of stored values in insertion order
 - `entries(map)` returns one Jayess array of `[key, value]` pairs in insertion order
+
+### Bulk Helpers
+
+- `fromEntries(entries)` accepts one Jayess array of two-item entry arrays and returns a new map
+- `setAll(map, entries)` mutates one existing map from an entries array and returns that same map
+- `deleteAll(map, keys)` removes each listed key from one existing map and returns that same map
+- malformed bulk entry shapes fail with a focused runtime error
 
 ### `isMap(value)`
 
@@ -195,29 +205,4 @@ The first primitive layer now has a concrete runtime direction:
 
 ## Remaining Follow-Up
 
-The next `jayess:collections/map` work now starts after the shipped iteration helpers.
-
-### Bulk Construction
-
-The next approved bulk-construction helper is:
-
-- `fromEntries(entries)`
-
-Rules:
-
-- accepts one Jayess array of two-item entry arrays
-- returns one new Jayess map
-- rejects malformed entry shapes with a clear runtime exception
-
-### Update Helpers
-
-The next approved update helpers are:
-
-- `setAll(map, entries)`
-- `deleteAll(map, keys)`
-
-Rules:
-
-- `setAll(map, entries)` mutates one existing map from an entries array and returns that same map
-- `deleteAll(map, keys)` removes each listed key from one existing map and returns that same map
-- these helpers stay data-oriented and do not introduce callback-based update protocols in the next slice
+The next map work should stay data-oriented and avoid callback-based update protocols until Jayess has a broader callback/lifetime policy for collection helpers.

@@ -35,6 +35,8 @@ The first shipped `jayess:async` composition surface stays intentionally narrow:
 - `resolved(value)`
 - `rejected(error)`
 - `all(handles)`
+- `allSettled(handles)`
+- `any(handles)`
 - `race(handles)`
 - `isAsync(value)`
 
@@ -59,6 +61,9 @@ The first shipped slice uses explicit Jayess async-handle failure propagation ru
 - `rejected(error)` creates an already-failed Jayess async handle
 - `all(handles)` resolves when every input resolves
 - `all(handles)` fails immediately when the first input fails
+- `allSettled(handles)` always resolves with per-handle result objects
+- `any(handles)` resolves with the first resolved input
+- `any(handles)` rejects with a Jayess array of rejection values when every input rejects
 - `race(handles)` completes with the first input completion, whether that completion is success or failure
 
 These rules are Jayess-owned async-handle semantics, not JavaScript Promise compatibility promises.
@@ -72,6 +77,8 @@ The first shipped composition layer focuses only on:
 - already-resolved handles
 - already-failed handles
 - `all(...)`
+- `allSettled(...)`
+- `any(...)`
 - `race(...)`
 - async-handle introspection
 
@@ -118,7 +125,7 @@ That keeps the language design clear:
 The current async-module plan assumes:
 
 - async function expressions and async arrow functions are part of the current supported async syntax slice and reuse the same async-handle runtime model as async function declarations
-- async methods remain a separate later class-system slice
+- async class methods reuse the same async-handle runtime model as async function declarations
 - async constructors remain unsupported by design
 - top-level `await` remains unsupported until Jayess defines explicit module-level async initialization ordering
 
@@ -130,4 +137,4 @@ The shipped first slice is split across:
 - `stdlib/jayess/async/async-primitives.hpp`
 - `src/cpp/runtime-async-source.js`
 
-The C++ runtime owns only the primitive async-handle state and the narrow `all` / `race` composition machinery. The public module surface stays Jayess-owned.
+The C++ runtime owns only the primitive async-handle state and the narrow `all` / `allSettled` / `any` / `race` composition machinery. The public module surface stays Jayess-owned.

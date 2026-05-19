@@ -17,6 +17,16 @@ inline jayess::value jayessAsyncAll(const std::vector<jayess::value>& jayessArgs
   return jayess::async_all(handles);
 }
 
+inline jayess::value jayessAsyncAllSettled(const std::vector<jayess::value>& jayessArgs) {
+  const auto handles = jayess::argument_at(jayessArgs, 0);
+  return jayess::async_all_settled(handles);
+}
+
+inline jayess::value jayessAsyncAny(const std::vector<jayess::value>& jayessArgs) {
+  const auto handles = jayess::argument_at(jayessArgs, 0);
+  return jayess::async_any(handles);
+}
+
 inline jayess::value jayessAsyncRace(const std::vector<jayess::value>& jayessArgs) {
   const auto handles = jayess::argument_at(jayessArgs, 0);
   return jayess::async_race(handles);

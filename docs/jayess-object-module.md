@@ -6,9 +6,12 @@ This document defines the first shipped `jayess:object` helper surface.
 
 The current module exports:
 
+- `has(value, key)`
 - `keys(value)`
 - `values(value)`
 - `entries(value)`
+- `fromEntries(entries)`
+- `assign(target, source)`
 
 These are function exports from a Jayess-owned module, not ambient global `Object.*` helpers.
 
@@ -21,6 +24,9 @@ The first shipped slice is intentionally narrow:
 - key order is deterministic and sorted by public property name
 - only public fields participate
 - private fields do not participate
+- `has(value, key)` requires a string key and returns a boolean
+- `fromEntries(entries)` creates a plain Jayess object from array entries shaped as `[key, value]`
+- `assign(target, source)` copies public fields from `source` into `target` and returns `target`
 
 `entries(value)` returns a Jayess array of two-element Jayess arrays:
 
@@ -48,7 +54,6 @@ Still separate later work:
 - ambient `Object.keys(...)` / `Object.values(...)` / `Object.entries(...)`
 - descriptor/reflection helpers
 - prototype-introspection helpers
-- mutation helpers such as `assign`
 - sealing/freezing helpers
 
 ## Verification

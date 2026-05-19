@@ -6,7 +6,7 @@ This checklist turns the architecture and constraints from `Agents.md` into smal
 
 The repository is currently close to empty, so the checklist starts with minimal vertical slices and then expands stage by stage. Keep changes incremental and behavior-preserving.
 
-Completed milestones through section 105 now live here.
+Completed milestones through section 112 now live here.
 
 ## 0. Project Baseline
 
@@ -1447,3 +1447,782 @@ Completed milestones through section 105 now live here.
 - [x] Define a library-first strategy for future `Date`, `JSON`, `Map`, and `Set` support rather than ambient globals.
 - [x] Add overview, README, contributor docs, and architecture docs for the standard-library and core-system model.
 
+## 106. Regex Expansion
+
+- [x] Define the next approved `jayess:regex` slice explicitly: replacement helpers, flags policy, literal-syntax policy, and result-shape policy as separate tasks.
+- [x] Decide whether the next regex slice stays module-only or adds any parser syntax at all.
+- [x] Add only the primitive/runtime support needed for the next approved regex helper family.
+- [x] Implement the next approved `jayess:regex` helpers in Jayess source where practical.
+- [x] Add semantic diagnostics for unsupported ambient/global regex forms that still remain outside the approved slice.
+- [x] Add API, runtime, module-resolution, and compile-validation tests for the next regex slice.
+- [x] Update regex docs after the next slice lands.
+
+Shipped follow-up: module-only `replaceFirst(regex, text, replacement)` and `replaceAll(regex, text, replacement)` with string replacements only. Regex literals, ambient `RegExp`, flags, callback replacement, and broad string/regex compatibility remain separate later decisions. See [docs/regex-roadmap.md](./docs/regex-roadmap.md) and [docs/jayess-regex-module.md](./docs/jayess-regex-module.md).
+
+## 107. Generator Follow-Up
+
+- [x] Define whether generator methods are the next approved generator slice or remain deferred.
+- [x] Define the next approved broader `yield` positions explicitly instead of leaving them as a vague later bucket.
+- [x] Define whether `yield` inside `try` / `catch` / `finally` belongs in the next slice or remains deferred.
+- [x] Add AST/parser support only for the approved next generator forms.
+- [x] Extend semantic analysis so `yield` legality and diagnostics match the approved next generator contexts exactly.
+- [x] Extend generator lowering/runtime only for the approved next `yield` positions, keeping one generator-frame model.
+- [x] Add parser, semantic, runtime, and compile-validation tests for each generator follow-up sub-slice.
+- [x] Update generator docs after the next follow-up slice lands.
+
+Decision: generator methods, broader nested/control-flow `yield`, `yield` inside `try` / `catch` / `finally`, async generators, and generator arrow forms remain deferred. No parser/lowering expansion is active until a later checklist approves one concrete slice, so no code expansion is needed for this checklist section. See [docs/generators-roadmap.md](./docs/generators-roadmap.md).
+
+## 108. Async Follow-Up
+
+- [x] Define whether async methods are the next approved async class-model slice or remain deferred.
+- [x] Define whether `await` inside `try` / `catch` / `finally` needs a broader explicit async-lowering slice.
+- [x] Define whether any module-level async initialization work becomes active or remains deferred with top-level `await` unsupported.
+- [x] Add AST/parser support only for the approved next async forms.
+- [x] Extend semantic and lifetime analysis only where the approved next async slice requires it.
+- [x] Extend async lowering/runtime only where the approved next async slice requires it, without creating a second async-result model.
+- [x] Add parser, semantic, runtime, and compile-validation tests for the next async follow-up slice.
+- [x] Update async docs after the next follow-up slice lands.
+
+Decision: async methods and module-level async initialization remain deferred; top-level `await` remains unsupported. `await` in `try` / `catch` is the broader async-lowering direction, while `await` in `finally` remains a separate later slice. No code expansion is needed until a later checklist approves one of those concrete forms. See [docs/async-await-roadmap.md](./docs/async-await-roadmap.md).
+
+## 109. Standard-Library Breadth: Arrays, Strings, Numbers, And Objects
+
+- [x] Define the next approved array helper family explicitly instead of broad “more array methods”.
+- [x] Define the next approved string helper family explicitly instead of broad “more string methods”.
+- [x] Define the next approved `jayess:number` helper family explicitly instead of ambient/global numeric growth.
+- [x] Define the next approved `jayess:object` helper family explicitly instead of broad `Object.*` compatibility.
+- [x] Add the approved next array runtime/module helpers one family at a time.
+- [x] Add the approved next string runtime/module helpers one family at a time.
+- [x] Add the approved next number runtime/module helpers one family at a time.
+- [x] Add the approved next object runtime/module helpers one family at a time.
+- [x] Extend semantic diagnostics for still-unsupported built-in names and methods.
+- [x] Add API, runtime, module-resolution, and compile-validation tests for each built-in family slice separately.
+- [x] Update stdlib docs after each family slice lands.
+
+Shipped slices: `array.includes`, string `includes` / `indexOf` / `endsWith`, `jayess:number` `parseInt` / `parseFloat`, and `jayess:object` `keys` / `values` / `entries`. See [docs/standard-library-expansion-roadmap.md](./docs/standard-library-expansion-roadmap.md).
+
+## 110. Built-In Modules Follow-Up: Date, JSON, Map, And Set
+
+- [x] Define the next approved `jayess:date` slice explicitly: formatting expansion, parsing expansion, arithmetic helpers, and timezone policy as separate tasks.
+- [x] Define the next approved `jayess:json` slice explicitly: replacement/transform policy, richer validation, and formatting helpers as separate tasks.
+- [x] Define the next approved `jayess:collections/map` slice explicitly: bulk construction, bulk updates, and iteration/data helpers as separate tasks.
+- [x] Define the next approved `jayess:collections/set` slice explicitly: bulk construction, pure set operations, and iteration/data helpers as separate tasks.
+- [x] Add only the primitive/runtime support needed for the approved next built-in-module helpers.
+- [x] Implement the approved next module-level helpers in Jayess source where practical.
+- [x] Add API, runtime, module-resolution, and compile-validation tests for each new built-in-module slice separately.
+- [x] Update built-in module docs after each next slice lands.
+
+Shipped date/json follow-ups are documented. Shipped map/set follow-ups include map `fromEntries` / `setAll` / `deleteAll` and set `fromValues` / `union` / `intersection` / `difference`. See [docs/jayess-date-module.md](./docs/jayess-date-module.md), [docs/jayess-json-module.md](./docs/jayess-json-module.md), [docs/jayess-map-module.md](./docs/jayess-map-module.md), and [docs/jayess-set-module.md](./docs/jayess-set-module.md).
+
+## 111. System Modules Follow-Up
+
+- [x] Define whether `jayess:os`, `jayess:url`, or `jayess:timers` becomes the next approved system-module slice.
+- [x] Define the next approved `jayess:fs` helper family explicitly beyond the current file/list/stat slice.
+- [x] Define the next approved `jayess:path` helper family explicitly beyond the current path-shaping slice.
+- [x] Define the next approved `jayess:process` helper family explicitly, keeping env mutation and subprocess policy separate.
+- [x] Add only the minimal native adapter primitives needed for the approved next system-module slice.
+- [x] Implement the approved next Jayess system-module wrappers in Jayess source where practical.
+- [x] Keep unsupported raw `node:*` and non-approved host APIs rejected with focused diagnostics.
+- [x] Add module-resolution, API, runtime, and compile-validation tests for each next system-module slice separately.
+- [x] Update system-module docs after each next slice lands.
+
+Shipped follow-ups include `jayess:fs` `remove` / `list` / `rename` / `stat`, `jayess:path` `resolve` / `relative` / `isAbsolute`, and `jayess:process` `argv`. `jayess:os`, `jayess:url`, `jayess:timers`, env mutation, and subprocess spawning remain deferred. See [docs/jayess-system-modules.md](./docs/jayess-system-modules.md).
+
+## 112. Class System And Inheritance Follow-Up
+
+- [x] Define whether private static fields are the next approved private-member slice or remain deferred.
+- [x] Define whether private static methods are approved separately from private static fields.
+- [x] Define whether static inheritance becomes an active approved slice or remains deferred.
+- [x] Define whether any broader `super` forms become active approved slices or remain deferred.
+- [x] Add AST/parser support only for the approved next class-system forms.
+- [x] Extend semantic analysis only for the approved next private/class/inheritance slice.
+- [x] Extend runtime/class-model support only for the approved next forms, keeping one class-chain model.
+- [x] Extend lowering only for the approved next forms without broadening unrelated class behavior.
+- [x] Add parser, semantic, runtime, and compile-validation tests for each class follow-up slice separately.
+- [x] Update class-model docs after each next slice lands.
+
+Decision: private static fields, private static methods, static inheritance, computed `super[expr]`, and `super` assignment remain deferred as separate class-side slices. No parser/runtime/lowering expansion is needed until a later checklist approves one concrete class-side slice. See [docs/private-fields-roadmap.md](./docs/private-fields-roadmap.md) and [docs/inheritance-roadmap.md](./docs/inheritance-roadmap.md).
+
+---
+
+## Archived Completed Active Checklist - 2026-05-19
+
+## 113. Active Feature Buildout
+
+- [x] Implement the next `jayess:regex` flags slice.
+- [x] Implement the next generator follow-up slice.
+- [x] Implement the next async follow-up slice.
+- [x] Implement the next class-system follow-up slice.
+- [x] Implement the next system-module follow-up slice.
+- [x] Implement the first explicit multi-threading module slice.
+- [x] Update docs after each feature slice lands.
+
+## 114. Next Improvement: `jayess:regex` Flags
+
+- [x] Extend `jayess:regex` `create(pattern)` to accept an optional flags string.
+- [x] Add a focused regex flag parser in `src/cpp/runtime-regex-source.js`.
+- [x] Store regex flags in the existing regex runtime object carrier.
+- [x] Support a small first flags set: `i`, `m`, and `s`.
+- [x] Reject duplicate or unknown regex flags with focused runtime diagnostics.
+- [x] Update `stdlib/jayess/regex/regex-primitives.hpp` and `stdlib/jayess/regex/index.js`.
+- [x] Add focused tests under `test/` for runtime source shape, generated output, module resolution, and compile validation.
+- [x] Update `docs/jayess-regex-module.md`.
+
+### 114.1 Runtime And Native Bridge Tasks
+
+- [x] Add a hidden regex flags storage key beside the existing hidden regex pattern key.
+- [x] Add a small runtime helper that validates a flags string and returns one internal flag representation.
+- [x] Map `i` to the C++ regex case-insensitive option.
+- [x] Implement `m` behavior in the approved runtime path.
+- [x] Implement `s` behavior in the approved runtime path.
+- [x] Ensure `create(pattern)` preserves current no-flag behavior.
+- [x] Ensure `create(pattern, flags)` validates that `flags` is a string.
+- [x] Ensure regex compilation reads both stored pattern and stored flags.
+- [x] Add focused runtime error text for duplicate regex flags.
+- [x] Add focused runtime error text for unknown regex flags.
+- [x] Keep regex value detection through `isRegex(value)` unchanged.
+- [x] Keep `test`, `exec`, `replaceFirst`, and `replaceAll` using the shared compiled-regex helper.
+
+### 114.2 Jayess Module Surface Tasks
+
+- [x] Update `stdlib/jayess/regex/regex-primitives.hpp` so `jayessRegexCreate` forwards the optional flags argument.
+- [x] Update `stdlib/jayess/regex/index.js` so `create(pattern, ...flags)` remains a thin wrapper with omitted-flag handling.
+- [x] Keep all regex helpers as explicit `jayess:regex` exports.
+- [x] Keep parser syntax unchanged for this slice.
+
+### 114.3 Regex Flags Tests
+
+- [x] Add or update `test/fixtures/modules/regex-main.js` to import and exercise flagged regex creation.
+- [x] Add runtime-source assertions in `test/runtime-semantics.test.js` for flag storage and validation helpers.
+- [x] Add generated-output assertions in `test/output/transpile-file.test.js` for regex flag declarations and bridge functions.
+- [x] Add module graph coverage in `test/modules/module-graph.test.js` for flagged regex module imports.
+- [x] Add compile-validation coverage in `test/cpp/compiler.test.js` for a generated project using flagged regex helpers.
+- [x] Add API-level coverage in `test/api/transpile.test.js` for flagged regex imports.
+
+### 114.4 Regex Documentation Tasks
+
+- [x] Update `docs/jayess-regex-module.md` with `create(pattern, flags)` behavior.
+- [x] Document the first supported flags and their Jayess semantics.
+- [x] Document runtime diagnostics for malformed flags.
+- [x] Keep public documentation focused on current behavior.
+
+## 115. Maintainability Improvement: C++ Emitter Split
+
+- [x] Extract built-in member and call emission helpers from `src/cpp/emit-module.js` into `src/cpp/emit-builtins.js`.
+- [x] Keep the public `emitModule(...)` API unchanged.
+- [x] Preserve generated C++ output for existing snapshot cases.
+- [x] Add or update focused tests under `test/` only where behavior coverage is missing.
+
+### 115.1 Extraction Scope Tasks
+
+- [x] Move built-in member recognizers out of `src/cpp/emit-module.js`.
+- [x] Move built-in array call renderers out of `src/cpp/emit-module.js`.
+- [x] Move built-in string call renderers out of `src/cpp/emit-module.js`.
+- [x] Move primitive `toString()` call rendering out of `src/cpp/emit-module.js`.
+- [x] Keep shared expression rendering passed in as narrow callbacks instead of creating broad cross-module state.
+- [x] Keep spread-argument rendering reusable without duplicating call argument logic.
+- [x] Export only the helper functions needed by `emit-module.js`.
+
+### 115.2 Behavior Preservation Tasks
+
+- [x] Keep generated C++ for existing array built-ins unchanged.
+- [x] Keep generated C++ for existing string built-ins unchanged.
+- [x] Keep generated C++ for primitive `.toString()` unchanged.
+- [x] Keep fallback dynamic property calls unchanged.
+- [x] Keep public `emitModule(...)` return shape unchanged.
+- [x] Avoid changing parser, semantic analysis, lifetime analysis, or module resolution in this refactor.
+
+### 115.3 Emitter Split Tests
+
+- [x] Run or update snapshot coverage for `test/output/transpile-snapshots.test.js`.
+- [x] Keep `test/api/transpile.test.js` array/string built-in assertions passing.
+- [x] Keep `test/cpp/compiler.test.js` composite built-in compile case passing.
+- [x] Add focused helper-level coverage for the extracted emission helpers.
+
+## 116. Diagnostics And Source Organization Improvement
+
+- [x] Extract unsupported built-in identifier diagnostics from `src/semantic/analyze.js` into a focused semantic helper module.
+- [x] Extract supported built-in property classification from `src/semantic/analyze.js` into a focused semantic helper module.
+- [x] Preserve all existing diagnostic message text unless a test explicitly updates it.
+- [x] Add focused semantic tests only for newly covered diagnostic paths.
+- [x] Keep `analyzeModule(...)` public API unchanged.
+
+## 117. Parser Organization Improvement
+
+- [x] Extract parser binding-pattern code from `src/parser/parse.js` into a focused parser helper module.
+- [x] Extract parser import/export declaration parsing into a focused parser helper module.
+- [x] Preserve current AST node shapes.
+- [x] Preserve current syntax diagnostics unless a test explicitly updates them.
+- [x] Keep `parse(sourceText)` public API unchanged.
+- [x] Keep parser tests under `test/parser/`.
+
+## 118. Standard Library Expansion: `jayess:string`
+
+- [x] Add a focused `jayess:string` standard module.
+- [x] Add explicit string helpers for `trim`, `startsWith`, `endsWith`, `includes`, `slice`, and `split`.
+- [x] Keep helper behavior aligned with Jayess string semantics instead of JavaScript compatibility guesses.
+- [x] Add a focused native bridge under `stdlib/jayess/string/`.
+- [x] Add any required runtime helpers in a small string-focused runtime source file.
+- [x] Add generated-output and runtime tests under `test/`.
+- [x] Add `docs/jayess-string-module.md`.
+
+### 118.1 String Module Runtime Tasks
+
+- [x] Implement string argument validation for each exported helper.
+- [x] Preserve current string value representation in generated C++.
+- [x] Keep `slice` bounds behavior deterministic for negative and out-of-range indexes.
+- [x] Keep `split` behavior focused on plain string separators for the first slice.
+- [x] Add clear diagnostics for unsupported separator values.
+
+### 118.2 String Module Tests
+
+- [x] Add focused API-level transpile tests for imports from `jayess:string`.
+- [x] Add generated-output assertions for string module bridge declarations.
+- [x] Add C++ compile-validation coverage for the supported string helpers.
+- [x] Add runtime semantic coverage for edge cases that affect Jayess behavior.
+
+## 119. Standard Library Expansion: `jayess:array`
+
+- [x] Add a focused `jayess:array` standard module.
+- [x] Add explicit non-callback array helpers for `slice`, `concat`, `indexOf`, `includes`, and `join`.
+- [x] Keep this slice focused on non-callback helpers and track callback helpers in section 127.
+- [x] Add a focused native bridge under `stdlib/jayess/array/`.
+- [x] Add any required runtime helpers in a small array-focused runtime source file.
+- [x] Add generated-output and runtime tests under `test/`.
+- [x] Add `docs/jayess-array-module.md`.
+
+### 119.1 Array Module Runtime Tasks
+
+- [x] Implement array argument validation for each exported helper.
+- [x] Preserve current array value representation in generated C++.
+- [x] Keep `slice` bounds behavior deterministic for negative and out-of-range indexes.
+- [x] Keep `concat` behavior focused on array values for the first slice.
+- [x] Keep `join` behavior deterministic for null-like Jayess values.
+- [x] Add clear diagnostics for unsupported helper arguments.
+
+### 119.2 Array Module Tests
+
+- [x] Add focused API-level transpile tests for imports from `jayess:array`.
+- [x] Add generated-output assertions for array module bridge declarations.
+- [x] Add C++ compile-validation coverage for the supported array helpers.
+- [x] Add runtime semantic coverage for edge cases that affect Jayess behavior.
+
+## 120. Standard Library Expansion: `jayess:object`
+
+- [x] Add or extend explicit object helpers for `has`, `keys`, `values`, `entries`, `fromEntries`, and `assign`.
+- [x] Keep object helper behavior aligned with the current Jayess object model.
+- [x] Reuse existing object runtime support where it is already focused and small.
+- [x] Extract new runtime support into a focused object helper file when needed.
+- [x] Add focused tests under `test/`.
+- [x] Update or add object module documentation under `docs/`.
+
+### 120.1 Object Module Runtime Tasks
+
+- [x] Implement `has(object, key)` with explicit string-key validation.
+- [x] Implement `keys(object)` using deterministic key ordering from the existing object representation.
+- [x] Implement `values(object)` using the same ordering as `keys`.
+- [x] Implement `entries(object)` using the same ordering as `keys`.
+- [x] Implement `fromEntries(entries)` for Jayess array entry pairs.
+- [x] Implement `assign(target, source)` for own enumerable object properties supported by Jayess.
+- [x] Add clear diagnostics for unsupported object helper arguments.
+
+## 121. Standard Library Expansion: `jayess:number`
+
+- [x] Add or extend explicit number helpers for `isInteger`, `isFinite`, `parseInt`, and `parseFloat`.
+- [x] Keep numeric parsing behavior deterministic and documented.
+- [x] Reuse existing number runtime support where it is already focused and small.
+- [x] Extract new runtime support into a focused number helper file when needed.
+- [x] Add focused tests under `test/`.
+- [x] Update or add number module documentation under `docs/`.
+
+### 121.1 Number Module Runtime Tasks
+
+- [x] Implement `isInteger(value)` for Jayess numeric values.
+- [x] Implement `isFinite(value)` for Jayess numeric values.
+- [x] Implement `parseInt(value)` with explicit string input validation.
+- [x] Implement `parseFloat(value)` with explicit string input validation.
+- [x] Add clear diagnostics for unsupported number helper arguments.
+
+## 122. Async Follow-Up: Async Class Methods
+
+- [x] Parse async instance method declarations in class bodies.
+- [x] Preserve current async function declaration, expression, arrow, and `await` behavior.
+- [x] Allow `await` inside async class method bodies.
+- [x] Reject `await` in non-async class method bodies with the existing diagnostic style.
+- [x] Lower async class methods through the existing async runtime model.
+- [x] Keep async constructors unsupported according to Jayess language rules.
+- [x] Add focused parser, semantic, output, and C++ compile-validation tests under `test/`.
+- [x] Update async and class documentation under `docs/`.
+
+### 122.1 Async Method Lowering Tasks
+
+- [x] Reuse existing async function lowering helpers where possible.
+- [x] Preserve `this` binding for async instance methods.
+- [x] Preserve method call arity and argument handling.
+- [x] Ensure async method return values use the existing Jayess async carrier.
+- [x] Add diagnostics for invalid async method forms according to Jayess class rules.
+
+## 123. Generator Follow-Up: Generator Class Methods
+
+- [x] Parse generator instance method declarations in class bodies.
+- [x] Preserve current generator declaration, expression, `yield`, and `yield*` behavior.
+- [x] Allow `yield` inside generator class method bodies.
+- [x] Reject `yield` in non-generator class method bodies with the existing diagnostic style.
+- [x] Lower generator class methods through the existing generator runtime model.
+- [x] Add focused parser, semantic, output, and C++ compile-validation tests under `test/`.
+- [x] Update generator and class documentation under `docs/`.
+
+### 123.1 Generator Method Lowering Tasks
+
+- [x] Reuse existing generator function lowering helpers where possible.
+- [x] Preserve `this` binding for generator instance methods.
+- [x] Preserve method call arity and argument handling.
+- [x] Ensure yielded values use the existing Jayess generator carrier.
+- [x] Add diagnostics for invalid generator method forms according to Jayess generator rules.
+
+## 124. Class-System Follow-Up: Private Static Members
+
+- [x] Add parser support for private static fields in class bodies.
+- [x] Add parser support for private static methods in class bodies.
+- [x] Add semantic checks for private static member declarations.
+- [x] Add semantic checks for private static member access.
+- [x] Lower private static storage through a focused class-runtime path.
+- [x] Preserve existing private instance field and method behavior.
+- [x] Add focused parser, semantic, output, and C++ compile-validation tests under `test/`.
+- [x] Update class documentation under `docs/`.
+
+### 124.1 Private Static Member Runtime Tasks
+
+- [x] Choose a deterministic private static storage key scheme.
+- [x] Keep private static fields scoped to the declaring class.
+- [x] Keep private static methods callable only through valid private access.
+- [x] Preserve inheritance behavior already defined by Jayess class semantics.
+- [x] Add clear diagnostics for invalid private static access.
+
+## 125. System Module Expansion
+
+- [x] Extend focused `jayess:system` support for process arguments, current working directory, environment reads, and exit code helpers.
+- [x] Keep platform-specific behavior isolated in runtime support.
+- [x] Keep filesystem and path behavior in explicit system modules rather than ambient globals.
+- [x] Add small native bridges under `stdlib/jayess/system/` as needed.
+- [x] Add focused tests under `test/`.
+- [x] Update system module documentation under `docs/`.
+
+### 125.1 System Module Runtime Tasks
+
+- [x] Add `args()` for process arguments when the generated runtime has access to them.
+- [x] Add `cwd()` using the existing platform abstraction style.
+- [x] Add `getEnv(name)` with explicit string-key validation.
+- [x] Add `hasEnv(name)` with explicit string-key validation.
+- [x] Add `exitCode(value)` with explicit integer validation.
+- [x] Add clear diagnostics for unsupported system helper arguments.
+
+## 126. Async Runtime Library Expansion
+
+- [x] Extend `jayess:async` with additional explicit helpers built on the current Jayess async carrier.
+- [x] Add Jayess-native `allSettled` helper behavior without JavaScript `Promise` compatibility.
+- [x] Add Jayess-native `any` helper behavior without changing existing async error semantics.
+- [x] Add focused diagnostics for unsupported async helper inputs.
+- [x] Add focused tests under `test/`.
+- [x] Update async module documentation under `docs/`.
+
+### 126.1 Async Helper Runtime Tasks
+
+- [x] Reuse existing `resolved`, `rejected`, `all`, `race`, and `isAsync` runtime paths.
+- [x] Preserve existing async carrier representation.
+- [x] Preserve existing async error propagation behavior.
+- [x] Keep helper input validation explicit and documented.
+
+## 127. Callback-Based Library Helpers
+
+- [x] Add callback ABI coverage for generated callable invocation, ownership, and lifetime behavior.
+- [x] Add `jayess:array` callback helpers using the covered callback invocation path.
+- [x] Implement `map` as the first callback-based array helper.
+- [x] Implement `filter` with callback return coercion covered by tests.
+- [x] Implement `reduce` with callback accumulator behavior covered by tests.
+- [x] Add focused tests under `test/`.
+- [x] Update array module documentation under `docs/`.
+
+### 127.1 Callback Helper Runtime Tasks
+
+- [x] Reuse the existing generated callable representation.
+- [x] Validate callback arguments before iteration starts.
+- [x] Preserve array element lifetime across callback calls.
+- [x] Preserve callback return value ownership across generated C++ scopes.
+- [x] Add clear diagnostics for unsupported callback helper arguments.
+
+## 128. Multi-Threading Module: `jayess:thread`
+
+- [x] Add a focused `jayess:thread` standard module.
+- [x] Add explicit thread helpers for `spawn`, `join`, `sleep`, `hardwareConcurrency`, and `currentId`.
+- [x] Lower thread support through isolated runtime helpers backed by portable C++ standard-library threading.
+- [x] Keep threading as an explicit imported module instead of ambient globals.
+- [x] Implement value transfer so worker threads do not require shared mutable state.
+- [x] Add clear diagnostics for unsupported thread arguments, invalid handles, and invalid joins.
+- [x] Add focused parser, semantic, runtime, generated-output, and C++ compile-validation tests under `test/`.
+- [x] Add `docs/jayess-thread-module.md`.
+
+### 128.1 Thread Runtime Tasks
+
+- [x] Add a Jayess thread handle runtime value backed by `std::thread`.
+- [x] Add deterministic handle state tracking for pending, joined, detached, completed, and failed worker states.
+- [x] Implement `spawn(callback, args)` using the existing generated callable representation.
+- [x] Implement `join(handle)` so completed worker results return through the existing Jayess value representation.
+- [x] Implement worker error capture and propagation through `join(handle)`.
+- [x] Implement `sleep(milliseconds)` with explicit non-negative integer validation.
+- [x] Implement `hardwareConcurrency()` with deterministic fallback behavior.
+- [x] Implement `currentId()` as a stable Jayess string value.
+- [x] Add runtime cleanup behavior for thread handles that leave scope before being joined.
+
+### 128.2 Thread Value Transfer Tasks
+
+- [x] Add thread-safe value transfer for numbers, booleans, strings, and null-like Jayess values.
+- [x] Add thread-safe value transfer for arrays containing supported transfer values.
+- [x] Add thread-safe value transfer for plain objects containing supported transfer values.
+- [x] Preserve ownership and lifetime boundaries across worker threads.
+- [x] Add diagnostics for values that cannot cross a thread boundary.
+- [x] Keep transferred worker arguments independent from the caller's mutable objects.
+
+### 128.3 Thread Module Tests
+
+- [x] Add API-level transpile tests for imports from `jayess:thread`.
+- [x] Add generated-output assertions for thread module bridge declarations.
+- [x] Add runtime-source assertions for thread handle storage and worker state helpers.
+- [x] Add C++ compile-validation coverage for `spawn`, `join`, `sleep`, `hardwareConcurrency`, and `currentId`.
+- [x] Add runtime semantic coverage for worker return values.
+- [x] Add runtime semantic coverage for worker error propagation.
+- [x] Add diagnostics coverage for invalid handles and unsupported transferred values.
+
+## 129. Generator Lowering Hardening
+
+- [x] Extend generator lowering so yielded values can appear inside nested statement blocks.
+- [x] Extend generator lowering so yielded values can appear inside `if` and `else` branches.
+- [x] Extend generator lowering so yielded values can appear inside `while` loops.
+- [x] Extend generator lowering so yielded values can appear inside `for` loops.
+- [x] Add generator-local destructuring declaration lowering for array and object binding patterns already accepted by the parser.
+- [x] Preserve existing generator declaration, generator expression, and generator class method behavior.
+- [x] Preserve existing `yield` and `yield*` runtime value representation.
+- [x] Add focused semantic, output, and C++ compile-validation tests under `test/`.
+- [x] Update generator documentation under `docs/`.
+
+### 129.1 Generator Lowering Procedure
+
+- [x] Review the current generator lowering control-flow representation in `src/cpp/emit-generator.js`.
+- [x] Extract one focused helper for generator statement lowering if the current file needs smaller responsibilities.
+- [x] Add a small internal representation for nested generator steps that can be reused by blocks, branches, and loops.
+- [x] Lower `BlockStatement` bodies without flattening unrelated function emission logic.
+- [x] Lower `IfStatement` branches while preserving condition evaluation order.
+- [x] Lower `WhileStatement` bodies while preserving loop condition re-check behavior after resume.
+- [x] Lower `ForStatement` initializer, condition, update, and body in the same order as ordinary Jayess execution.
+- [x] Lower generator-local array destructuring declarations through the existing binding-pattern semantics.
+- [x] Lower generator-local object destructuring declarations through the existing binding-pattern semantics.
+- [x] Keep diagnostics focused when a generator statement form is still outside this implementation slice.
+
+### 129.2 Generator Hardening Tests
+
+- [x] Add parser or semantic coverage only where existing tests do not already cover the accepted syntax.
+- [x] Add output tests for `yield` inside nested blocks.
+- [x] Add output tests for `yield` inside `if` and `else`.
+- [x] Add output tests for `yield` inside `while`.
+- [x] Add output tests for `yield` inside `for`.
+- [x] Add output tests for generator-local array destructuring.
+- [x] Add output tests for generator-local object destructuring.
+- [x] Add C++ compile-validation coverage for the new generator lowering paths.
+- [x] Keep each new generator test file or fixture small and focused.
+
+## 130. Standard Library Expansion: `jayess:math`
+
+- [x] Add a focused `jayess:math` standard module.
+- [x] Add deterministic numeric helpers for `abs`, `floor`, `ceil`, `round`, `min`, `max`, `sqrt`, and `pow`.
+- [x] Keep math helper behavior aligned with Jayess numeric semantics instead of JavaScript coercion.
+- [x] Add a focused native bridge under `stdlib/jayess/math/`.
+- [x] Add required runtime helpers in a small math-focused runtime source file.
+- [x] Add generated-output, runtime-source, module graph, API, and C++ compile-validation tests under `test/`.
+- [x] Add `docs/jayess-math-module.md`.
+
+### 130.1 Math Module Runtime Tasks
+
+- [x] Implement shared numeric argument validation for math helpers.
+- [x] Implement `abs(value)` for Jayess numeric values.
+- [x] Implement `floor(value)` for Jayess numeric values.
+- [x] Implement `ceil(value)` for Jayess numeric values.
+- [x] Implement `round(value)` with documented deterministic midpoint behavior.
+- [x] Implement `min(...values)` with explicit numeric input validation.
+- [x] Implement `max(...values)` with explicit numeric input validation.
+- [x] Implement `sqrt(value)` with documented behavior for negative input.
+- [x] Implement `pow(base, exponent)` with explicit numeric input validation.
+- [x] Add clear diagnostics for unsupported math helper arguments.
+
+### 130.2 Math Module Integration Tasks
+
+- [x] Add `stdlib/jayess/math/index.js` exports as thin Jayess wrappers.
+- [x] Add `stdlib/jayess/math/math-primitives.hpp` bridge declarations.
+- [x] Include the math runtime source in generated C++ only when the module graph imports `jayess:math`.
+- [x] Ensure package import resolution recognizes `jayess:math` through the existing standard-library path.
+- [x] Keep parser syntax unchanged for this slice.
+- [x] Keep semantic built-in diagnostics aligned with explicit `jayess:math` imports.
+
+### 130.3 Math Module Tests
+
+- [x] Add a focused fixture under `test/fixtures/modules/` for `jayess:math`.
+- [x] Add API-level transpile tests for imports from `jayess:math`.
+- [x] Add module graph tests for resolving `jayess:math`.
+- [x] Add generated-output assertions for math bridge declarations.
+- [x] Add runtime-source assertions for math helper validation and implementation hooks.
+- [x] Add C++ compile-validation coverage for the supported math helpers.
+- [x] Add runtime semantic coverage for edge cases that affect Jayess behavior.
+
+## 131. Maintainability Improvement: Large File Extraction
+
+- [x] Extract one focused responsibility from `src/parser/parse.js` without changing parser behavior.
+- [x] Extract one focused responsibility from `src/semantic/analyze.js` without changing semantic behavior.
+- [x] Extract one focused responsibility from `src/cpp/emit-module.js` without changing generated C++ output.
+- [x] Keep public parser, semantic analyzer, and C++ emitter APIs unchanged.
+- [x] Preserve current diagnostics unless a focused test explicitly updates them.
+- [x] Add or update focused tests under `test/` only where behavior coverage is missing.
+- [x] Keep each extraction small enough to review independently.
+
+### 131.1 Parser Extraction Tasks
+
+- [x] Identify one parser responsibility still embedded in `src/parser/parse.js`.
+- [x] Move that responsibility into a focused file under `src/parser/`.
+- [x] Pass parser state through narrow callbacks or small helper arguments.
+- [x] Preserve existing AST node shapes.
+- [x] Preserve existing parser error messages.
+- [x] Run focused parser tests after extraction.
+
+### 131.2 Semantic Extraction Tasks
+
+- [x] Identify one semantic responsibility still embedded in `src/semantic/analyze.js`.
+- [x] Move that responsibility into a focused file under `src/semantic/`.
+- [x] Keep scope, binding, and diagnostic state boundaries explicit.
+- [x] Preserve existing semantic diagnostics.
+- [x] Preserve `analyzeModule(...)` return shape.
+- [x] Run focused semantic tests after extraction.
+
+### 131.3 C++ Emitter Extraction Tasks
+
+- [x] Identify one C++ emission responsibility still embedded in `src/cpp/emit-module.js`.
+- [x] Move that responsibility into a focused file under `src/cpp/`.
+- [x] Pass expression rendering, statement rendering, and temporary-name creation through narrow callbacks where needed.
+- [x] Preserve generated C++ for existing snapshot cases.
+- [x] Preserve runtime include and helper registration behavior.
+- [x] Run focused output and compile-validation tests after extraction.
+
+## 132. Generator Expression-Yield Lowering
+
+- [x] Extend generator lowering so `yield` can appear inside selected larger expressions.
+- [x] Preserve existing direct `yield`, direct `yield*`, nested block, branch, loop, and generator-local destructuring behavior.
+- [x] Keep generator lowering based on explicit state slots and Jayess generator handles.
+- [x] Add focused output and C++ compile-validation tests under `test/`.
+- [x] Update generator documentation under `docs/`.
+
+### 132.1 Expression-Yield Procedure
+
+- [x] Review current `containsYieldExpression(...)` rejection paths in `src/cpp/emit-generator.js`.
+- [x] Add a small expression-lowering helper for generator expressions that need suspension points.
+- [x] Lower `return yield value` through a resume state that completes with the resumed value.
+- [x] Lower variable initializers such as `var result = 1 + (yield value)` without re-evaluating the left operand after resume.
+- [x] Lower call arguments such as `use(yield value)` without re-evaluating earlier arguments after resume.
+- [x] Lower assignment RHS forms such as `target = yield value`.
+- [x] Lower binary expression forms where either side contains a direct `yield`.
+- [x] Keep unsupported expression-yield forms diagnosed through focused generator-lowering errors.
+- [x] Preserve generated C++ validity across switch case labels and local temporary initialization.
+
+### 132.2 Expression-Yield Tests
+
+- [x] Add API/output tests for `return yield value`.
+- [x] Add API/output tests for binary expressions containing `yield`.
+- [x] Add API/output tests for call arguments containing `yield`.
+- [x] Add API/output tests for assignment RHS containing `yield`.
+- [x] Add C++ compile-validation tests for each new expression-yield lowering path.
+- [x] Keep generator tests small and focused.
+
+## 133. Generator `yield*` Destructuring
+
+- [x] Support generator-local array destructuring initialized from direct `yield*`.
+- [x] Support generator-local object destructuring initialized from direct `yield*`.
+- [x] Reuse the shared C++ destructuring emission helper.
+- [x] Preserve existing direct `yield*` delegation behavior and completion-value handling.
+- [x] Add focused output and C++ compile-validation tests under `test/`.
+- [x] Update generator documentation under `docs/`.
+
+### 133.1 Yield-Star Destructuring Procedure
+
+- [x] Review the current generator diagnostic for destructuring declarations initialized from `yield*`.
+- [x] Store the delegated generator completion value in a predeclared generator temporary.
+- [x] Run array destructuring assignments from the delegated completion value after delegation completes.
+- [x] Run object destructuring assignments from the delegated completion value after delegation completes.
+- [x] Ensure destructuring temporaries are captured outside generator resume switch labels.
+- [x] Preserve delegated yielded values while the delegated generator is still running.
+- [x] Keep diagnostics focused for destructuring patterns that remain outside this slice.
+
+### 133.2 Yield-Star Destructuring Tests
+
+- [x] Add output tests for `var [first, second] = yield* source;`.
+- [x] Add output tests for `var { value } = yield* source;`.
+- [x] Add C++ compile-validation coverage for array destructuring from `yield*`.
+- [x] Add C++ compile-validation coverage for object destructuring from `yield*`.
+- [x] Keep tests under `test/` and avoid generated-output fixture churn outside the slice.
+
+## 134. Iterator Module: `jayess:iter`
+
+- [x] Add a focused `jayess:iter` standard module for Jayess generator handles.
+- [x] Add explicit helpers for `next`, `toArray`, `take`, `map`, and `filter`.
+- [x] Keep iterator behavior Jayess-owned rather than JavaScript iterator-protocol emulation.
+- [x] Add a focused native bridge under `stdlib/jayess/iter/`.
+- [x] Add required runtime helpers in a small iterator-focused runtime source file.
+- [x] Add generated-output, runtime-source, module graph, API, and C++ compile-validation tests under `test/`.
+- [x] Add `docs/jayess-iter-module.md`.
+
+### 134.1 Iterator Runtime Tasks
+
+- [x] Implement generator-handle argument validation.
+- [x] Implement `next(generator)` returning the next yielded value or Jayess `null` after completion.
+- [x] Implement `toArray(generator)` collecting yielded values until completion.
+- [x] Implement `take(generator, count)` with explicit non-negative integer validation.
+- [x] Implement `map(generator, callback)` using the existing generated callable representation.
+- [x] Implement `filter(generator, callback)` using Jayess truthiness for callback results.
+- [x] Preserve callback return ownership and yielded value lifetime across helper calls.
+- [x] Add clear diagnostics for unsupported iterator helper arguments.
+
+### 134.2 Iterator Module Integration Tasks
+
+- [x] Add `stdlib/jayess/iter/index.js` exports as thin Jayess wrappers.
+- [x] Add `stdlib/jayess/iter/iter-primitives.hpp` bridge declarations.
+- [x] Include iterator runtime declarations through the existing runtime-source organization.
+- [x] Ensure package import resolution recognizes `jayess:iter` through the existing standard-library path.
+- [x] Keep parser syntax unchanged for this slice.
+- [x] Keep semantic diagnostics aligned with explicit `jayess:iter` imports.
+
+### 134.3 Iterator Module Tests
+
+- [x] Add a focused fixture under `test/fixtures/modules/` for `jayess:iter`.
+- [x] Add API-level transpile tests for imports from `jayess:iter`.
+- [x] Add module graph tests for resolving `jayess:iter`.
+- [x] Add generated-output assertions for iterator bridge declarations.
+- [x] Add runtime-source assertions for iterator helper validation and implementation hooks.
+- [x] Add C++ compile-validation coverage for the supported iterator helpers.
+- [x] Add runtime semantic coverage for completion and callback behavior.
+
+## 135. Standard Library Expansion: `jayess:path`
+
+- [x] Extend the focused `jayess:path` standard module.
+- [x] Add explicit path helpers for `join`, `dirname`, `basename`, and `extname`.
+- [x] Keep path behavior deterministic and platform-isolated in runtime support.
+- [x] Add or update a focused native bridge under `stdlib/jayess/path/`.
+- [x] Add required runtime helpers in a small path-focused runtime source file.
+- [x] Add generated-output, runtime-source, module graph, API, and C++ compile-validation tests under `test/`.
+- [x] Add or update path module documentation under `docs/`.
+
+### 135.1 Path Module Runtime Tasks
+
+- [x] Implement shared string argument validation for path helpers.
+- [x] Implement `join(...parts)` with explicit string-part validation.
+- [x] Implement `dirname(path)` for string paths.
+- [x] Implement `basename(path)` for string paths.
+- [x] Implement `extname(path)` for string paths.
+- [x] Keep platform-specific separator behavior isolated in C++ runtime support.
+- [x] Add clear diagnostics for unsupported path helper arguments.
+
+### 135.2 Path Module Tests
+
+- [x] Add a focused fixture under `test/fixtures/modules/` for `jayess:path`.
+- [x] Add API-level transpile tests for imports from `jayess:path`.
+- [x] Add module graph tests for resolving `jayess:path`.
+- [x] Add generated-output assertions for path bridge declarations.
+- [x] Add runtime-source assertions for path helper validation and implementation hooks.
+- [x] Add C++ compile-validation coverage for the supported path helpers.
+
+## 136. Standard Library Expansion: `jayess:fs`
+
+- [x] Extend the focused `jayess:fs` standard module.
+- [x] Add explicit filesystem helpers for `readText`, `writeText`, and `exists`.
+- [x] Keep filesystem behavior explicit through imported modules instead of ambient globals.
+- [x] Add or update a focused native bridge under `stdlib/jayess/fs/`.
+- [x] Add required runtime helpers in a small filesystem-focused runtime source file.
+- [x] Add generated-output, runtime-source, module graph, API, and C++ compile-validation tests under `test/`.
+- [x] Add or update filesystem module documentation under `docs/`.
+
+### 136.1 Filesystem Runtime Tasks
+
+- [x] Implement shared string path validation for filesystem helpers.
+- [x] Implement `readText(path)` with deterministic text-file behavior.
+- [x] Implement `writeText(path, text)` with explicit string content validation.
+- [x] Implement `exists(path)` returning a Jayess boolean.
+- [x] Keep platform-specific filesystem behavior isolated in C++ runtime support.
+- [x] Add clear diagnostics for unsupported filesystem helper arguments and failed file operations.
+
+### 136.2 Filesystem Module Tests
+
+- [x] Add a focused fixture under `test/fixtures/modules/` for `jayess:fs`.
+- [x] Add API-level transpile tests for imports from `jayess:fs`.
+- [x] Add module graph tests for resolving `jayess:fs`.
+- [x] Add generated-output assertions for filesystem bridge declarations.
+- [x] Add runtime-source assertions for filesystem helper validation and implementation hooks.
+- [x] Add C++ compile-validation coverage for the supported filesystem helpers.
+
+## 137. Inheritance Follow-Up: Static Inheritance
+
+- [x] Extend class lowering so derived classes can inherit supported static members from a Jayess base class.
+- [x] Preserve existing instance inheritance, `super(...)`, and `super.method(...)` behavior.
+- [x] Keep inheritance behavior explicit in the class runtime helpers.
+- [x] Add focused semantic, output, and C++ compile-validation tests under `test/`.
+- [x] Update inheritance and class documentation under `docs/`.
+
+### 137.1 Static Inheritance Procedure
+
+- [x] Review current class-chain runtime helpers for instance member lookup.
+- [x] Add a focused class-runtime helper for static class-chain lookup.
+- [x] Lower derived class creation so static lookup can fall back to the base class.
+- [x] Preserve own static field and static method precedence over inherited static members.
+- [x] Preserve private static member isolation to the declaring class.
+- [x] Keep static initialization block ordering unchanged.
+- [x] Add semantic checks for invalid static inheritance forms.
+- [x] Keep diagnostics focused for unsupported `super` static forms outside this slice.
+
+### 137.2 Static Inheritance Tests
+
+- [x] Add parser or semantic tests only where existing syntax coverage is missing.
+- [x] Add output tests for inherited static method lookup.
+- [x] Add output tests for inherited static field lookup.
+- [x] Add output tests proving own static members override inherited static members.
+- [x] Add C++ compile-validation coverage for derived classes using inherited static members.
+- [x] Update docs for current static inheritance behavior.
+
+## 138. Maintainability Improvement: Large File Extraction Follow-Up
+
+- [x] Extract one additional focused responsibility from `src/parser/parse.js` without changing parser behavior.
+- [x] Extract one additional focused responsibility from `src/semantic/analyze.js` without changing semantic behavior.
+- [x] Extract one additional focused responsibility from `src/cpp/emit-module.js` without changing generated C++ output.
+- [x] Keep public parser, semantic analyzer, and C++ emitter APIs unchanged.
+- [x] Preserve current diagnostics unless a focused test explicitly updates them.
+- [x] Add or update focused tests under `test/` only where behavior coverage is missing.
+- [x] Keep each extraction small enough to review independently.
+
+### 138.1 Parser Follow-Up Extraction Tasks
+
+- [x] Identify one parser responsibility still embedded in `src/parser/parse.js`.
+- [x] Move that responsibility into a focused file under `src/parser/`.
+- [x] Pass parser state through narrow callbacks or small helper arguments.
+- [x] Preserve existing AST node shapes.
+- [x] Preserve existing parser error messages.
+- [x] Run focused parser tests after extraction.
+
+### 138.2 Semantic Follow-Up Extraction Tasks
+
+- [x] Identify one semantic responsibility still embedded in `src/semantic/analyze.js`.
+- [x] Move that responsibility into a focused file under `src/semantic/`.
+- [x] Keep scope, binding, and diagnostic state boundaries explicit.
+- [x] Preserve existing semantic diagnostics.
+- [x] Preserve `analyzeModule(...)` return shape.
+- [x] Run focused semantic tests after extraction.
+
+### 138.3 C++ Emitter Follow-Up Extraction Tasks
+
+- [x] Identify one C++ emission responsibility still embedded in `src/cpp/emit-module.js`.
+- [x] Move that responsibility into a focused file under `src/cpp/`.
+- [x] Pass expression rendering, statement rendering, and temporary-name creation through narrow callbacks where needed.
+- [x] Preserve generated C++ for existing snapshot cases.
+- [x] Preserve runtime include and helper registration behavior.
+- [x] Run focused output and compile-validation tests after extraction.

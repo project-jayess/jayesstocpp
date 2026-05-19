@@ -77,7 +77,7 @@ The following familiar JavaScript syntax is not currently documented as supporte
 
 Unsupported-by-design features such as `let`, dynamic `import()`, `eval(...)`, `Function(...)`, and `with` now fail with focused diagnostics. Remaining unimplemented forms may still fail with narrower generic unsupported diagnostics until their own slices are defined and shipped.
 
-Destructuring now supports nested patterns, pattern defaults, assignment destructuring into existing identifiers, and destructuring declarations in `for` initializers. See [destructuring-roadmap.md](./destructuring-roadmap.md) for the current supported surface and the remaining intentional limits.
+Destructuring now supports nested patterns, pattern defaults, assignment destructuring into existing identifiers, and destructuring declarations in `for` initializers.
 
 Some JavaScript features are not merely “not implemented yet”; they are intentionally unsupported because Jayess is a compiled language with closed module resolution. That currently includes:
 
@@ -91,21 +91,21 @@ Some JavaScript features are not merely “not implemented yet”; they are inte
 
 See [../Jayess.md](../Jayess.md) for the language-direction policy behind those non-goals.
 
-`async` / `await` now has a narrow shipped slice through `async function` declarations, async function expressions, async arrow functions, and `await expr` inside those async function bodies. JavaScript `Promise` is unsupported by design, and the first shipped Jayess-owned composition surface is `resolved`, `rejected`, `all`, `race`, and `isAsync` through `jayess:async`. Async methods/constructors and top-level `await` are still outside the current shipped slice. See [async-await-roadmap.md](./async-await-roadmap.md).
+`async` / `await` now has a narrow shipped slice through `async function` declarations, async function expressions, async arrow functions, and `await expr` inside those async function bodies. JavaScript `Promise` is unsupported by design, and the first shipped Jayess-owned composition surface is `resolved`, `rejected`, `all`, `race`, and `isAsync` through `jayess:async`.
 
-Generators now have a narrow shipped slice through generator declarations, generator function expressions, and direct `yield` / `yield*`. Generator methods, async generators, and broader generator forms are still outside the current shipped slice. See [generators-roadmap.md](./generators-roadmap.md).
+Generators now have a narrow shipped slice through generator declarations, generator function expressions, generator class methods, and direct `yield` / `yield*`.
 
-Inheritance now has a narrow first shipped slice through single inheritance, `extends`, `super(...)`, and `super.method(...)`. Static inheritance, computed `super[expr]`, and broader `super` forms are still outside the current slice, and `super` property assignment stays unsupported. See [inheritance-roadmap.md](./inheritance-roadmap.md).
+Inheritance now has a narrow first shipped slice through single inheritance, `extends`, `super(...)`, and `super.method(...)`.
 
-Private class fields now have a narrow shipped slice through private instance fields and private instance methods. Private static members remain later separate work. See [private-fields-roadmap.md](./private-fields-roadmap.md).
+Private class fields now have a narrow shipped slice through private instance fields and private instance methods.
 
-Computed class member names and static initialization blocks now have a narrow first shipped slice. Static blocks keep ordinary class-name access rather than gaining a special class-side `this` binding, and broader class-side semantics plus static inheritance follow-up work remain outside the current slice. See [class-members-roadmap.md](./class-members-roadmap.md).
+Computed class member names and static initialization blocks now have a narrow first shipped slice.
 
-Large runtime built-ins such as `Date`, `Map`, `Set`, and `JSON` are treated as explicit Jayess library/runtime features rather than ambient JavaScript globals. Narrow module-owned slices are now shipped through `jayess:date`, `jayess:json`, `jayess:collections/map`, and `jayess:collections/set`. See [runtime-builtins-roadmap.md](./runtime-builtins-roadmap.md).
+Large runtime built-ins such as `Date`, `Map`, `Set`, and `JSON` are treated as explicit Jayess library/runtime features rather than ambient JavaScript globals. Narrow module-owned slices are now shipped through `jayess:date`, `jayess:json`, `jayess:collections/map`, and `jayess:collections/set`.
 
-Regular-expression support now has a narrow shipped first slice through `jayess:regex`, with helper exports `create`, `test`, `exec`, and `isRegex`. Ambient `RegExp`, regex literals, replacement helpers, and broader compatibility remain outside the current slice. See [regex-roadmap.md](./regex-roadmap.md).
+Regular-expression support now has a narrow shipped first slice through `jayess:regex`, with helper exports `create`, `test`, `exec`, `replaceFirst`, `replaceAll`, and `isRegex`.
 
-The next standard-library expansion work is also intentionally bounded: array `includes(value)`, the string `includes` / `indexOf` / `endsWith` slice, the first `jayess:object` helper surface, and the first `jayess:number` parsing surface are now shipped. Broader numeric helpers still stay module-owned rather than ambient globals. See [standard-library-expansion-roadmap.md](./standard-library-expansion-roadmap.md).
+The standard-library expansion work is intentionally bounded: array `includes(value)`, the string `includes` / `indexOf` / `endsWith` slice, the first `jayess:object` helper surface, and the first `jayess:number` parsing surface are now shipped.
 
 ## Runtime And Standard Library Features Still Missing
 
@@ -131,7 +131,7 @@ These JavaScript ecosystem expectations are also intentionally narrower today:
 - Node built-ins such as `node:fs`, `node:path`, and `node:url` are not automatically available inside Jayess source.
 - Jayess instead grows host-facing behavior through explicit `jayess:fs`, `jayess:path`, and `jayess:process` slices, and the shipped follow-up work is still narrow rather than broad Node compatibility.
 
-`node:` imports now fail with explicit unsupported diagnostics instead of being treated like ordinary package imports. See [node-builtins-roadmap.md](./node-builtins-roadmap.md).
+`node:` imports now fail with explicit unsupported diagnostics instead of being treated like ordinary package imports.
 - npm package resolution exists, but not every JavaScript package is a valid Jayess package.
 - Native headers and native libraries are supported as dependency artifacts, but JavaScript packages are not treated as C++ bindings automatically.
 - The transpiler emits C++ source, not direct executable binaries as its primary product.
@@ -154,20 +154,9 @@ Some areas exist today but still need clearer long-term Jayess rules:
 - built-in property and method surface for arrays, objects, strings, and numbers
 - exact template-literal stringification semantics for all runtime value kinds
 
-## Roadmap Direction
+## Implementation Direction
 
-The current checklist roadmap is being extended with focused, small-step milestones for:
-
-- default parameters
-- trailing commas
-- compound assignment and update expressions
-- richer composite-value operations
-- narrow built-in library support
-- diagnostics quality
-- module/output polish
-- semantic tightening
-
-The preferred long-term direction for many larger remaining features is:
+The preferred long-term direction for larger features is:
 
 - a **small C++ runtime** for primitives Jayess cannot express yet
 - **Jayess-written standard-library and higher-level core modules** for behavior that can be implemented in Jayess and transpiled into the output project

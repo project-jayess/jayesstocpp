@@ -1,0 +1,65 @@
+#pragma once
+
+#include "runtime/jayess_runtime.hpp"
+
+inline std::vector<jayess::value> jayessArrayOptionalRestArgs(
+  const std::vector<jayess::value>& jayessArgs,
+  std::size_t restIndex,
+  const std::string& message
+) {
+  const auto rest = jayess::argument_at(jayessArgs, restIndex);
+  if (!std::holds_alternative<jayess::array_ptr>(rest)) {
+    throw std::runtime_error(message);
+  }
+  return std::get<jayess::array_ptr>(rest)->items;
+}
+
+inline jayess::value jayessArraySlice(const std::vector<jayess::value>& jayessArgs) {
+  std::vector<jayess::value> args = {jayess::argument_at(jayessArgs, 1)};
+  auto endArgs = jayessArrayOptionalRestArgs(jayessArgs, 2, "Jayess array slice expects optional end arguments");
+  if (endArgs.size() > 1) {
+    throw std::runtime_error("Jayess array slice expects at most one end argument");
+  }
+  if (!endArgs.empty()) {
+    args.push_back(endArgs[0]);
+  }
+  return jayess::array_slice(jayess::argument_at(jayessArgs, 0), args);
+}
+
+inline jayess::value jayessArrayConcat(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_concat(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessArrayIndexOf(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_index_of(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessArrayIncludes(const std::vector<jayess::value>& jayessArgs) {
+  const auto items = jayess::argument_at(jayessArgs, 0);
+  const auto needle = jayess::argument_at(jayessArgs, 1);
+  return jayess::array_includes(items, {needle});
+}
+
+inline jayess::value jayessArrayJoin(const std::vector<jayess::value>& jayessArgs) {
+  auto separatorArgs = jayessArrayOptionalRestArgs(jayessArgs, 1, "Jayess array join expects optional separator arguments");
+  if (separatorArgs.size() > 1) {
+    throw std::runtime_error("Jayess array join expects at most one separator argument");
+  }
+  return jayess::array_join(jayess::argument_at(jayessArgs, 0), separatorArgs);
+}
+
+inline jayess::value jayessArrayMap(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_map(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessArrayFilter(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_filter(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessArrayReduce(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_reduce(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2)
+  );
+}

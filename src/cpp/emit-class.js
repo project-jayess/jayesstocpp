@@ -1,4 +1,6 @@
-import { isPrivateFieldKey, renderPrivateFieldInitialization } from "./emit-private.js";
+import { emitAsyncCallableBody } from "./emit-async.js";
+import { renderGeneratorCallableExpression } from "./emit-generator.js";
+import { isPrivateFieldKey, renderPrivateFieldInitialization, renderPrivateStaticFieldInitialization } from "./emit-private.js";
 
 function emitMethodParameterInitialization(param, index, context, lines, emitParameterInitialization, indent = "  ", offset = 0) {
   emitParameterInitialization(param, index + offset, context, lines, indent);
@@ -40,9 +42,17 @@ export function renderSuperConstructorCall(argumentNodes, context, renderExpress
   return lines.join("\n");
 }
 
-function renderBoundStaticMethodClosure(node, context, emitParameterInitialization, emitStatement, thisAlias = "class_value") {
+function renderBoundStaticMethodClosure(node, context, emitParameterInitialization, emitStatement, renderExpression, thisAlias = "class_value") {
   const captureList = context.classSelfAlias != null ? `${thisAlias}` : thisAlias;
   const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  if (node.async) {
+    emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, thisAlias, 0);
+    lines.push("})");
+    return lines.join("\n");
+  }
+  if (node.generator) {
+    return renderGeneratorMethodClosure(node, context, renderExpression, emitParameterInitialization, thisAlias, 0, [thisAlias], null);
+  }
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
 
   for (const [index, param] of node.params.entries()) {
@@ -57,9 +67,26 @@ function renderBoundStaticMethodClosure(node, context, emitParameterInitializati
   return lines.join("\n");
 }
 
-function renderInstanceMethodClosure(node, context, emitParameterInitialization, emitStatement) {
+function renderInstanceMethodClosure(node, context, emitParameterInitialization, emitStatement, renderExpression) {
   const captureList = context.classSelfAlias != null ? context.classSelfAlias : "";
   const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  if (node.async) {
+    emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, "this_value", 1);
+    lines.push("})");
+    return lines.join("\n");
+  }
+  if (node.generator) {
+    return renderGeneratorMethodClosure(
+      node,
+      context,
+      renderExpression,
+      emitParameterInitialization,
+      "this_value",
+      1,
+      [context.classSelfAlias].filter(Boolean),
+      "this_value"
+    );
+  }
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
   lines.push("  jayess::value this_value = jayess::argument_at(jayess_args, 0);");
 
@@ -75,9 +102,26 @@ function renderInstanceMethodClosure(node, context, emitParameterInitialization,
   return lines.join("\n");
 }
 
-function renderPrivateInstanceMethodClosure(node, context, emitParameterInitialization, emitStatement, instanceExpr = "this_value") {
+function renderPrivateInstanceMethodClosure(node, context, emitParameterInitialization, emitStatement, renderExpression, instanceExpr = "this_value") {
   const captures = [context.classSelfAlias, instanceExpr].filter(Boolean);
   const lines = [`jayess::make_callable([${captures.join(", ")}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  if (node.async) {
+    emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, instanceExpr, 0);
+    lines.push("})");
+    return lines.join("\n");
+  }
+  if (node.generator) {
+    return renderGeneratorMethodClosure(
+      node,
+      context,
+      renderExpression,
+      emitParameterInitialization,
+      instanceExpr,
+      0,
+      [context.classSelfAlias, instanceExpr].filter(Boolean),
+      null
+    );
+  }
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
 
   for (const [index, param] of node.params.entries()) {
@@ -90,6 +134,65 @@ function renderPrivateInstanceMethodClosure(node, context, emitParameterInitiali
   lines.push("  return jayess::value(std::monostate{});");
   lines.push("})");
   return lines.join("\n");
+}
+
+function emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, thisAlias, argumentOffset) {
+  const methodContext = { ...context, thisAlias };
+  emitAsyncCallableBody(
+    node,
+    methodContext,
+    lines,
+    (param, index, activeContext, activeLines) => {
+      emitMethodParameterInitialization(param, index, activeContext, activeLines, emitParameterInitialization, "  ", argumentOffset);
+    },
+    emitStatement,
+    () => {
+      throw new Error("Async class methods should not use expression bodies");
+    },
+    {
+      beforeParameters(activeLines) {
+        if (thisAlias === "this_value" && argumentOffset === 1) {
+          activeLines.push("  jayess::value this_value = jayess::argument_at(jayess_args, 0);");
+        }
+      }
+    }
+  );
+}
+
+function renderGeneratorMethodClosure(
+  node,
+  context,
+  renderExpression,
+  emitParameterInitialization,
+  thisAlias,
+  argumentOffset,
+  captureNames,
+  thisArgumentAlias
+) {
+  const methodContext = { ...context, thisAlias };
+  const uniqueCaptureNames = [...new Set(captureNames.filter(Boolean))];
+  const outerCaptureNames = [...uniqueCaptureNames];
+  if (thisArgumentAlias != null && !outerCaptureNames.includes(thisArgumentAlias)) {
+    outerCaptureNames.push(thisArgumentAlias);
+  }
+
+  return renderGeneratorCallableExpression(
+    node,
+    methodContext,
+    renderExpression,
+    (param, index, activeContext, activeLines) => {
+      emitMethodParameterInitialization(param, index, activeContext, activeLines, emitParameterInitialization, "  ", argumentOffset);
+    },
+    {
+      captureList: uniqueCaptureNames.join(", "),
+      outerCaptureNames,
+      beforeParameters(lines) {
+        if (thisArgumentAlias != null) {
+          lines.push(`  jayess::value ${thisArgumentAlias} = jayess::argument_at(jayess_args, 0);`);
+        }
+      }
+    }
+  );
 }
 
 function renderConstructorClosure(
@@ -130,7 +233,7 @@ function renderConstructorClosure(
   }
 
   for (const method of privateMethodList) {
-    lines.push(`  ${renderPrivateFieldInitialization(method, renderPrivateInstanceMethodClosure(method, context, emitParameterInitialization, emitStatement), context, "this_value")};`);
+    lines.push(`  ${renderPrivateFieldInitialization(method, renderPrivateInstanceMethodClosure(method, context, emitParameterInitialization, emitStatement, renderExpression), context, "this_value")};`);
   }
 
   for (const field of instanceFieldList) {
@@ -218,15 +321,19 @@ export function renderClassValue(
       if (member.computed) {
         const keyAlias = nextComputedKeyAlias(localTempState);
         emitComputedKeyAlias(member, keyAlias, classContext, lines, renderExpression);
-        lines.push(`  jayess::define_dynamic_class_method(class_value, ${keyAlias}, ${renderInstanceMethodClosure(member, classContext, emitParameterInitialization, emitStatement)});`);
+        lines.push(`  jayess::define_dynamic_class_method(class_value, ${keyAlias}, ${renderInstanceMethodClosure(member, classContext, emitParameterInitialization, emitStatement, renderExpression)});`);
         continue;
       }
-      lines.push(`  jayess::define_class_method(class_value, ${JSON.stringify(member.key.name)}, ${renderInstanceMethodClosure(member, classContext, emitParameterInitialization, emitStatement)});`);
+      lines.push(`  jayess::define_class_method(class_value, ${JSON.stringify(member.key.name)}, ${renderInstanceMethodClosure(member, classContext, emitParameterInitialization, emitStatement, renderExpression)});`);
       continue;
     }
 
     if (member.type === "ClassFieldDefinition" && member.static) {
       const init = member.init == null ? "0.0" : renderExpression(member.init, { ...classContext, thisAlias: "class_value" });
+      if (isPrivateFieldKey(member.key)) {
+        lines.push(`  ${renderPrivateStaticFieldInitialization(member, init, classContext)};`);
+        continue;
+      }
       if (member.computed) {
         const keyAlias = nextComputedKeyAlias(localTempState);
         emitComputedKeyAlias(member, keyAlias, classContext, lines, renderExpression);
@@ -238,7 +345,11 @@ export function renderClassValue(
     }
 
     if (member.type === "MethodDefinition" && member.static) {
-      const closure = renderBoundStaticMethodClosure(member, classContext, emitParameterInitialization, emitStatement, "class_value");
+      const closure = renderBoundStaticMethodClosure(member, classContext, emitParameterInitialization, emitStatement, renderExpression, "class_value");
+      if (isPrivateFieldKey(member.key)) {
+        lines.push(`  ${renderPrivateStaticFieldInitialization(member, closure, classContext)};`);
+        continue;
+      }
       if (member.computed) {
         const keyAlias = nextComputedKeyAlias(localTempState);
         emitComputedKeyAlias(member, keyAlias, classContext, lines, renderExpression);

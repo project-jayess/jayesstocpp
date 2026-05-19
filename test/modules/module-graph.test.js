@@ -68,12 +68,55 @@ test("module graph resolves repository-owned built-in object modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/object-main.js"));
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:object");
 });
 
 test("module graph resolves repository-owned built-in number modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/number-main.js"));
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+});
+
+test("module graph resolves repository-owned built-in math modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/math-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:math");
+});
+
+test("module graph resolves repository-owned built-in iterator modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/iter-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:iter");
+});
+
+test("module graph resolves repository-owned built-in path modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/path-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:path");
+});
+
+test("module graph resolves repository-owned built-in filesystem modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/fs-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:fs");
+});
+
+test("module graph resolves repository-owned built-in string modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/string-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:string");
+});
+
+test("module graph resolves repository-owned built-in array modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/array-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:array");
 });
 
 test("module graph resolves repository-owned built-in async modules", () => {
@@ -86,6 +129,7 @@ test("module graph resolves repository-owned built-in regex modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/regex-main.js"));
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:regex");
 });
 
 test("module graph resolves repository-owned system modules", () => {
@@ -95,6 +139,20 @@ test("module graph resolves repository-owned system modules", () => {
     graph.modules[0].dependencies.map((dependency) => dependency.kind),
     ["builtin-module", "builtin-module", "builtin-module"]
   );
+});
+
+test("module graph resolves repository-owned built-in system module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/system-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:system");
+});
+
+test("module graph resolves repository-owned built-in thread module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/thread-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:thread");
 });
 
 test("module graph rejects missing packages clearly", () => {

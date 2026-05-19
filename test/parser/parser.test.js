@@ -174,10 +174,20 @@ test("parser handles async function expressions and async arrow functions", () =
   assert.equal(ast.body[2].declarations[0].init.body.type, "BlockStatement");
 });
 
-test("parser rejects unsupported async forms clearly after the expression slice lands", () => {
+test("parser handles async class methods and rejects async constructors", () => {
+  const ast = parse(createSourceText("class Worker { async run(value) { return await value; } async() { return 1; } }"));
+  const declaration = ast.body[0];
+
+  assert.equal(declaration.methods[0].type, "MethodDefinition");
+  assert.equal(declaration.methods[0].key.name, "run");
+  assert.equal(declaration.methods[0].async, true);
+  assert.equal(declaration.methods[0].body.body[0].argument.type, "AwaitExpression");
+  assert.equal(declaration.methods[1].key.name, "async");
+  assert.equal(declaration.methods[1].async, false);
+
   assert.throws(
-    () => parse(createSourceText("class Worker { async run(value) { return await value; } }")),
-    /Jayess does not support this async form yet|Expected ';' after class field|Expected identifier/
+    () => parse(createSourceText("class Worker { async constructor(value) { return await value; } }")),
+    /Jayess does not support async constructors/
   );
 });
 
@@ -213,10 +223,23 @@ test("parser handles supported generator declaration state flow", () => {
   assert.equal(declaration.body.body[2].type, "ReturnStatement");
 });
 
-test("parser rejects unsupported generator forms clearly", () => {
+test("parser handles generator class methods", () => {
+  const ast = parse(createSourceText("class Point { *items(value) { yield value; return yield* value; } static *all(value) { yield value; } }"));
+  const declaration = ast.body[0];
+
+  assert.equal(declaration.methods[0].type, "MethodDefinition");
+  assert.equal(declaration.methods[0].key.name, "items");
+  assert.equal(declaration.methods[0].generator, true);
+  assert.equal(declaration.methods[0].static, false);
+  assert.equal(declaration.methods[0].body.body[0].expression.type, "YieldExpression");
+  assert.equal(declaration.methods[0].body.body[1].argument.delegate, true);
+  assert.equal(declaration.methods[1].key.name, "all");
+  assert.equal(declaration.methods[1].generator, true);
+  assert.equal(declaration.methods[1].static, true);
+
   assert.throws(
-    () => parse(createSourceText("class Point { *items() { yield 1; } }")),
-    /Expected binding target|Expected identifier|Expected ';' after class field/
+    () => parse(createSourceText("class Point { *constructor() { yield 1; } }")),
+    /Jayess does not support generator constructors/
   );
 });
 
@@ -256,17 +279,18 @@ test("parser handles private fields and private member access", () => {
   assert.equal(declaration.methods[1].body.body[0].argument.computed, false);
 });
 
-test("parser handles private instance methods while keeping private static forms blocked", () => {
-  const ast = parse(createSourceText("class Point { #value() { return 1; } }"));
+test("parser handles private instance and static members", () => {
+  const ast = parse(createSourceText("class Point { #value() { return 1; } static #count = 0; static #next() { return Point.#count; } }"));
   const declaration = ast.body[0];
   assert.equal(declaration.methods[0].type, "MethodDefinition");
   assert.equal(declaration.methods[0].key.type, "PrivateIdentifier");
   assert.equal(declaration.methods[0].key.name, "value");
-
-  assert.throws(
-    () => parse(createSourceText("class Point { static #value = 1; }")),
-    /Jayess does not support private static fields yet; the first private-member slice starts with private instance fields only/
-  );
+  assert.equal(declaration.methods[1].type, "ClassFieldDefinition");
+  assert.equal(declaration.methods[1].static, true);
+  assert.equal(declaration.methods[1].key.name, "count");
+  assert.equal(declaration.methods[2].type, "MethodDefinition");
+  assert.equal(declaration.methods[2].static, true);
+  assert.equal(declaration.methods[2].key.name, "next");
 });
 
 test("parser handles computed class members and static initialization blocks", () => {

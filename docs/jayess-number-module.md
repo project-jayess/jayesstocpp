@@ -8,15 +8,20 @@ It does not expose JavaScript ambient globals like `parseInt` or `parseFloat`.
 
 ## Exports
 
-The first shipped exports are:
+The shipped exports are:
 
+- `isInteger(value)`
+- `isFinite(value)`
 - `parseInt(text)`
 - `parseFloat(text)`
 
-## First-Slice Semantics
+## Current Semantics
 
-The first slice is intentionally narrow.
+The current slice is intentionally narrow.
 
+- `isInteger(value)` returns `true` only for finite Jayess numeric values with no fractional part.
+- `isFinite(value)` returns `true` only for finite Jayess numeric values.
+- non-number values return `false` from numeric predicate helpers.
 - Both helpers require a string input.
 - Leading and trailing ASCII whitespace is ignored.
 - `parseInt(text)` accepts only full decimal integer text with an optional sign.
@@ -64,6 +69,6 @@ This first slice does not attempt to provide:
 - radix arguments
 - hexadecimal, binary, or octal parsing modes
 - formatting helpers
-- numeric predicates or broader `Number` emulation
+- broader `Number` emulation
 
 Those remain separate future slices.

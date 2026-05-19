@@ -3,10 +3,14 @@ import {
   jayessSetClear,
   jayessSetCreate,
   jayessSetDeleteValue,
+  jayessSetDifference,
   jayessSetEntries,
+  jayessSetFromValues,
   jayessSetHas,
+  jayessSetIntersection,
   jayessSetIsSet,
   jayessSetSize,
+  jayessSetUnion,
   jayessSetValues
 } from "./set-primitives.hpp";
 
@@ -40,6 +44,22 @@ export function values(set) {
 
 export function entries(set) {
   return jayessSetEntries(set);
+}
+
+export function fromValues(values) {
+  return jayessSetFromValues(values);
+}
+
+export function union(left, right) {
+  return jayessSetUnion(left, right);
+}
+
+export function intersection(left, right) {
+  return jayessSetIntersection(left, right);
+}
+
+export function difference(left, right) {
+  return jayessSetDifference(left, right);
 }
 
 export function isSet(value) {

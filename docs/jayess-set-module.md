@@ -24,6 +24,10 @@ Current exports:
 - `size(set)`
 - `values(set)`
 - `entries(set)`
+- `fromValues(values)`
+- `union(left, right)`
+- `intersection(left, right)`
+- `difference(left, right)`
 - `isSet(value)`
 
 ## First-Slice Semantics
@@ -63,6 +67,15 @@ Current exports:
 
 - `values(set)` returns one Jayess array of members in insertion order
 - `entries(set)` returns one Jayess array of `[value, value]` pairs in insertion order
+
+### Bulk And Set-Operation Helpers
+
+- `fromValues(values)` accepts one Jayess array of candidate values and returns a new set
+- duplicate values collapse under the set's existing membership rules
+- `union(left, right)` returns a new set containing all left values followed by newly added right values
+- `intersection(left, right)` returns a new set containing values from `left` that are also in `right`
+- `difference(left, right)` returns a new set containing values from `left` that are not in `right`
+- set-operation helpers do not mutate their inputs
 
 ### `isSet(value)`
 
@@ -187,30 +200,4 @@ Current verification coverage:
 
 ## Remaining Follow-Up
 
-The next `jayess:collections/set` work now starts after the shipped iteration helpers.
-
-### Bulk Construction
-
-The next approved bulk-construction helper is:
-
-- `fromValues(values)`
-
-Rules:
-
-- accepts one Jayess array of candidate values
-- returns one new Jayess set
-- duplicate values collapse under the set's existing membership rules
-
-### Set-Operation Helpers
-
-The next approved set-operation helpers are:
-
-- `union(left, right)`
-- `intersection(left, right)`
-- `difference(left, right)`
-
-Rules:
-
-- each helper returns one new Jayess set instead of mutating its inputs
-- result order follows the left-hand set's insertion order first, then any newly added right-hand values when applicable
-- the next slice does not add iterator-based or callback-based set algebra APIs
+The next set work should keep iterator-based and callback-based set algebra APIs separate from this data-oriented helper surface.

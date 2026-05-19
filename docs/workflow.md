@@ -20,10 +20,6 @@ This repository keeps development workflow decisions narrow and explicit.
 - if local agent scratch files are needed, keep them under `./dev-agent`
 - do not mix scratch files into `src`, `test`, or generated output directories
 
-## CI
-
-- GitHub Actions runs the fast unit suite and compile-validation suite separately
-- the workflow installs `clang` so compiler-validation stays active instead of silently skipping
 
 ## Review Discipline
 

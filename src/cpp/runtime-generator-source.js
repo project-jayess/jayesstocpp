@@ -10,6 +10,7 @@ struct generator_state {
   generator_status status = generator_status::suspended_start;
   std::size_t next_state = 0;
   value current = std::monostate{};
+  value sent = std::monostate{};
   std::function<void()> resume;
 };
 
@@ -24,7 +25,9 @@ void generator_set_resume(const value& input, std::function<void()> resume);
 void generator_yield(const value& input, std::size_t nextState, value yielded);
 void generator_complete(const value& input, value completed);
 void generator_fail(const value& input, value failure);
+value generator_take_sent(const value& input);
 value generator_resume(const value& input);
+value generator_resume_with(const value& input, value sent);
 `;
 }
 
@@ -93,7 +96,14 @@ void generator_fail(const value& input, value failure) {
   state->resume = nullptr;
 }
 
-value generator_resume(const value& input) {
+value generator_take_sent(const value& input) {
+  const auto& state = require_generator_state(input);
+  value sent = state->sent;
+  state->sent = value(std::monostate{});
+  return sent;
+}
+
+value generator_resume_with(const value& input, value sent) {
   const auto& state = require_generator_state(input);
   if (state->status == generator_status::completed) {
     return state->current;
@@ -105,6 +115,7 @@ value generator_resume(const value& input) {
     throw std::runtime_error("Generator has no resume function");
   }
 
+  state->sent = std::move(sent);
   state->resume();
 
   if (state->status == generator_status::failed) {
@@ -112,6 +123,10 @@ value generator_resume(const value& input) {
   }
 
   return state->current;
+}
+
+value generator_resume(const value& input) {
+  return generator_resume_with(input, value(std::monostate{}));
 }
 `;
 }

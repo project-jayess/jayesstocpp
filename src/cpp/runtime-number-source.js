@@ -1,6 +1,8 @@
 export function getNumberRuntimeHeaderFragment() {
   return `value number_parse_int(const value& input);
-value number_parse_float(const value& input);`;
+value number_parse_float(const value& input);
+value number_is_integer(const value& input);
+value number_is_finite(const value& input);`;
 }
 
 export function getNumberRuntimeCppFragment() {
@@ -61,5 +63,20 @@ value number_parse_float(const value& input) {
   } catch (const std::exception&) {
     return value(std::monostate{});
   }
+}
+
+value number_is_integer(const value& input) {
+  if (!std::holds_alternative<double>(input)) {
+    return false;
+  }
+  const auto number = std::get<double>(input);
+  return std::isfinite(number) && std::floor(number) == number;
+}
+
+value number_is_finite(const value& input) {
+  if (!std::holds_alternative<double>(input)) {
+    return false;
+  }
+  return std::isfinite(std::get<double>(input));
 }`;
 }

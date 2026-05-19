@@ -71,14 +71,16 @@ export function classDeclaration(id, base, methods, start, end, exported = false
   return withRange("ClassDeclaration", start, end, { id, base, methods, exported });
 }
 
-export function methodDefinition(key, params, body, start, end, kind = "method", isStatic = false, computed = false) {
+export function methodDefinition(key, params, body, start, end, kind = "method", isStatic = false, computed = false, isAsync = false, isGenerator = false) {
   return withRange("MethodDefinition", start, end, {
     key,
     params,
     body,
     kind,
     static: isStatic,
-    computed
+    computed,
+    async: isAsync,
+    generator: isGenerator
   });
 }
 

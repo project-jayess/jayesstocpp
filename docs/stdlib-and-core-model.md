@@ -158,7 +158,7 @@ Examples of features that likely still need C++ primitives first:
 Current shipped example in this category:
 
 - private instance fields already use C++ runtime hidden-storage primitives, while broader private-member forms remain follow-up work
-- computed class member names and static blocks already use C++ runtime-backed class construction and class-side property helpers, while broader static inheritance and richer class-side semantics remain follow-up work
+- computed class member names, static blocks, and public static inheritance use C++ runtime-backed class construction and class-side property helpers
 
 Current planned example in this category:
 
@@ -180,13 +180,12 @@ The first planned example of this pattern is:
 - `jayess:async` for composition helpers over Jayess async handles
 - `jayess:iter` for higher-level generator and iterator helpers over Jayess generator handles
 
-## Active Milestone Policy
+## Implementation Policy
 
-The remaining language/runtime gaps should be treated as active build work, not as indefinite placeholders.
+Language/runtime gaps should be implemented through small, concrete slices.
 
 Repository policy for those gaps:
 
-- keep each remaining feature represented by explicit checklist milestones
 - split each feature into parser, semantic, runtime, backend, tests, and docs work where applicable
 - keep focused diagnostics for not-yet-implemented forms until the corresponding slice is actually shipped
 - replace those diagnostics only when the feature has a real semantic/runtime implementation behind it

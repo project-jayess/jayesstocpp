@@ -1,13 +1,16 @@
 import {
   clear,
   create,
+  deleteAll,
   deleteKey,
   entries,
+  fromEntries,
   get,
   has,
   isMap,
   keys,
   set,
+  setAll,
   size,
   values
 } from "jayess:collections/map";
@@ -22,10 +25,13 @@ export function run() {
     var keyList = keys(map);
     var valueList = values(map);
     var entryList = entries(map);
+    var copied = fromEntries(entryList);
+    setAll(copied, [["stage", "bulk"]]);
+    deleteAll(copied, ["kind"]);
     deleteKey(map, "name");
     clear(map);
     if (count > 0) {
-      return [value, keyList, valueList, entryList];
+      return [value, keyList, valueList, entryList, copied];
     }
   }
   return "invalid";

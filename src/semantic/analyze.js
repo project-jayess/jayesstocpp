@@ -1,9 +1,10 @@
-import path from "node:path";
 import { collectBindingIdentifiers, isBindingPattern } from "../ast/binding-patterns.js";
 import { throwDiagnostics } from "../diagnostics.js";
-import { createModuleDiagnostic } from "../diagnostics/module-diagnostic.js";
 import { createSemanticDiagnostic } from "../diagnostics/semantic-diagnostic.js";
 import { classifyImport } from "../modules/classify-import.js";
+import { getSupportedBuiltinProperty, unsupportedBuiltinIdentifierMessage } from "./builtins.js";
+import { validateFinallyControlFlow } from "./finally-control-flow.js";
+import { collectNativeHeaderStems, validateImportBindings, validateNativeLibraryHeaderPair } from "./imports.js";
 import { createScope, defineBinding, resolveBinding } from "./scope.js";
 
 function addScopedBinding(scope, diagnostics, sourceText, node, name, binding) {
@@ -20,85 +21,6 @@ function registerExport(exports, diagnostics, sourceText, node, exportedName, lo
   exports.push({ exportedName, localName, kind, source });
 }
 
-function libraryStem(source) {
-  return path.basename(source, path.extname(source));
-}
-
-function validateImportBindings(sourceText, statement, classification, diagnostics) {
-  if (classification.kind === "node-builtin") {
-    diagnostics.push(
-      createModuleDiagnostic(
-        sourceText,
-        statement,
-        `Jayess does not support Node built-in modules inside source imports: '${statement.source}'. Use Jayess system modules such as 'jayess:fs', 'jayess:path', or 'jayess:process', or use native headers/repository-defined adapters instead`,
-        statement.source
-      )
-    );
-    return;
-  }
-
-  if (statement.specifiers.length === 0) {
-    return;
-  }
-
-  if (classification.kind === "cpp-header") {
-    diagnostics.push(
-      createModuleDiagnostic(
-        sourceText,
-        statement,
-        `C++ standard library imports do not provide Jayess bindings: '${statement.source}'`,
-        statement.source
-      )
-    );
-    return;
-  }
-
-  if (
-    classification.kind === "native-source"
-    || classification.kind === "shared-library"
-    || classification.kind === "static-library"
-  ) {
-    diagnostics.push(
-      createModuleDiagnostic(
-        sourceText,
-        statement,
-        `Native dependency artifacts cannot provide Jayess bindings: '${statement.source}'. Import the matching header instead`,
-        statement.source
-      )
-    );
-    return;
-  }
-}
-
-function unsupportedBuiltinIdentifierMessage(name) {
-  switch (name) {
-    case "parseInt":
-      return "Jayess does not expose ambient global 'parseInt'; import { parseInt } from 'jayess:number' instead";
-    case "parseFloat":
-      return "Jayess does not expose ambient global 'parseFloat'; import { parseFloat } from 'jayess:number' instead";
-    case "Object":
-      return "Jayess does not expose ambient global 'Object'; import { keys, values, entries } from 'jayess:object' instead";
-    case "Date":
-      return "Jayess does not expose ambient global 'Date'; import helpers from 'jayess:date' instead";
-    case "JSON":
-      return "Jayess does not expose ambient global 'JSON'; import helpers from 'jayess:json' instead";
-    case "Map":
-      return "Jayess does not expose ambient global 'Map'; import helpers from 'jayess:collections/map' instead";
-    case "Set":
-      return "Jayess does not expose ambient global 'Set'; import helpers from 'jayess:collections/set' instead";
-    case "Promise":
-      return "Jayess does not expose JavaScript 'Promise'; use Jayess async/await and Jayess-owned 'jayess:async' helpers instead";
-    case "RegExp":
-      return "Jayess does not expose ambient global 'RegExp'; import helpers from 'jayess:regex' instead";
-    case "eval":
-      return "Jayess does not support ambient global 'eval'; runtime source evaluation is unsupported by design in Jayess";
-    case "Function":
-      return "Jayess does not support the JavaScript 'Function' constructor; runtime source evaluation is unsupported by design in Jayess";
-    default:
-      return null;
-  }
-}
-
 function scopeBelongsToFunction(scope, functionScope) {
   let current = scope;
   while (current != null) {
@@ -108,44 +30,6 @@ function scopeBelongsToFunction(scope, functionScope) {
     current = current.parent;
   }
   return false;
-}
-
-function getSupportedBuiltinProperty(node) {
-  if (node.type !== "MemberExpression" || node.computed || node.property.type !== "Identifier") {
-    return null;
-  }
-
-  if (node.object.type === "ArrayExpression") {
-    if (node.property.name === "length" || node.property.name === "push" || node.property.name === "pop" || node.property.name === "join" || node.property.name === "includes") {
-      return { receiver: "array", property: node.property.name };
-    }
-    return { receiver: "array", property: node.property.name, unsupported: true };
-  }
-
-  if (node.object.type === "Literal" && node.object.kind === "string") {
-    if (
-      node.property.name === "length"
-      || node.property.name === "toString"
-      || node.property.name === "slice"
-      || node.property.name === "substring"
-      || node.property.name === "startsWith"
-      || node.property.name === "includes"
-      || node.property.name === "indexOf"
-      || node.property.name === "endsWith"
-    ) {
-      return { receiver: "string", property: node.property.name };
-    }
-    return { receiver: "string", property: node.property.name, unsupported: true };
-  }
-
-  if (node.object.type === "Literal" && (node.object.kind === "number" || node.object.kind === "boolean" || node.object.kind === "null")) {
-    if (node.property.name === "toString") {
-      return { receiver: node.object.kind, property: node.property.name };
-    }
-    return { receiver: node.object.kind, property: node.property.name, unsupported: true };
-  }
-
-  return null;
 }
 
 function bindBlockDeclarations(statements, scope, diagnostics, sourceText) {
@@ -175,60 +59,6 @@ function bindBlockDeclarations(statements, scope, diagnostics, sourceText) {
         node: statement.id
       });
     }
-  }
-}
-
-function validateFinallyControlFlow(node, diagnostics, sourceText) {
-  if (node == null) {
-    return;
-  }
-
-  switch (node.type) {
-    case "BlockStatement":
-      for (const statement of node.body) {
-        validateFinallyControlFlow(statement, diagnostics, sourceText);
-      }
-      return;
-    case "IfStatement":
-      validateFinallyControlFlow(node.consequent, diagnostics, sourceText);
-      validateFinallyControlFlow(node.alternate, diagnostics, sourceText);
-      return;
-    case "WhileStatement":
-    case "DoWhileStatement":
-      validateFinallyControlFlow(node.body, diagnostics, sourceText);
-      return;
-    case "ForStatement":
-      validateFinallyControlFlow(node.body, diagnostics, sourceText);
-      return;
-    case "SwitchStatement":
-      for (const clause of node.cases) {
-        for (const statement of clause.consequent) {
-          validateFinallyControlFlow(statement, diagnostics, sourceText);
-        }
-      }
-      return;
-    case "TryStatement":
-      validateFinallyControlFlow(node.block, diagnostics, sourceText);
-      validateFinallyControlFlow(node.handler?.body ?? null, diagnostics, sourceText);
-      validateFinallyControlFlow(node.finalizer, diagnostics, sourceText);
-      return;
-    case "ReturnStatement":
-      diagnostics.push(createSemanticDiagnostic(sourceText, node, "Jayess does not yet support 'return' inside finally blocks"));
-      return;
-    case "BreakStatement":
-      diagnostics.push(createSemanticDiagnostic(sourceText, node, "Jayess does not yet support 'break' inside finally blocks"));
-      return;
-    case "ContinueStatement":
-      diagnostics.push(createSemanticDiagnostic(sourceText, node, "Jayess does not yet support 'continue' inside finally blocks"));
-      return;
-    case "FunctionDeclaration":
-    case "FunctionExpression":
-    case "ArrowFunctionExpression":
-    case "ClassDeclaration":
-    case "MethodDefinition":
-      return;
-    default:
-      return;
   }
 }
 
@@ -275,7 +105,7 @@ function initializePrivateMemberMap(classNode, diagnostics, sourceText) {
   return privateMemberMap;
 }
 
-function validatePrivateMemberAccess(node, currentClass, diagnostics, sourceText) {
+function validatePrivateMemberAccess(node, currentClass, currentMethod, diagnostics, sourceText) {
   if (node.property?.type !== "PrivateIdentifier") {
     return;
   }
@@ -300,7 +130,36 @@ function validatePrivateMemberAccess(node, currentClass, diagnostics, sourceText
         `Private member '#${node.property.name}' is not declared in ${currentClassLabel(currentClass)}`
       )
     );
+    return;
   }
+
+  const member = privateMemberMap.get(node.property.name);
+  const staticAccess = isPrivateStaticAccessTarget(node.object, currentClass, currentMethod);
+  if (member.static && !staticAccess) {
+    diagnostics.push(
+      createSemanticDiagnostic(
+        sourceText,
+        node.property,
+        `Private static member '#${node.property.name}' must be accessed through the declaring class`
+      )
+    );
+  }
+  if (!member.static && staticAccess) {
+    diagnostics.push(
+      createSemanticDiagnostic(
+        sourceText,
+        node.property,
+        `Private instance member '#${node.property.name}' must be accessed through an instance`
+      )
+    );
+  }
+}
+
+function isPrivateStaticAccessTarget(objectNode, currentClass, currentMethod) {
+  if (objectNode?.type === "Identifier" && currentClass?.id?.name === objectNode.name) {
+    return true;
+  }
+  return objectNode?.type === "ThisExpression" && currentMethod?.static === true;
 }
 
 export function analyzeModule(ast, sourceText, options = {}) {
@@ -323,25 +182,9 @@ export function analyzeModule(ast, sourceText, options = {}) {
     if (statement.type === "ImportDeclaration") {
       const classification = classifyImport(statement.source);
       const localNames = new Set();
-      const importedHeaderStems = new Set(
-        ast.body
-          .filter((entry) => entry.type === "ImportDeclaration" && classifyImport(entry.source).kind === "native-header")
-          .map((entry) => libraryStem(entry.source))
-      );
+      const importedHeaderStems = collectNativeHeaderStems(ast.body, classifyImport);
 
-      if (
-        (classification.kind === "shared-library" || classification.kind === "static-library") &&
-        !importedHeaderStems.has(libraryStem(statement.source))
-      ) {
-        diagnostics.push(
-          createModuleDiagnostic(
-            sourceText,
-            statement,
-            `Native library imports require a matching header import: '${statement.source}'`,
-            statement.source
-          )
-        );
-      }
+      validateNativeLibraryHeaderPair(sourceText, statement, classification, importedHeaderStems, diagnostics);
 
       validateImportBindings(sourceText, statement, classification, diagnostics);
 
@@ -706,6 +549,9 @@ export function analyzeModule(ast, sourceText, options = {}) {
         if (node.computed) {
           walk(node.key, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
+        if (node.async === true && node.kind === "constructor") {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.key, "Jayess does not support async constructors"));
+        }
         const methodScope = createScope(activeScope, "function");
         addScopedBinding(methodScope, diagnostics, sourceText, node.key, "this", {
           name: "this",
@@ -713,14 +559,14 @@ export function analyzeModule(ast, sourceText, options = {}) {
           node: node.key
         });
         for (const param of node.params) {
-          walk(param.defaultValue, methodScope, 0, 0, methodScope, null, false, false, currentClass, node);
+          walk(param.defaultValue, methodScope, 0, 0, methodScope, node, node.async === true, node.generator === true, currentClass, node);
           addScopedBinding(methodScope, diagnostics, sourceText, param, param.name, {
             name: param.name,
             kind: "param",
             node: param
           });
         }
-        walk(node.body, methodScope, 0, 0, methodScope, null, false, false, currentClass, node);
+        walk(node.body, methodScope, 0, 0, methodScope, node, node.async === true, node.generator === true, currentClass, node);
         return;
       }
       case "StaticInitializationBlock": {
@@ -817,7 +663,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
           return;
         }
         if (node.left.type === "MemberExpression") {
-          validatePrivateMemberAccess(node.left, currentClass, diagnostics, sourceText);
+          validatePrivateMemberAccess(node.left, currentClass, currentMethod, diagnostics, sourceText);
           walk(node.left.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
           if (node.left.computed) {
             walk(node.left.property, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
@@ -867,7 +713,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       case "UpdateExpression": {
         if (node.argument.type === "MemberExpression") {
-          validatePrivateMemberAccess(node.argument, currentClass, diagnostics, sourceText);
+          validatePrivateMemberAccess(node.argument, currentClass, currentMethod, diagnostics, sourceText);
           walk(node.argument.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
           if (node.argument.computed) {
             walk(node.argument.property, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
@@ -996,7 +842,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       case "MemberExpression":
       case "OptionalMemberExpression":
-        validatePrivateMemberAccess(node, currentClass, diagnostics, sourceText);
+          validatePrivateMemberAccess(node, currentClass, currentMethod, diagnostics, sourceText);
         if (node.object.type === "SuperExpression") {
           const validSuperMemberLookup = (
             currentClass?.base != null

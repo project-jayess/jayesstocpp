@@ -18,6 +18,62 @@ test("transpile rejects built-in Jayess modules in string mode without explicit 
   );
 });
 
+test("transpile rejects flagged regex imports in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { create } from "jayess:regex"; function run() { return create("hello", "i"); }', { moduleName: "builtin_regex_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess string modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { trim } from "jayess:string"; function run() { return trim(" Jayess "); }', { moduleName: "builtin_string_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess array modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { slice } from "jayess:array"; function run(items) { return slice(items, 0); }', { moduleName: "builtin_array_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess thread modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { currentId } from "jayess:thread"; function run() { return currentId(); }', { moduleName: "builtin_thread_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess math modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { sqrt } from "jayess:math"; function run() { return sqrt(9); }', { moduleName: "builtin_math_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess iterator modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { next } from "jayess:iter"; function run(generator) { return next(generator); }', { moduleName: "builtin_iter_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess path modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { join } from "jayess:path"; function run(root) { return join(root, "main.js"); }', { moduleName: "builtin_path_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess filesystem modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { exists } from "jayess:fs"; function run(path) { return exists(path); }', { moduleName: "builtin_fs_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
 test("transpile rejects built-in Jayess system modules in string mode without explicit resolution support", () => {
   assert.throws(
     () => transpile('import { cwd } from "jayess:process"; function run() { return cwd(); }', { moduleName: "builtin_process_case" }),
@@ -190,6 +246,17 @@ test("transpile emits async function expressions and async arrows through the sh
   assert.match(cpp, /if \(!jayess::has_argument\(jayess_args, 0\)\) \{\s*value = step;/);
 });
 
+test("transpile emits async class methods through Jayess async handles", () => {
+  const cpp = transpile("class Worker { async run(value) { return await value; } }", { moduleName: "async_method_case" });
+
+  assert.match(cpp, /jayess::define_class_method\(class_value, "run", jayess::make_callable/);
+  assert.match(cpp, /jayess::value this_value = jayess::argument_at\(jayess_args, 0\);/);
+  assert.match(cpp, /jayess::value jayess_async_result = jayess::make_pending_async\(\);/);
+  assert.match(cpp, /jayess::value value = jayess::argument_at\(jayess_args, 1\);/);
+  assert.match(cpp, /return jayess::await_sync\(jayess_async_input\);/);
+  assert.match(cpp, /jayess::async_resolve\(jayess_async_result, \(\[&\]\(\) -> jayess::value \{/);
+});
+
 test("transpile emits generator declarations through Jayess generator handles and state slots", () => {
   const cpp = transpile("function* run(value) { yield value; return value; }", { moduleName: "generator_case" });
   assert.match(cpp, /jayess::value jayess_generator = jayess::make_generator_handle\(\);/);
@@ -200,6 +267,31 @@ test("transpile emits generator declarations through Jayess generator handles an
   assert.match(cpp, /jayess::generator_complete\(jayess_generator, value\);/);
 });
 
+test("transpile lowers selected generator expression-yield forms", () => {
+  const cpp = transpile(
+    "function* run(value, use, target) { var sum = 1 + (yield value); use(yield sum); target.value = yield sum; return yield target.value; }",
+    { moduleName: "generator_expression_yield_case" }
+  );
+
+  assert.match(cpp, /jayess::generator_yield\(jayess_generator, [0-9]+, value\);/);
+  assert.match(cpp, /jayess_yield_expr_[0-9]+ = jayess::generator_take_sent\(jayess_generator\);/);
+  assert.match(cpp, /sum = jayess::add\(jayess_yield_expr_[0-9]+, jayess_yield_expr_[0-9]+\);/);
+  assert.match(cpp, /jayess::call\(jayess_yield_expr_[0-9]+, jayess_yield_expr_[0-9]+\);/);
+  assert.match(cpp, /jayess::set_property\(jayess_yield_expr_[0-9]+, "value", jayess_yield_expr_[0-9]+\);/);
+  assert.match(cpp, /jayess::generator_complete\(jayess_generator, jayess::generator_take_sent\(jayess_generator\)\);/);
+});
+
+test("transpile emits generator class methods through Jayess generator handles", () => {
+  const cpp = transpile("class Worker { *items(value) { yield value; return value; } }", { moduleName: "generator_method_case" });
+
+  assert.match(cpp, /jayess::define_class_method\(class_value, "items", jayess::make_callable/);
+  assert.match(cpp, /jayess::value this_value = jayess::argument_at\(jayess_args, 0\);/);
+  assert.match(cpp, /jayess::value jayess_generator = jayess::make_generator_handle\(\);/);
+  assert.match(cpp, /jayess::value value = jayess::argument_at\(jayess_args, 1\);/);
+  assert.match(cpp, /jayess::generator_yield\(jayess_generator, 1, value\);/);
+  assert.match(cpp, /jayess::generator_complete\(jayess_generator, value\);/);
+});
+
 test("transpile emits generator function expressions through the shared generator handle path", () => {
   const cpp = transpile("function build(step) { var make = function* named(value) { yield value; return step; }; return make; }", { moduleName: "generator_expression_case" });
   assert.match(cpp, /jayess::make_callable\(\[step\]\(const std::vector<jayess::value>& jayess_args\) -> jayess::value \{/);
@@ -207,6 +299,42 @@ test("transpile emits generator function expressions through the shared generato
   assert.match(cpp, /jayess::generator_set_resume\(jayess_generator,/);
   assert.match(cpp, /jayess::generator_yield\(jayess_generator, 1, value\);/);
   assert.match(cpp, /jayess::generator_complete\(jayess_generator, step\);/);
+});
+
+test("transpile emits generator yields inside nested control flow", () => {
+  const cpp = transpile(
+    "function* run(flag, items) { if (flag) { yield items[0]; } else { yield items[1]; } var index = 0; while (index < 2) { yield index; index = index + 1; } for (var step = 0; step < 2; step = step + 1) { yield step; } }",
+    { moduleName: "generator_control_flow_case" }
+  );
+
+  assert.match(cpp, /if \(jayess::truthy\(flag\)\) \{/);
+  assert.match(cpp, /else \{/);
+  assert.match(cpp, /while \(jayess::truthy\(jayess::less_than\(index, jayess::value\(static_cast<double>\(2\)\)\)\)\) \{/);
+  assert.match(cpp, /while \(jayess::truthy\(jayess::less_than\(step, jayess::value\(static_cast<double>\(2\)\)\)\)\) \{/);
+  assert.match(cpp, /jayess::generator_yield\(jayess_generator, \d+, jayess::get_index\(items, jayess::value\(static_cast<double>\(0\)\)\)\);/);
+});
+
+test("transpile emits generator-local destructuring through shared helpers", () => {
+  const cpp = transpile("function* run(pair, record) { var [first, second] = pair; var { name } = record; yield first; yield second; return name; }", {
+    moduleName: "generator_destructuring_case"
+  });
+
+  assert.match(cpp, /jayess::destructure_index\(jayess_destructure_\d+, jayess::value\(static_cast<double>\(0\)\)\);/);
+  assert.match(cpp, /jayess::destructure_property\(jayess_destructure_\d+, "name"\);/);
+  assert.match(cpp, /jayess::generator_complete\(jayess_generator, name\);/);
+});
+
+test("transpile emits generator-local destructuring from yield-star completion", () => {
+  const cpp = transpile(
+    "function* run(source) { var [first, second] = yield* source; var { value } = yield* source; yield first; yield second; return value; }",
+    { moduleName: "generator_yield_star_destructuring_case" }
+  );
+
+  assert.match(cpp, /if \(jayess::generator_is_completed\(jayess_delegate_\d+\)\) \{/);
+  assert.match(cpp, /else \{\s+jayess::generator_yield\(jayess_generator, \d+, jayess_delegate_\d+_value\);/);
+  assert.match(cpp, /jayess::destructure_index\(jayess_destructure_\d+, jayess::value\(static_cast<double>\(0\)\)\);/);
+  assert.match(cpp, /jayess::destructure_property\(jayess_destructure_\d+, "value"\);/);
+  assert.match(cpp, /jayess::generator_complete\(jayess_generator, value\);/);
 });
 
 test("transpile locks current truthiness and equality helper usage", () => {
@@ -330,6 +458,15 @@ test("transpile emits private instance methods through hidden private callables"
   assert.doesNotMatch(cpp, /jayess::define_class_method\(class_value, "value"/);
 });
 
+test("transpile emits private static members through hidden class storage", () => {
+  const cpp = transpile("class Box { static #value = 1; static #read() { return Box.#value; } static read() { return Box.#read(); } }", { moduleName: "private_static_case" });
+  assert.match(cpp, /jayess::set_private_static_field\(class_value, "value", jayess::value\(static_cast<double>\(1\)\)\)/);
+  assert.match(cpp, /jayess::set_private_static_field\(class_value, "read", jayess::make_callable/);
+  assert.match(cpp, /return jayess::get_private_static_field\(class_value, "value"\);/);
+  assert.match(cpp, /return jayess::call\(jayess::get_private_static_field\(class_value, "read"\)\);/);
+  assert.doesNotMatch(cpp, /jayess::define_class_method\(class_value, "read"/);
+});
+
 test("transpile emits callable closures with captured bindings", () => {
   const cpp = transpile("function outer(x) { return function(y) { return x + y; }; }", { moduleName: "closure_case" });
   assert.match(cpp, /jayess::make_callable/);
@@ -382,6 +519,19 @@ test("transpile inherits instance methods through class-chain dispatch", () => {
 
   assert.match(cpp, /jayess::define_class_method\(class_value, "name"/);
   assert.match(cpp, /return jayess::call\(jayess::get_property\(child, "name"\)\)/);
+});
+
+test("transpile emits static inheritance through class-side property lookup", () => {
+  const cpp = transpile(
+    "class Base { static label = 1; static read() { return Base.label; } } class Child extends Base { static label = 2; } class Grandchild extends Child {} function run() { return Grandchild.read() + Grandchild.label; }",
+    { moduleName: "static_inheritance_case" }
+  );
+
+  assert.match(cpp, /jayess::set_base_class\(class_value, base_class\)/);
+  assert.match(cpp, /jayess::set_property\(class_value, "label", jayess::value\(static_cast<double>\(1\)\)\)/);
+  assert.match(cpp, /jayess::set_property\(class_value, "read", jayess::make_callable/);
+  assert.match(cpp, /jayess::set_property\(class_value, "label", jayess::value\(static_cast<double>\(2\)\)\)/);
+  assert.match(cpp, /return jayess::add\(jayess::call\(jayess::get_property\(Grandchild, "read"\)\), jayess::get_property\(Grandchild, "label"\)\);/);
 });
 
 test("transpile rejects derived constructors whose super call is not the first statement", () => {

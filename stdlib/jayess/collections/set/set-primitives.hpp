@@ -44,6 +44,29 @@ inline jayess::value jayessSetEntries(const std::vector<jayess::value>& jayessAr
   return jayess::set_entries(set);
 }
 
+inline jayess::value jayessSetFromValues(const std::vector<jayess::value>& jayessArgs) {
+  const auto values = jayess::argument_at(jayessArgs, 0);
+  return jayess::set_from_values(values);
+}
+
+inline jayess::value jayessSetUnion(const std::vector<jayess::value>& jayessArgs) {
+  const auto left = jayess::argument_at(jayessArgs, 0);
+  const auto right = jayess::argument_at(jayessArgs, 1);
+  return jayess::set_union(left, right);
+}
+
+inline jayess::value jayessSetIntersection(const std::vector<jayess::value>& jayessArgs) {
+  const auto left = jayess::argument_at(jayessArgs, 0);
+  const auto right = jayess::argument_at(jayessArgs, 1);
+  return jayess::set_intersection(left, right);
+}
+
+inline jayess::value jayessSetDifference(const std::vector<jayess::value>& jayessArgs) {
+  const auto left = jayess::argument_at(jayessArgs, 0);
+  const auto right = jayess::argument_at(jayessArgs, 1);
+  return jayess::set_difference(left, right);
+}
+
 inline jayess::value jayessSetIsSet(const std::vector<jayess::value>& jayessArgs) {
   const auto value = jayess::argument_at(jayessArgs, 0);
   return jayess::value(jayess::is_set_value(value));

@@ -185,7 +185,7 @@ Current async support is intentionally narrow:
 
 Current limitations:
 
-- async methods and constructors are not supported
+- async constructors are not supported
 - top-level `await` is not supported
 - the first slice uses explicit Jayess async handles rather than ambient JavaScript `Promise` behavior
 
@@ -195,8 +195,12 @@ Current generator support is intentionally narrow:
 
 - `function*` declarations are supported
 - generator function expressions are supported
-- `yield expr` is supported inside generator declaration bodies
-- `yield* expr` is supported inside generator declaration bodies
+- generator class methods are supported
+- `yield expr` is supported inside generator bodies
+- `yield* expr` is supported inside generator bodies
+- `yield expr` can appear inside nested blocks, `if` / `else` branches, `while` loops, and `for` loops
+- selected expression-yield forms are supported, including `return yield value`, binary expressions, call arguments, and simple assignment right-hand sides
+- generator-local array and object destructuring declarations are supported
 - generator calls return Jayess-owned generator handles
 - generator handles store explicit suspended/completed/failed state in the runtime
 - generator resumption uses explicit state-slot dispatch in generated C++
@@ -204,6 +208,7 @@ Current generator support is intentionally narrow:
 Current first-slice behavior:
 
 - direct `yield expr` stores one current yielded value and suspends
+- expression `yield` resumes with the value supplied by `generator_resume_with(...)`; ordinary `generator_resume(...)` resumes with Jayess `null`
 - direct `yield* expr` repeatedly resumes the delegated generator handle and re-yields its current values
 - `return expr` stores one final completion value
 - falling off the end completes the generator with Jayess `null`
@@ -211,9 +216,8 @@ Current first-slice behavior:
 
 Current limitations:
 
-- generator methods are not supported
 - async generators are not supported
-- more complex yield nesting beyond the current direct positions is not supported
+- short-circuit expression-yield forms such as `left && (yield value)` are not supported
 
 ## Inheritance And `super`
 
@@ -238,12 +242,13 @@ Current dispatch behavior:
 - instance methods are stored in a class-side method table rather than copied onto each instance
 - instance property lookup first checks direct object fields
 - if a direct object field is missing, lookup falls back through the instance's class link and the base-class chain
+- public static member lookup first checks the derived class value, then walks the base-class chain
+- own static fields and methods take precedence over inherited static members
 - `super.method(...)` skips derived methods and resolves directly against the base-class chain
 - the resolved base method is called with the current derived instance bound as `this`
 
 Current limitations:
 
-- static inheritance is not supported
 - `super.staticMethod(...)` is not supported
 - `super[expr]` is not supported
 - `super` property assignment forms are not supported
@@ -256,20 +261,22 @@ Current private-member support is intentionally narrow:
 
 - private instance field declarations such as `#value = 1` are supported
 - private instance reads and writes such as `this.#value`, `other.#value = next`, `other.#value += 1`, and `other.#value++` are supported when they occur inside methods or field initializers of the declaring class
+- private static field declarations such as `static #value = 1` are supported
+- private static methods such as `static #read() { ... }` are supported
+- private static access uses the declaring class name or class-side `this`
 - each class owns its own private-name identity, so `#value` in one class is distinct from `#value` in another
 - duplicate private field names inside one class are rejected
 
 Current runtime behavior:
 
 - private storage is attached to instances separately from ordinary public object properties
+- private static storage is attached to the class value separately from ordinary public static properties
 - private lowering uses dedicated runtime helpers instead of `get_property(...)` / `set_property(...)`
 - inherited classes do not gain private access through name matching
 - `super` does not expose private storage
 
 Current limitations:
 
-- private static fields are not supported
-- private static methods are not supported
 - private access outside methods or field initializers of the declaring class is rejected
 
 ## Computed Class Members And Static Blocks
@@ -294,12 +301,12 @@ Current runtime behavior:
 - computed class keys lower through one-shot temporary Jayess values created during class definition
 - computed instance fields reuse those key temporaries later during constructor-time instance initialization
 - computed static fields and computed static methods lower through the ordinary class-value index/property runtime helpers
+- inherited public static fields and methods are resolved through the base-class chain when the derived class has no own class-side member with that key
 - static blocks lower as explicit class-side scoped blocks inside class construction
 
 Current limitations:
 
 - static blocks do not currently introduce a special `this` binding
-- static inheritance is not supported
 - broader JavaScript class edge cases around computed keys and class-side evaluation are still outside the current slice
 
 ## Destructuring

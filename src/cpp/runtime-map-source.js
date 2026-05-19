@@ -18,7 +18,10 @@ value map_clear(const value& map);
 value map_size(const value& map);
 value map_keys(const value& map);
 value map_values(const value& map);
-value map_entries(const value& map);`;
+value map_entries(const value& map);
+value map_from_entries(const value& entries);
+value map_set_all(const value& map, const value& entries);
+value map_delete_all(const value& map, const value& keys);`;
 }
 
 export function getMapRuntimeCppFragment() {
@@ -40,6 +43,25 @@ std::vector<map_entry>::const_iterator find_map_entry(const map_ptr& map, const 
   return std::find_if(map->entries.begin(), map->entries.end(), [&key](const map_entry& entry) {
     return std::get<bool>(equal(entry.key, key));
   });
+}
+
+array_ptr require_map_entry_array(const value& input) {
+  if (!std::holds_alternative<array_ptr>(input)) {
+    throw std::runtime_error("Jayess map bulk entries must contain two-item arrays");
+  }
+
+  const auto& entry = std::get<array_ptr>(input);
+  if (entry->items.size() != 2) {
+    throw std::runtime_error("Jayess map bulk entries must contain two-item arrays");
+  }
+  return entry;
+}
+
+array_ptr require_map_bulk_array(const value& input, const std::string& message) {
+  if (!std::holds_alternative<array_ptr>(input)) {
+    throw std::runtime_error(message);
+  }
+  return std::get<array_ptr>(input);
 }
 } // namespace
 
@@ -127,5 +149,27 @@ value map_entries(const value& map) {
     items.push_back(make_array({entry.key, entry.stored}));
   }
   return make_array(std::move(items));
+}
+
+value map_from_entries(const value& entries) {
+  const auto result = make_map();
+  return map_set_all(result, entries);
+}
+
+value map_set_all(const value& map, const value& entries) {
+  const auto& bulkEntries = require_map_bulk_array(entries, "Jayess map setAll expects an array of entries");
+  for (const auto& candidate : bulkEntries->items) {
+    const auto& entry = require_map_entry_array(candidate);
+    map_set(map, entry->items[0], entry->items[1]);
+  }
+  return map;
+}
+
+value map_delete_all(const value& map, const value& keys) {
+  const auto& bulkKeys = require_map_bulk_array(keys, "Jayess map deleteAll expects an array of keys");
+  for (const auto& key : bulkKeys->items) {
+    map_delete(map, key);
+  }
+  return map;
 }`;
 }

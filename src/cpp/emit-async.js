@@ -5,9 +5,10 @@ export function renderAwaitExpression(argumentExpression) {
 })()`;
 }
 
-function emitAsyncCallableBody(node, context, lines, emitParameterInitialization, emitStatement, renderExpression) {
+export function emitAsyncCallableBody(node, context, lines, emitParameterInitialization, emitStatement, renderExpression, options = {}) {
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
   lines.push("  jayess::value jayess_async_result = jayess::make_pending_async();");
+  options.beforeParameters?.(lines);
   for (const [index, param] of node.params.entries()) {
     emitParameterInitialization(param, index, context, lines);
   }
