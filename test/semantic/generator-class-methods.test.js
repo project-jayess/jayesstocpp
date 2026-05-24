@@ -21,3 +21,23 @@ test("semantic analysis keeps yield rejected inside non-generator class methods"
     /'yield' is only valid inside generator functions/
   );
 });
+
+test("semantic analysis rejects generator array spread containing yield before emission", () => {
+  const sourceText = createSourceText("function* run(items) { var copied = [...(yield items)]; return copied; }");
+  const ast = parse(sourceText);
+
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /array spread elements containing 'yield'/
+  );
+});
+
+test("semantic analysis rejects generator object spread containing yield before emission", () => {
+  const sourceText = createSourceText("function* run(record) { var copied = { ...(yield record) }; return copied; }");
+  const ast = parse(sourceText);
+
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /object spread properties containing 'yield'/
+  );
+});

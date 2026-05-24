@@ -9,11 +9,17 @@
 - `basename(path)`
 - `extname(path)`
 - `normalize(path)`
+- `parse(path)`
+- `format(parts)`
+- `separator()`
+- `delimiter()`
 - `resolve(...parts)`
 - `relative(fromPath, toPath)`
 - `isAbsolute(path)`
 
-All arguments are expected to be strings. Path separator and normalization behavior is isolated in the C++ runtime support so Jayess source does not depend on ambient Node.js path APIs.
+All path arguments are expected to be strings. `parse(path)` returns an object with `root`, `dir`, `base`, `ext`, and `name` fields. `format(parts)` accepts the same field names and returns a path string. `separator()` returns the host path separator and `delimiter()` returns the host path-list delimiter.
+
+Path separator and normalization behavior is isolated in the C++ runtime support so Jayess source does not depend on ambient Node.js path APIs.
 
 ## Implementation Shape
 

@@ -88,24 +88,22 @@ Current exports:
 - returns `true` when `value` is a Jayess map value from this module surface
 - returns `false` otherwise
 
-## Deliberate Non-Goals For The First Slice
+## Current Non-Goals
 
-The first `jayess:collections/map` slice should not try to emulate the full JavaScript `Map` object surface.
+The shipped `jayess:collections/map` module does not emulate the full JavaScript `Map` object surface.
 
-Out of scope for the first slice:
+Out of scope for the current module surface:
 
 - ambient global `Map`
 - constructor overloads like `new Map(iterable)`
 - iterator-returning methods such as `keys()`, `values()`, or `entries()`
 - callback helpers such as `forEach(...)`
-- direct method-call syntax on map instances if the first implementation lands as function exports first
+- direct method-call syntax on map instances
 - object/array coercion shims that blur ordinary object semantics with map semantics
 
-Those can land later as separate bounded slices after the dedicated map carrier and entry operations are stable.
+## Current Module Shape
 
-## Current Planned Module Shape
-
-The first Jayess-owned module source now lives at:
+The Jayess-owned module source lives at:
 
 - `stdlib/jayess/collections/map/index.js`
 
@@ -126,21 +124,21 @@ Current resolution behavior:
 - `transpileFile()` resolves `jayess:collections/map` through the repository-owned stdlib tree
 - `transpile()` string mode still requires explicit resolver support and rejects `jayess:collections/map` by default
 
-## Primitive Boundary Decision
+## Primitive Boundary
 
-The first `jayess:collections/map` slice should use mixed ownership.
+The shipped `jayess:collections/map` module uses mixed ownership.
 
 ### Needs A New Runtime Value Kind
 
-The first shipped `Map` slice should use a dedicated runtime value kind instead of a wrapper over plain objects, arrays, or ad hoc closure state.
+The shipped map module uses a dedicated runtime value kind instead of a wrapper over plain objects, arrays, or ad hoc closure state.
 
 That value kind is required for three reasons:
 
 - `Map` needs key identity semantics that are not the same as object-property string coercion
 - `Map` needs insertion-order iteration and stable entry storage that ordinary object fields do not provide
-- `Map` should be distinguishable from ordinary objects and arrays through explicit runtime type checks
+- map values must be distinguishable from ordinary objects and arrays through explicit runtime type checks
 
-The first primitive layer should therefore provide one dedicated map carrier in the Jayess runtime rather than trying to encode `Map` behavior through lower-level wrappers.
+The primitive layer provides one dedicated map carrier in the Jayess runtime rather than encoding map behavior through lower-level wrappers.
 
 ### Why Plain Objects Are Not Enough
 
@@ -150,9 +148,9 @@ That is a poor fit for `Map` because:
 
 - numeric, boolean, object, class, async, and generator keys would be coerced or lost if routed through object-field names
 - insertion order for entry iteration should belong to `Map` itself rather than to ordinary object property rules
-- `Map` methods such as `has(key)` or `delete(key)` should operate on Jayess value identity/equality, not on public property lookup paths
+- map helpers such as `has(key)` or `deleteKey(key)` operate on Jayess value identity/equality, not on public property lookup paths
 
-The first `Map` slice should not claim support by approximating `Map` through plain object fields.
+The shipped map module does not approximate map support through plain object fields.
 
 ### Why Pure Jayess Wrappers Are Not Enough
 
@@ -160,7 +158,7 @@ A pure Jayess wrapper over arrays of `[key, value]` pairs would keep the runtime
 
 - key lookup would become linear-time library code for every operation
 - key equality rules would be duplicated at the Jayess library layer instead of staying in one runtime path
-- future `Set` layering would still need a dedicated container substrate later
+- set support uses its own dedicated container substrate
 
 That is acceptable for experiments, but not for the intended repository-owned first shipped `Map` slice.
 
@@ -193,16 +191,15 @@ The first primitive layer now has a concrete runtime direction:
 
 - the public `jayess:collections/map` export surface
 - thin wrapper functions or class-like APIs that forward to primitive operations
-- later convenience helpers such as entry conversion or composition helpers
 
 ## Explicit First-Slice Decision
 
-- the first shipped `Map` slice should use a new runtime value kind
-- the public module surface should still be Jayess-owned
-- the first shipped slice should not provide an ambient global `Map`
-- the first shipped slice should start with function exports, not a large compatibility class surface
-- the first shipped slice should not emulate `Map` through plain object fields or array pairs just to claim support
+- the shipped map slice uses a runtime value kind
+- the public module surface is Jayess-owned
+- the shipped slice does not provide an ambient global `Map`
+- the shipped slice starts with function exports, not a large compatibility class surface
+- the shipped slice does not emulate `Map` through plain object fields or array pairs just to claim support
 
-## Remaining Follow-Up
+## Current Boundaries
 
-The next map work should stay data-oriented and avoid callback-based update protocols until Jayess has a broader callback/lifetime policy for collection helpers.
+The shipped map helper surface stays data-oriented and does not include callback-based update protocols.

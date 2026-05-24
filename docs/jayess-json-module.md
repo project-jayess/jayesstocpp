@@ -56,11 +56,11 @@ Current exports:
 - returns `false` otherwise
 - expects one string argument
 
-## Deliberate Non-Goals For The First Slice
+## Current Non-Goals
 
-The first `jayess:json` slice should not try to emulate the full JavaScript global `JSON` object surface.
+The shipped `jayess:json` module does not emulate the full JavaScript global `JSON` object surface.
 
-Out of scope for the first slice:
+Out of scope for the current module surface:
 
 - ambient global `JSON`
 - `JSON.stringify(value, replacer, space)` compatibility
@@ -69,15 +69,13 @@ Out of scope for the first slice:
 - stream-oriented parsing or incremental serializers
 - special treatment for class instances beyond ordinary object fields
 
-Those can land later as separate bounded slices after the core parse/stringify path is stable.
+## Current Layering
 
-## Intended Layering
+The current API surface is intentionally small and uses a narrow primitive substrate with a thin Jayess wrapper layer.
 
-The first API surface is intentionally small so the module can start with a narrow primitive substrate and a thin Jayess wrapper layer.
+## Current Module Shape
 
-## Current Planned Module Shape
-
-The intended Jayess-owned module source location is:
+The Jayess-owned module source location is:
 
 - `stdlib/jayess/json/index.js`
 
@@ -92,9 +90,9 @@ Current resolution behavior:
 - `transpileFile()` resolves `jayess:json` through the repository-owned stdlib tree
 - `transpile()` string mode still requires explicit resolver support and rejects `jayess:json` by default
 
-## Primitive Boundary Decision
+## Primitive Boundary
 
-The first `jayess:json` slice should use mixed ownership.
+The shipped `jayess:json` module uses mixed ownership.
 
 ### Needs Native Primitive Support
 
@@ -103,7 +101,7 @@ The first `jayess:json` slice should use mixed ownership.
 - one shared validation path used by `isJsonText(text)`
 - one explicit rejection path for unsupported Jayess values such as callables, async handles, generator handles, and class values
 
-These should land as a small native helper layer rather than as a pure Jayess implementation. The current Jayess language does not have enough string-processing and recursive structure-building primitives to make a small, correct, reviewable JSON parser or serializer a good fit in Jayess source first.
+These live in a small native helper layer rather than as a pure Jayess implementation. The current Jayess language does not have enough string-processing and recursive structure-building primitives to make a small, correct, reviewable JSON parser or serializer a good fit in Jayess source.
 
 The first primitive layer now uses runtime-native helper entry points:
 
@@ -115,9 +113,8 @@ The first primitive layer now uses runtime-native helper entry points:
 
 - the public `jayess:json` export surface
 - thin wrapper functions that forward to the primitive layer
-- later convenience helpers built on top of `parse(text)` and `stringify(value)`
 
-The first slice should keep the Jayess module thin and let it forward into a small native helper.
+The Jayess module stays thin and forwards into a small native helper.
 
 ## Current Primitive Direction
 
@@ -126,13 +123,13 @@ The first slice should keep the Jayess module thin and let it forward into a sma
 - `stringifyPretty(value, indent?)` is the shipped formatting extension path
 - `validate(text)` is the shipped validation/diagnostics helper
 - `isJsonText(text)` exists as a small validation helper over the same parser contract
-- the public `jayess:json` module file should be written in Jayess
-- the parse/stringify substrate should land as a small native helper instead of a broad runtime-wide compatibility layer
+- the public `jayess:json` module file is written in Jayess
+- the parse/stringify substrate is a small native helper instead of a broad runtime-wide compatibility layer
 
-## Remaining Follow-Up
+## Current Boundaries
 
-Later work still needs to decide:
+The shipped `jayess:json` module keeps these boundaries explicit:
 
-- reviver/replacer-like transforms as separate later helpers instead of direct JavaScript callback compatibility
-- any broader diagnostics surface beyond `validate(text)`
-- where parse/stringify argument validation belongs between the Jayess module and the primitive layer
+- no reviver/replacer callback compatibility
+- no broader diagnostics surface beyond `validate(text)`
+- parse/stringify validation is split between the Jayess module surface and primitive layer

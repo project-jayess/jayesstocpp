@@ -1,0 +1,32 @@
+{
+  "name": "package-project",
+  "imports": {
+    "#tools": "./src/self-tools.js",
+    "#condition": {
+      "jayess": "./src/self-import.js",
+      "default": "./src/self-default.js"
+    },
+    "#features/*": "./src/self-*.js",
+    "#missing": "./src/self-missing.js",
+    "#outside": "../outside.js",
+    "#array": ["./src/self-tools.js"],
+    "#arrayInvalid": [
+      42,
+      {
+        "require": "./src/self-default.js"
+      },
+      "./src/self-missing.js"
+    ],
+    "#invalid": 42
+  },
+  "exports": {
+    ".": "./src/self-entry.js",
+    "./feature": "./src/self-feature.js",
+    "./condition": {
+      "import": "./src/self-import.js",
+      "default": "./src/self-default.js"
+    },
+    "./features/*": "./src/self-*.js",
+    "./missing": "./src/self-missing.js"
+  }
+}

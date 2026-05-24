@@ -17,7 +17,7 @@ export function privateIdentifier(name, start, end) {
 export function parameter(id, defaultValue, start, end, rest = false) {
   return withRange("Parameter", start, end, {
     id,
-    name: id.name,
+    name: id.name ?? null,
     defaultValue,
     rest
   });

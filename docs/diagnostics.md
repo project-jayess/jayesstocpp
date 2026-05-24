@@ -1,37 +1,101 @@
-# Diagnostics Expectations
+# Jayess Diagnostics
 
-This repository treats diagnostics as part of the transpiler contract, not incidental error text.
+Jayess diagnostics should report the failing language layer and the concrete unsupported shape. The goal is to make invalid source actionable without treating unsupported-by-design features as roadmap tasks.
 
-## Current Friction Areas
+Every diagnostic carries:
 
-The highest-friction diagnostics for contributors have been:
+- `phase`: the exact compiler phase label
+- `category`: a stable family such as `parser`, `semantic`, `module`, `emitter`, or `runtime`
+- `code`: a stable diagnostic code such as `JY_PARSE_DYNAMIC_IMPORT`
+- `message`: the human-readable explanation
+- optional source location and related path metadata
 
-- malformed import/export syntax that failed with generic `Expected ...` messages
-- valid-looking operators used on unsupported targets, such as `++(a + 1)` or `(a + 1) += 2`
-- package imports that failed without distinguishing:
-  - package missing from `node_modules`
-  - package subpath missing
-  - package export target missing on disk
-  - package present but without a transpileable entry file
+## Code Families
 
-## Repository Expectations
+- `JY_PARSE_*` for parser diagnostics
+- `JY_SEMANTIC_*` for semantic diagnostics
+- `JY_MODULE_*` for module-resolution diagnostics
+- `JY_EMIT_*` for generated C++ emission diagnostics
+- `JY_RUNTIME_*` for runtime validation diagnostics
 
-- syntax diagnostics should say which declaration or form is malformed when practical
-- unsupported-feature diagnostics should say that Jayess does not support the form, rather than only saying `Expected ...`
-- semantic diagnostics should explain the operation that is unsupported, not only the node kind
-- module-resolution diagnostics should distinguish missing packages from unusable package entries when practical
-- diagnostics should include `filename`, `line`, and `column` whenever the failing source location is known
-- file-level module diagnostics may omit `line` and `column` when only a resolved path is known
+Generic fallback codes such as `JY_PARSE_ERROR` and `JY_MODULE_ERROR` are used when a more focused code has not been assigned yet.
 
-## Message Style
+## Parser Diagnostics
 
-- prefer direct statements such as `Malformed import declaration: expected 'from' before the source string`
-- prefer `Jayess syntax does not support ...` or `Jayess semantic analysis does not support ...` for unsupported forms
-- include the relevant operator, import source, package name, or related path when it materially improves debugging
-- avoid replacing structured diagnostics with generic thrown `Error` messages
+Parser diagnostics cover malformed or unsupported syntax before semantic analysis runs.
 
-## Contributor Guidance
+Current focused parser diagnostic families include:
 
-- if you add a new unsupported form, give it a focused, user-facing diagnostic
-- if a parser or semantic rule has a custom diagnostic, add a regression test for the wording
-- if a module-resolution path gains a new failure mode, add a fixture and test that prove the diagnostic stays specific
+- unsupported-by-design declarations such as `let`
+- unsupported-by-design dynamic `import()`
+- unsupported-by-design `with`
+- malformed control-flow clauses such as detached `catch` or `finally`
+- invalid expression starts such as empty initializers, repeated commas, standalone spread, or bare `=>`
+- unsupported spread/rest placement outside accepted literal, call, parameter, or binding positions
+- unsupported tagged template literals
+
+## Semantic Diagnostics
+
+Semantic diagnostics cover syntax that parsed successfully but cannot be lowered with Jayess rules.
+
+Current focused semantic diagnostic families include:
+
+- undefined identifiers and unsupported ambient built-ins
+- unsupported-by-design runtime source evaluation through `eval` or `Function`
+- invalid assignment/update targets
+- const reassignment or update
+- unsupported `super` member forms
+- unsupported bare `super` expressions outside `super(...)` constructor calls or `super.name`/`super[expr]` member access
+- derived constructors whose first statement is not `super(...)`
+- generator `yield` forms that cannot be lowered into valid resumable C++
+- async generator declarations and methods that remain outside Jayess-owned async semantics
+- invalid loop control outside loops or switches
+
+## Module Diagnostics
+
+Module diagnostics keep Jayess source graphs closed and deterministic.
+
+Current focused module diagnostic families include:
+
+- rejected Node built-in imports such as `node:*`
+- missing packages or package entry files
+- package export targets that point outside the package root
+- package export/import mappings with unsupported target shapes
+- imports or re-exports of missing exported names
+- missing native header, native source, shared library, or static library artifacts copied during project generation
+
+## Runtime Diagnostics
+
+Runtime diagnostics cover invalid values passed to generated standard-library handles and host adapters.
+
+Current focused runtime diagnostic families include:
+
+- invalid HTTP response, request, and server handler handles
+- invalid net socket or server handles, including closed handles
+- invalid stream handles and closed stream handles
+- invalid subprocess handles
+- invalid thread handles
+- unsupported array, map, set, string, spread, and destructuring sources
+- unsupported operands for explicit non-coercive operators
+- unsupported net, HTTP, and subprocess option keys
+- unsupported string conversion and template interpolation values
+
+Generated runtime handle diagnostics use consistent message shapes:
+
+- invalid handle type: `Jayess <module> expected a <handle> handle`
+- closed handle: `Jayess <module> <handle> handle is closed`
+- completed handle: `Jayess <module> <handle> handle is already <state>`
+- wrong stream direction: `Jayess stream <operation> requires a <direction> stream`
+- timeout: `Jayess <module> operation timed out`
+
+Generated runtime validation diagnostics use these additional message shapes:
+
+- unsupported receiver: `Jayess <module> <operation> requires <receiver> receiver`
+- unsupported option key: `Jayess <module> option is unsupported: <key>`
+- unsupported string conversion: `Jayess string conversion does not support <value-kind>`
+- unsupported template interpolation: `Jayess template interpolation does not support this value`
+- unsupported operands: `Jayess <operation> operands are unsupported`
+- unsupported destructuring source: `Jayess <pattern> destructuring requires <source-kind>`
+- unsupported spread source: `Jayess <spread-kind> spread requires <source-kind>`
+
+Diagnostics should preserve filename, line, and column information when source text includes a filename. New diagnostics should be added with focused tests under `test/` and should not add GitHub workflow files.

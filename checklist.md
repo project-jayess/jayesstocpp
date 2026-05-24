@@ -2,7 +2,7 @@
 
 This file contains the active remaining milestones for the Jayess transpiler.
 
-Completed milestones through section 112 were moved to [archived-checklist.md](./archived-checklist.md) to keep the working checklist small and focused.
+Completed milestones through section 308 were moved to [archived-checklist.md](./archived-checklist.md) to keep the working checklist small and focused.
 
 ## Active Buildout Rule
 

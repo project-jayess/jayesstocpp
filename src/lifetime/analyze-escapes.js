@@ -160,6 +160,11 @@ export function analyzeEscapes(ast) {
             markEscapingValue(argument);
           }
         }
+        if (node.callee.type === "Identifier" && node.callee.name === "spawn") {
+          for (const argument of node.arguments) {
+            markEscapingValue(argument);
+          }
+        }
         walk(node.callee);
         for (const argument of node.arguments) {
           walk(argument);

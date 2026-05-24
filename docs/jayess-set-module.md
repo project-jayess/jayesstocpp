@@ -82,24 +82,22 @@ Current exports:
 - returns `true` when `value` is a Jayess set value from this module surface
 - returns `false` otherwise
 
-## Deliberate Non-Goals For The First Slice
+## Current Non-Goals
 
-The first `jayess:collections/set` slice should not try to emulate the full JavaScript `Set` object surface.
+The shipped `jayess:collections/set` module does not emulate the full JavaScript `Set` object surface.
 
-Out of scope for the first slice:
+Out of scope for the current module surface:
 
 - ambient global `Set`
 - constructor overloads like `new Set(iterable)`
 - iterator-returning methods such as `keys()`, `values()`, or `entries()`
 - callback helpers such as `forEach(...)`
-- direct method-call syntax on set instances if the first implementation lands as function exports first
+- direct method-call syntax on set instances
 - object/array coercion shims that blur ordinary collection semantics with set semantics
 
-Those can land later as separate bounded slices after the dedicated set carrier and membership operations are stable.
+## Current Module Shape
 
-## Current Planned Module Shape
-
-The first Jayess-owned module source now lives at:
+The Jayess-owned module source lives at:
 
 - `stdlib/jayess/collections/set/index.js`
 
@@ -114,21 +112,21 @@ Current resolution behavior:
 - `transpileFile()` resolves `jayess:collections/set` through the repository-owned stdlib tree
 - `transpile()` string mode still requires explicit resolver support and rejects `jayess:collections/set` by default
 
-## Primitive Boundary Decision
+## Primitive Boundary
 
-The first `jayess:collections/set` slice should use mixed ownership.
+The shipped `jayess:collections/set` module uses mixed ownership.
 
 ### Needs A New Runtime Value Kind
 
-The first shipped `Set` slice should use a dedicated runtime value kind instead of a wrapper over plain arrays, plain objects, or ad hoc closure state.
+The shipped set module uses a dedicated runtime value kind instead of a wrapper over plain arrays, plain objects, or ad hoc closure state.
 
 That value kind is required for three reasons:
 
 - `Set` needs value-identity membership checks that are not the same as object-property string coercion
 - `Set` needs insertion-order element storage that ordinary object fields and ad hoc arrays do not provide cleanly
-- `Set` should be distinguishable from ordinary arrays and objects through explicit runtime type checks
+- set values must be distinguishable from ordinary arrays and objects through explicit runtime type checks
 
-The first primitive layer should therefore provide one dedicated set carrier in the Jayess runtime rather than trying to encode `Set` behavior through lower-level wrappers.
+The primitive layer provides one dedicated set carrier in the Jayess runtime rather than encoding set behavior through lower-level wrappers.
 
 ### Why Plain Arrays Are Not Enough
 
@@ -138,7 +136,7 @@ An array wrapper can hold values, but it is a poor fit for the first shipped `Se
 - duplicate suppression would need to be reimplemented at the Jayess library layer
 - array semantics and `Set` semantics would blur in the wrong direction
 
-The first `Set` slice should not claim support by approximating `Set` through arrays.
+The shipped set module does not approximate set support through arrays.
 
 ### Why Plain Objects Are Not Enough
 
@@ -148,9 +146,9 @@ That is a poor fit for `Set` because:
 
 - numeric, boolean, object, class, async, and generator members would be coerced or lost if routed through object-field names
 - insertion order for `Set` membership should belong to the `Set` carrier itself rather than ordinary object property rules
-- `Set` membership should operate on Jayess value identity/equality, not on public property lookup paths
+- set membership operates on Jayess value identity/equality, not on public property lookup paths
 
-The first `Set` slice should not claim support by approximating `Set` through object fields.
+The shipped set module does not approximate set support through object fields.
 
 ## Intended Ownership Split
 
@@ -180,15 +178,14 @@ The first primitive layer now has a concrete runtime direction:
 
 - the public `jayess:collections/set` export surface
 - thin wrapper functions or class-like APIs that forward to primitive operations
-- later convenience helpers such as conversion or composition helpers
 
 ## Explicit First-Slice Decision
 
-- the first shipped `Set` slice should use a new runtime value kind
-- the public module surface should still be Jayess-owned
-- the first shipped slice should not provide an ambient global `Set`
-- the first shipped slice should start with function exports, not a large compatibility class surface
-- the first shipped slice should not emulate `Set` through arrays or plain object fields just to claim support
+- the shipped set slice uses a runtime value kind
+- the public module surface is Jayess-owned
+- the shipped slice does not provide an ambient global `Set`
+- the shipped slice starts with function exports, not a large compatibility class surface
+- the shipped slice does not emulate `Set` through arrays or plain object fields just to claim support
 
 ## Current Verification Coverage
 
@@ -198,6 +195,6 @@ Current verification coverage:
 - generated-output tests that verify the Jayess module and native bridge are written into `transpileFile()` output
 - compile-validation tests that confirm a generated project importing `jayess:collections/set` compiles with the available C++ compiler
 
-## Remaining Follow-Up
+## Current Boundaries
 
-The next set work should keep iterator-based and callback-based set algebra APIs separate from this data-oriented helper surface.
+The shipped set helper surface keeps iterator-based and callback-based set algebra APIs separate from this data-oriented helper surface.

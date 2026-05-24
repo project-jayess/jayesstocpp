@@ -21,11 +21,24 @@ npm run test:update-snapshots
 - escape analysis
 - module graph resolution including `node_modules`
 - `transpileFile()` output writing
+- focused `transpileFile()` runtime fragment, builtin module, and module metadata output
 - native header and native source artifact copying
 - native library artifact copying
 - emitted C++ snapshot stability
 - compiler validation with `clang++`, `c++`, or `g++`
+- generated-C++ executable runtime validation for selected stdlib and language behavior
 - shared-library-oriented generated project layout
+
+## Test Organization
+
+Large test files are split by feature area:
+
+- semantic coverage is grouped by broad semantic behavior, builtins, classes, control flow, destructuring, and diagnostics
+- `transpile()` API coverage keeps string-mode API errors separate from generated-output shape assertions
+- parser coverage is grouped by control flow, async/generators, classes, destructuring, and expressions
+- `transpileFile()` output coverage is grouped by runtime fragments, builtin module families, and project metadata
+- compiler coverage is grouped by expression/control-flow, destructuring/spread, functions, and project/module builds
+- runtime source assertions are grouped by core value helpers, collection/text primitives, system/thread/time primitives, and executable runtime tests
 
 ## Compiler Validation
 

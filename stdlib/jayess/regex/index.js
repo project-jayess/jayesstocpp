@@ -2,8 +2,10 @@ import {
   jayessRegexCreate,
   jayessRegexExec,
   jayessRegexIsRegex,
+  jayessRegexMatchAll,
   jayessRegexReplaceAll,
   jayessRegexReplaceFirst,
+  jayessRegexSplit,
   jayessRegexTest
 } from "./regex-primitives.hpp";
 
@@ -17,6 +19,14 @@ export function test(regex, text) {
 
 export function exec(regex, text) {
   return jayessRegexExec(regex, text);
+}
+
+export function split(regex, text) {
+  return jayessRegexSplit(regex, text);
+}
+
+export function matchAll(regex, text) {
+  return jayessRegexMatchAll(regex, text);
 }
 
 export function replaceFirst(regex, text, replacement) {

@@ -32,6 +32,10 @@ This repository contains a small but working first milestone of the Jayess to C+
 - single inheritance through `extends`
 - `super(...)` inside derived constructors
 - `super.method(...)` inside derived instance methods
+- `super[expr](...)` inside derived instance methods
+- `super.method(...)` calls inside derived static methods
+- `super.name` reads inside derived static methods
+- `super[expr](...)` calls and `super[expr]` reads inside derived static or instance methods
 - private instance field declarations with `#field`
 - private instance methods with `#method()`
 - private reads and writes inside the declaring class body
@@ -69,7 +73,7 @@ This repository contains a small but working first milestone of the Jayess to C+
 - exponentiation operator: `**`
 - array literals
 - object literals with identifier or string keys
-- destructuring with nested array/object patterns, pattern defaults, final rest bindings, assignment destructuring into existing identifiers, and destructuring declarations in `for` initializers
+- destructuring with nested array/object patterns, array elisions, pattern defaults, final rest bindings, assignment destructuring into existing identifiers and public member targets, destructuring declarations in `for` initializers, and destructured parameters
 - call spread in ordinary calls, optional calls, and `new` argument lists
 - array spread in array literals
 - object spread in object literals
@@ -99,8 +103,33 @@ This repository contains a small but working first milestone of the Jayess to C+
 - optional shared-library-oriented output layout for `transpileFile(..., { projectKind: "shared-library" })`
 - Jayess-owned system modules:
   - `jayess:fs`
+  - `jayess:os`
   - `jayess:path`
   - `jayess:process`
+  - `jayess:system`
+  - `jayess:thread`
+  - `jayess:timers`
+- Jayess-owned standard-library modules:
+  - `jayess:assert`
+  - `jayess:array`
+  - `jayess:async`
+  - `jayess:bytes`
+  - `jayess:buffer`
+  - `jayess:console`
+  - `jayess:crypto`
+  - `jayess:date`
+  - `jayess:encoding`
+  - `jayess:iter`
+  - `jayess:json`
+  - `jayess:math`
+  - `jayess:number`
+  - `jayess:object`
+  - `jayess:regex`
+  - `jayess:string`
+  - `jayess:time`
+  - `jayess:url`
+  - `jayess:collections/map`
+  - `jayess:collections/set`
 
 ## Current Non-Goals
 
@@ -149,18 +178,38 @@ The current semantics direction is also explicit on truthiness and coercion:
 See [../Jayess.md](../Jayess.md) for the current language-direction rules and explicit permanently unsupported JavaScript features.
 See [javascript-feature-gaps.md](./javascript-feature-gaps.md) for a broader list of unsupported or intentionally different JavaScript features.
 See [stdlib-and-core-model.md](./stdlib-and-core-model.md) for the intended split between low-level C++ runtime support and Jayess-written standard-library/core modules.
+See [standard-library.md](./standard-library.md) for the current `jayess:*` module index and export list.
+See [runtime-verification.md](./runtime-verification.md) for the local executable checks that compile generated C++ and run selected exported functions.
+See [feature-matrix.md](./feature-matrix.md), [standard-library-matrix.md](./standard-library-matrix.md), [unsupported-by-design.md](./unsupported-by-design.md), and [generated-project-layout.md](./generated-project-layout.md) for concise project indexes.
 See [semantics.md](./semantics.md) for the current truthiness, equality, and numeric-operator rules that Jayess implements today.
 See [generated-project-shape.md](./generated-project-shape.md) for the current `transpileFile()` output layout and file naming rules.
-See [jayess-async-module.md](./jayess-async-module.md) for the first planned `jayess:async` core-module surface.
+See [jayess-async-module.md](./jayess-async-module.md) for the shipped `jayess:async` core-module surface and generated async module-init entry point.
+See [module-resolution.md](./module-resolution.md) for package import resolution, including the Jayess-specific package export condition.
+See [jayess-assert-module.md](./jayess-assert-module.md) for the shipped `jayess:assert` assertion helper surface.
 See [builtin-module-policy.md](./builtin-module-policy.md) for the repository-owned `jayess:*` namespace and built-in module resolution contract.
-See [jayess-date-module.md](./jayess-date-module.md) for the first intended `jayess:date` module surface.
-See [jayess-json-module.md](./jayess-json-module.md) for the first intended `jayess:json` module surface.
-See [jayess-map-module.md](./jayess-map-module.md) for the current first intended module surface and runtime-boundary decision for `jayess:collections/map`.
-See [jayess-set-module.md](./jayess-set-module.md) for the current runtime-boundary decision for `jayess:collections/set`.
-See [jayess-object-module.md](./jayess-object-module.md) for the first shipped `jayess:object` helper surface.
-See [jayess-number-module.md](./jayess-number-module.md) for the first shipped `jayess:number` parsing surface.
-See [jayess-regex-module.md](./jayess-regex-module.md) for the first shipped `jayess:regex` helper surface.
-See [jayess-system-modules.md](./jayess-system-modules.md) for the current first-slice `jayess:fs`, `jayess:path`, and `jayess:process` surface and ownership split.
+See [jayess-array-module.md](./jayess-array-module.md) for the shipped `jayess:array` helper surface.
+See [jayess-string-module.md](./jayess-string-module.md) for the shipped `jayess:string` helper surface.
+See [jayess-stream-module.md](./jayess-stream-module.md) for the shipped `jayess:stream` byte-stream surface.
+See [jayess-object-module.md](./jayess-object-module.md) for the shipped `jayess:object` helper surface.
+See [jayess-number-module.md](./jayess-number-module.md) for the shipped `jayess:number` parsing surface.
+See [jayess-math-module.md](./jayess-math-module.md) for the shipped `jayess:math` helper surface.
+See [jayess-date-module.md](./jayess-date-module.md) for the shipped `jayess:date` module surface.
+See [jayess-json-module.md](./jayess-json-module.md) for the shipped `jayess:json` module surface.
+See [jayess-map-module.md](./jayess-map-module.md) for the shipped `jayess:collections/map` module surface and runtime-boundary decision.
+See [jayess-set-module.md](./jayess-set-module.md) for the shipped `jayess:collections/set` module surface and runtime-boundary decision.
+See [jayess-regex-module.md](./jayess-regex-module.md) for the shipped `jayess:regex` helper surface.
+See [jayess-console-module.md](./jayess-console-module.md) for the shipped `jayess:console` output surface.
+See [jayess-bytes-module.md](./jayess-bytes-module.md) for the shipped `jayess:bytes` binary-data surface.
+See [jayess-buffer-module.md](./jayess-buffer-module.md) for the shipped `jayess:buffer` range-checked byte-buffer surface.
+See [jayess-encoding-module.md](./jayess-encoding-module.md) for the shipped `jayess:encoding` helper surface.
+See [jayess-events-module.md](./jayess-events-module.md) for the shipped `jayess:events` callback-emitter surface.
+See [jayess-crypto-module.md](./jayess-crypto-module.md) for the shipped `jayess:crypto` helper surface.
+See [jayess-url-module.md](./jayess-url-module.md) for the shipped `jayess:url` helper surface.
+See [jayess-iter-module.md](./jayess-iter-module.md) for the shipped `jayess:iter` generator-helper surface.
+See [jayess-time-module.md](./jayess-time-module.md) for the shipped `jayess:time` monotonic duration surface.
+See [jayess-system-modules.md](./jayess-system-modules.md) for the shipped `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:system`, and `jayess:thread` surfaces and ownership split.
+See [jayess-timers-module.md](./jayess-timers-module.md) for the shipped `jayess:timers` helper surface.
+See [jayess-os-module.md](./jayess-os-module.md) for the shipped `jayess:os` operating-system information surface.
 
 ## Diagnostics Behavior
 
@@ -185,20 +234,20 @@ Current async note:
 - async function expressions and async arrow functions are now supported and lower through the same Jayess async-handle machinery as async function declarations
 - async instance and static class methods are supported through the same Jayess async-handle machinery
 - JavaScript `Promise` is unsupported by design; async composition stays Jayess-owned through `jayess:async`
-- the first shipped `jayess:async` composition surface is `resolved`, `rejected`, `all`, `race`, and `isAsync`
+- the shipped `jayess:async` composition surface is `resolved`, `rejected`, `all`, `allSettled`, `any`, `race`, `sleep`, `timeout`, `catchError`, `finallyDo`, `delay`, `retry`, and `isAsync`
 - async constructors remain unsupported by design
-- top-level `await` remains unsupported until Jayess defines explicit module-level async initialization ordering
+- top-level `await` remains unsupported; generated modules expose `jayess_module_init_async()` as a resolved async-handle wrapper around synchronous module initialization
 
 Current generator note:
 
 - generator declarations with direct `yield expr` and direct `yield* expr` are supported
-- direct `yield expr` can appear inside nested blocks, `if` / `else` branches, `while` loops, and `for` loops
-- selected expression-yield forms are supported, including `return yield value`, binary expressions, call arguments, and simple assignment right-hand sides
+- direct `yield expr` can appear inside nested blocks, `if` / `else` branches, `while` loops, `do` / `while` loops, `for` loops, and `switch` statements
+- selected expression-yield forms are supported, including `return yield value`, binary expressions, short-circuit expressions, call arguments, and simple assignment right-hand sides
 - generator-local array and object destructuring declarations are supported
 - `yield` legality is checked against generator-function context
 - generator declarations and generator function expressions lower to Jayess-owned generator handles with explicit state-slot resume lambdas
 - generator function expressions and generator class methods are supported in the current generator slice
-- async generators and short-circuit expression-yield forms remain unsupported
+- async generators remain unsupported
 
 Current private-member note:
 
@@ -214,25 +263,52 @@ Current computed-class-member note:
 - computed class keys evaluate exactly once, left to right, during class definition
 - static fields and static blocks run in one shared class-side source-ordered sequence
 - static blocks currently use ordinary class-side name access such as `Point.value`; they do not currently introduce a special `this` binding
-- broader follow-up work such as static inheritance and richer class-side semantics remains outside the current slice
+- public static member inheritance is supported; richer class-side semantics remain outside the current slice
 
 Current system-module note:
 
-- Jayess-owned `jayess:fs`, `jayess:path`, and `jayess:process` modules are supported in a narrow first slice
-- `jayess:fs` currently exports `exists`, `readText`, `writeText`, `createDirectories`, `remove`, `list`, `rename`, and `stat`
-- `jayess:path` currently exports `join`, `dirname`, `basename`, `extname`, `normalize`, `resolve`, `relative`, and `isAbsolute`
+- Jayess-owned `jayess:*` standard-library modules are supported through explicit imports
+- system-facing modules include `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:system`, `jayess:thread`, and `jayess:timers`
+- `jayess:fs` currently exports default async filesystem helpers plus matching `Sync` variants: `exists`, `readText`, `readBytes`, `writeText`, `writeBytes`, `appendText`, `copy`, `copyRecursive`, `createDirectories`, `remove`, `removeRecursive`, `list`, `walk`, `rename`, `stat`, and their `Sync` forms
+- `jayess:os` currently exports `platform`, `arch`, `homeDir`, `tmpDir`, `hostname`, and `newline`
+- `jayess:path` currently exports `join`, `dirname`, `basename`, `extname`, `normalize`, `parse`, `format`, `separator`, `delimiter`, `resolve`, `relative`, and `isAbsolute`
 - `jayess:process` currently exports `argv`, `cwd`, `getEnv`, and `exit`
+- `jayess:system` currently exports `args`, `cwd`, `getEnv`, `hasEnv`, and `exitCode`
+- `jayess:thread` currently exports `spawn`, `join`, `sleep`, `hardwareConcurrency`, and `currentId`
+- `jayess:timers` currently exports `sleep`, `setTimeout`, and `clearTimeout`
+- `jayess:stream` currently exports `openRead`, `openWrite`, `readChunk`, `writeChunk`, `close`, `pipe`, `copy`, `chunks`, and `readText`
+- `jayess:assert` currently exports `ok`, `equal`, `notEqual`, `fail`, and `throws`
+- `jayess:console` currently exports `log`, `error`, `write`, and `writeLine`
+- `jayess:bytes` currently exports `fromUtf8`, `fromArray`, `toArray`, `toUtf8`, `length`, `get`, `set`, `fill`, `slice`, `concat`, `equals`, `compare`, `startsWith`, `endsWith`, and `isBytes`
+- `jayess:buffer` currently exports `create`, `fromBytes`, `toBytes`, `length`, `read`, `write`, and `concat`
+- `jayess:encoding` currently exports `base64Encode`, `base64Decode`, `hexEncode`, `hexDecode`, `asciiEncode`, `asciiDecode`, `utf16Encode`, `utf16Decode`, `uriEncode`, and `uriDecode`
+- `jayess:events` currently exports `create`, `on`, `once`, `off`, `emit`, and `listenerCount`
+- `jayess:crypto` currently exports `sha256`, `sha1`, `hmacSha256`, `hmacSha1`, `createHash`, `updateHash`, `digestHash`, and `randomBytes`
+- `jayess:url` currently exports `parse`, `format`, `joinPath`, `getQuery`, and `setQuery`
+- `jayess:time` currently exports `millis`, `seconds`, `minutes`, `elapsed`, and `formatDuration`
+- `jayess:iter` currently exports `next`, `toArray`, `take`, `map`, `filter`, `forEach`, `reduce`, `some`, `every`, `find`, `chain`, and `range` for Jayess generator handles
+- `jayess:array` currently exports `slice`, `concat`, `indexOf`, `includes`, `find`, `findIndex`, `some`, `every`, `join`, `reverse`, `sort`, `map`, `filter`, and `reduce`
+- `jayess:string` currently exports `trim`, `startsWith`, `endsWith`, `includes`, `indexOf`, `slice`, `split`, `replaceFirst`, `replaceAll`, `padStart`, `padEnd`, `repeat`, `toLower`, and `toUpper`
+- `jayess:object` currently exports `has`, `keys`, `values`, `entries`, `fromEntries`, and `assign`
+- `jayess:number` currently exports `isInteger`, `isFinite`, `parseInt`, and `parseFloat`
+- `jayess:math` currently exports `abs`, `floor`, `ceil`, `round`, `min`, `max`, `sqrt`, and `pow`
+- `jayess:json` currently exports `parse`, `stringify`, `stringifyPretty`, `validate`, and `isJsonText`
+- `jayess:date` currently exports `now`, `fromUnixMillis`, `toUnixMillis`, `toIsoString`, UTC component readers, millisecond arithmetic, `parseIso`, and `isDate`
+- `jayess:regex` currently exports `create`, `test`, `exec`, `split`, `matchAll`, `replaceFirst`, `replaceAll`, and `isRegex`
+- `jayess:subprocess` currently exports `run`, `spawn`, `join`, and `kill`
 - these modules resolve through the built-in module graph and lower through explicit native adapter primitives
 - ambient `node:*` imports remain explicitly unsupported
-- the current shipped follow-up work now includes `jayess:fs` `remove` / `list` / `rename` / narrow `stat`, `jayess:path` `resolve` / `relative` / `isAbsolute`, and `jayess:process` `argv()`
-- env mutation, subprocess spawning, and additional modules such as `jayess:os`, `jayess:url`, and `jayess:timers` remain separate later decisions
+- env mutation remains outside the current system-module surface
+- subprocess execution is provided by the concrete [`jayess:subprocess`](./jayess-subprocess-module.md) module slice
+- cross-platform native rendering is planned through `jayess:color`, `jayess:image`, and `jayess:canvas`; see [jayess-native-gui.md](./jayess-native-gui.md)
 
 Current module/export hardening note:
 
 - `export *` permanently excludes default exports; default forwarding must stay explicit
-- package `exports` support remains intentionally narrow rather than trying to emulate full Node conditional-exports behavior in the next slice
-- top-level `await` is still unsupported, so async module-initialization cycle rules remain a separate later milestone rather than an active resolver rule today
-- the next diagnostic-hardening work should distinguish missing packages, unsupported file types, and installed JavaScript-oriented packages that are not valid Jayess packages
+- package `exports` support remains focused: Jayess accepts root and explicit subpath targets plus `jayess`, `import`, and `default` conditions
+- top-level `await` is still unsupported, so source module initialization remains closed and compile-time ordered
+- package diagnostics distinguish missing packages, unsupported file types, missing package entry files, package entries outside the package root, and unsupported conditional export maps
+- generated dependency metadata records module dependencies, built-in modules, selected package roots/entries, and selected package export conditions
 - mixed graphs that combine named re-exports and `export *` are supported in the current shipped hardening slice
 - duplicate exported names now fail explicitly
 - packages that expose only unsupported conditional export branches now fail with focused diagnostics
@@ -240,10 +316,10 @@ Current module/export hardening note:
 Current regex note:
 
 - a narrow helper-only `jayess:regex` slice is now shipped
-- the shipped exports are `create`, `test`, `exec`, and `isRegex`
+- the shipped exports are `create`, `test`, `exec`, `replaceFirst`, `replaceAll`, and `isRegex`
 - regex literals and ambient/global `RegExp` remain unsupported
 
-Current next-stdlib-slice note:
+Current standard-library expansion note:
 
 - `jayess:date` now also ships UTC ISO formatting, UTC component extraction, millisecond arithmetic, and narrow ISO parsing; broader timezone/formatting work stays separate
 - `jayess:json` now also ships pretty-printing and small validation/failure-diagnostics helpers; reviver/replacer-like work stays separate
@@ -263,7 +339,7 @@ Current next-stdlib-slice note:
 
 Repository-defined Jayess standard-library/core modules may also be transpiled into the output when they participate in the resolved module graph.
 
-The preferred future built-in-module direction is a Jayess-owned namespace such as `jayess:*`, kept distinct from `node:*` and `cpp:*`.
+The built-in-module direction is a Jayess-owned namespace such as `jayess:*`, kept distinct from `node:*` and `cpp:*`.
 
 The generated project is meant to be compiled later by an external compiler such as `clang++`.
 
@@ -296,13 +372,15 @@ The generated project is meant to be compiled later by an external compiler such
   - string `.indexOf(value)`
   - string `.endsWith(value)`
   - primitive `.toString()` for strings, numbers, booleans, and null
+  - `jayess:assert` module exports `ok(value)`, `equal(left, right)`, `notEqual(left, right)`, `fail(message?)`, and `throws(callback)`
   - `jayess:object` module exports `keys(value)`, `values(value)`, and `entries(value)`
   - `jayess:number` module exports `parseInt(text)` and `parseFloat(text)`
   - `jayess:date` module exports `now()`, `fromUnixMillis(value)`, `toUnixMillis(date)`, `toIsoString(date)`, UTC component helpers, `addMillis(date, amount)`, `diffMillis(left, right)`, `parseIso(text)`, and `isDate(value)`
   - `jayess:json` module exports `parse(text)`, `stringify(value)`, `stringifyPretty(value, indent?)`, `validate(text)`, and `isJsonText(text)`
+  - `jayess:array` module exports `slice`, `concat`, `indexOf`, `includes`, `find`, `findIndex`, `some`, `every`, `join`, `reverse`, `sort`, `map`, `filter`, and `reduce`
   - `jayess:collections/map` module exports `create`, `get`, `set`, `has`, `deleteKey`, `clear`, `size`, `keys`, `values`, `entries`, `fromEntries`, `setAll`, `deleteAll`, and `isMap`
   - `jayess:collections/set` module exports `create`, `add`, `has`, `deleteValue`, `clear`, `size`, `values`, `entries`, `fromValues`, `union`, `intersection`, `difference`, and `isSet`
-  - `jayess:regex` module exports `create(pattern)`, `test(regex, text)`, `exec(regex, text)`, `replaceFirst(regex, text, replacement)`, `replaceAll(regex, text, replacement)`, and `isRegex(value)`
+  - `jayess:regex` module exports `create(pattern, ...flags)`, `test(regex, text)`, `exec(regex, text)`, `split(regex, text)`, `matchAll(regex, text)`, `replaceFirst(regex, text, replacement)`, `replaceAll(regex, text, replacement)`, and `isRegex(value)`
 - still not implemented in the current slice:
   - broad `Array.prototype` coverage
   - broad `String.prototype` coverage
@@ -320,6 +398,7 @@ The generated project is meant to be compiled later by an external compiler such
 - arrow functions capture outer `this` lexically when used inside methods or field initializers
 - named function-expression self-bindings remain local to the function body
 - captured bindings are treated as escaping for lifetime analysis
+- generator, async, class, thread, and module-exported values that outlive their defining scope are retained through the same scope-based lifetime model
 
 ## Current Class Model
 
@@ -338,7 +417,10 @@ The generated project is meant to be compiled later by an external compiler such
 - instance property lookup falls back through the instance's class link and base-class chain when a direct object property is missing
 - the first inheritance slice supports one Jayess class base through `class Derived extends Base`
 - derived construction links the instance to the derived class, runs the base constructor against that same instance shell, then runs derived field initializers and the remaining derived constructor body
-- `super.method(...)` lowers through explicit base-class lookup and binds the current derived instance as `this`
+- instance `super.method(...)` lowers through explicit base-class lookup and binds the current derived instance as `this`
+- computed instance `super[expr](...)` uses the same base method lookup after converting the computed key to a Jayess property key
+- static `super.method(...)` lowers through class-side base lookup and calls the inherited public static callable
+- static `super.name` reads lower through class-side base lookup
 - private instance fields use class-owned hidden runtime keys and do not participate in ordinary public property lookup
 - computed class-side writes currently reuse the same property/index runtime path as other class-value property writes
 - public static member lookup falls back through the base-class chain, with own static fields and methods taking precedence

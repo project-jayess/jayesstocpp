@@ -1,11 +1,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { emitModule } from "../cpp/emit-module.js";
+import { throwDiagnostics } from "../diagnostics.js";
+import { createModuleFileDiagnostic } from "../diagnostics/module-diagnostic.js";
 import { buildModuleGraph } from "../modules/module-graph.js";
 import { expandExportSurfaces } from "../modules/export-surface.js";
 import { ensureInsideTarget, planModulePaths } from "../output/path-plan.js";
+import { analyzeRuntimeFeatures } from "../output/runtime-feature-analysis.js";
+import { writeBuildHints } from "../output/write-build-hints.js";
+import { writeDependencyPlan } from "../output/write-dependency-plan.js";
+import { writeProjectManifests } from "../output/write-project-manifests.js";
 import { writeSharedLibraryLayout } from "../output/write-shared-library-layout.js";
 import { writeRuntime } from "../output/write-runtime.js";
+import { resolveRuntimeFragmentKeys } from "../cpp/runtime-fragments.js";
 
 function copyIfNativeArtifact(targetDirname, sourceFilename, importRecord) {
   if (
@@ -18,6 +25,15 @@ function copyIfNativeArtifact(targetDirname, sourceFilename, importRecord) {
   }
 
   const fromPath = path.resolve(path.dirname(sourceFilename), importRecord.source);
+  if (!fs.existsSync(fromPath) || !fs.statSync(fromPath).isFile()) {
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        sourceFilename,
+        `Cannot copy ${importRecord.kind} import '${importRecord.source}': file does not exist`,
+        importRecord.source
+      )
+    ]);
+  }
   const bucket = importRecord.kind === "shared-library" || importRecord.kind === "static-library" ? "libraries" : "native";
   const toPath = path.join(targetDirname, bucket, path.basename(importRecord.source));
   fs.mkdirSync(path.dirname(toPath), { recursive: true });
@@ -35,9 +51,12 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
 
   const resolvedTargetDir = path.resolve(targetDirname);
   fs.mkdirSync(resolvedTargetDir, { recursive: true });
-  const outputs = [...writeRuntime(resolvedTargetDir)];
 
   const graph = buildModuleGraph(entryFilename);
+  const runtimeFeatures = options.runtimeFeatures ?? analyzeRuntimeFeatures(graph);
+  const runtimeFragmentInput = options.runtimeFragments === "all" ? "all" : runtimeFeatures;
+  const runtimeFragmentKeys = resolveRuntimeFragmentKeys(runtimeFragmentInput);
+  const outputs = [...writeRuntime(resolvedTargetDir, { features: runtimeFragmentInput })];
   const exportSurfaces = expandExportSurfaces(graph);
   const metadata = new Map();
 
@@ -45,7 +64,12 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
     const paths = planModulePaths(moduleRecord.filename, graph.projectRoot, resolvedTargetDir);
     metadata.set(moduleRecord.filename, {
       moduleStem: paths.moduleStem,
-      header: `${paths.moduleStem}.hpp`,
+      header: paths.headerIncludePath,
+      headerPath: paths.headerPath,
+      cppPath: paths.cppPath,
+      headerOutputPath: paths.headerIncludePath,
+      cppOutputPath: paths.cppOutputPath,
+      sourceKind: paths.sourceKind,
       namespace: `jayess_module_${paths.moduleStem}`,
       exportNames: exportSurfaces.get(moduleRecord.filename)?.exportNames ?? []
     });
@@ -56,11 +80,13 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
     if (!ensureInsideTarget(resolvedTargetDir, paths.headerPath) || !ensureInsideTarget(resolvedTargetDir, paths.cppPath)) {
       throw new Error("Refusing to write outside target directory");
     }
+    fs.mkdirSync(path.dirname(paths.headerPath), { recursive: true });
+    fs.mkdirSync(path.dirname(paths.cppPath), { recursive: true });
 
     const dependencies = new Map();
     const includeOverrides = new Map();
     for (const entry of moduleRecord.dependencies) {
-      if (entry.kind === "jayess-module" || entry.kind === "builtin-module" || entry.kind === "package") {
+      if (entry.kind === "jayess-module" || entry.kind === "builtin-module" || entry.kind === "package" || entry.kind === "package-import") {
         const dependencyMetadata = metadata.get(entry.resolved);
         dependencies.set(entry.source, dependencyMetadata);
       }
@@ -83,16 +109,21 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
     outputs.push(paths.headerPath, paths.cppPath);
   }
 
+  outputs.push(writeDependencyPlan(resolvedTargetDir, graph, metadata));
+  outputs.push(...writeProjectManifests(resolvedTargetDir, graph, metadata, runtimeFragmentKeys));
+
   if (options.projectKind === "shared-library") {
     const entryPaths = planModulePaths(graph.entryFilename, graph.projectRoot, resolvedTargetDir);
     const entryMetadata = metadata.get(graph.entryFilename);
     const sharedLayoutFiles = writeSharedLibraryLayout(resolvedTargetDir, {
       libraryName: options.libraryName ?? "jayess_module",
-      entryHeader: `${entryPaths.moduleStem}.hpp`,
+      entryHeader: entryPaths.headerIncludePath,
       entryNamespace: entryMetadata.namespace
     });
     outputs.push(...sharedLayoutFiles);
   }
+
+  outputs.push(writeBuildHints(resolvedTargetDir, outputs, { runtimeFeatures: runtimeFragmentKeys }));
 
   return {
     entryFilename: graph.entryFilename,

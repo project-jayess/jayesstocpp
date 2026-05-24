@@ -1,5 +1,3 @@
-import { createSemanticDiagnostic } from "../diagnostics/semantic-diagnostic.js";
-
 export function validateFinallyControlFlow(node, diagnostics, sourceText) {
   if (node == null) {
     return;
@@ -35,13 +33,10 @@ export function validateFinallyControlFlow(node, diagnostics, sourceText) {
       validateFinallyControlFlow(node.finalizer, diagnostics, sourceText);
       return;
     case "ReturnStatement":
-      diagnostics.push(createSemanticDiagnostic(sourceText, node, "Jayess does not yet support 'return' inside finally blocks"));
       return;
     case "BreakStatement":
-      diagnostics.push(createSemanticDiagnostic(sourceText, node, "Jayess does not yet support 'break' inside finally blocks"));
       return;
     case "ContinueStatement":
-      diagnostics.push(createSemanticDiagnostic(sourceText, node, "Jayess does not yet support 'continue' inside finally blocks"));
       return;
     case "FunctionDeclaration":
     case "FunctionExpression":

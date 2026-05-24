@@ -165,8 +165,9 @@ Current exception-handling support is intentionally narrow:
 Current control-flow note:
 
 - `finally` is guaranteed to run when control leaves the try/catch region through normal completion, `return`, `break`, `continue`, or C++ exception unwinding
-- this is currently lowered through a focused RAII finalizer helper
-- to keep that lowering explicit and correct, `return`, `break`, and `continue` are intentionally rejected inside `finally` blocks in this slice
+- finalizers without their own control flow lower through a focused RAII finalizer helper
+- `return`, `break`, and `continue` inside `finally` lower through internal control-flow signals that the surrounding generated block translates back into ordinary Jayess control flow
+- malformed `break` and `continue` targets still fail during semantic analysis
 
 ## Async And Await
 
@@ -182,6 +183,7 @@ Current async support is intentionally narrow:
 - `await` runs the current Jayess async scheduler when an async handle is still pending
 - `await` returns the resolved value of a settled async handle
 - `await` rethrows the rejection payload of a rejected async handle as a Jayess thrown value
+- scheduler-backed `sleep` and `timeout` use a Jayess timer queue; due timers run through the same scheduler path as queued async continuations
 
 Current limitations:
 
@@ -199,7 +201,7 @@ Current generator support is intentionally narrow:
 - `yield expr` is supported inside generator bodies
 - `yield* expr` is supported inside generator bodies
 - `yield expr` can appear inside nested blocks, `if` / `else` branches, `while` loops, and `for` loops
-- selected expression-yield forms are supported, including `return yield value`, binary expressions, call arguments, and simple assignment right-hand sides
+- selected expression-yield forms are supported, including `return yield value`, binary expressions, short-circuit expressions, conditional expressions, array/object literal values, call arguments, and simple assignment right-hand sides
 - generator-local array and object destructuring declarations are supported
 - generator calls return Jayess-owned generator handles
 - generator handles store explicit suspended/completed/failed state in the runtime
@@ -217,7 +219,11 @@ Current first-slice behavior:
 Current limitations:
 
 - async generators are not supported
-- short-circuit expression-yield forms such as `left && (yield value)` are not supported
+- short-circuit expression-yield forms such as `left && (yield value)`, `left || (yield value)`, and `left ?? (yield value)` evaluate the left operand once and yield only when the right side is required
+- direct generator yields are supported inside `do` / `while` and `switch` statements
+- generator `try/catch` supports focused shapes where the `try` block ends with one direct non-delegated `yield`, or contains multiple direct non-delegated yield statement positions with non-yielding surrounding statements; both forms require a catch body that does not contain `yield`
+- generator `try/catch` also supports a focused catch-body shape where the `try` block contains no `yield` and the catch body contains exactly one direct non-delegated `yield`
+- generator `try/finally` supports focused shapes where the `try` block contains direct non-delegated yield statement positions with non-yielding surrounding statements, and the `finally` block does not contain `yield`
 
 ## Inheritance And `super`
 
@@ -227,7 +233,11 @@ Current inheritance support is intentionally narrow:
 - the base must resolve to a Jayess class value
 - only single inheritance is supported
 - `super(...)` is supported only inside derived constructors
-- `super.method(...)` is supported only inside derived instance methods
+- `super.method(...)` is supported inside derived instance methods and as a call inside derived static methods
+- `super[expr](...)` is supported inside derived instance methods
+- `super[expr](...)` is supported inside derived static methods
+- non-call `super[expr]` reads are supported inside derived instance methods
+- non-call static `super[expr]` reads are supported inside derived static methods
 
 Current first-slice construction behavior:
 
@@ -244,13 +254,16 @@ Current dispatch behavior:
 - if a direct object field is missing, lookup falls back through the instance's class link and the base-class chain
 - public static member lookup first checks the derived class value, then walks the base-class chain
 - own static fields and methods take precedence over inherited static members
-- `super.method(...)` skips derived methods and resolves directly against the base-class chain
-- the resolved base method is called with the current derived instance bound as `this`
+- instance `super.method(...)` skips derived methods and resolves directly against the base-class chain
+- instance `super[expr](...)` uses the same base method lookup after converting the computed key to a property key
+- the resolved base instance method is called with the current derived instance bound as `this`
+- static `super.method(...)` inside a derived static method starts lookup at the base class value and calls the inherited public static method through the class-side callable model
+- static `super.name` inside a derived static method starts lookup at the base class value and reads the inherited public static member
+- static `super[expr]` and `super[expr](...)` use the same base-class lookup after converting the computed key to a property key
 
 Current limitations:
 
-- `super.staticMethod(...)` is not supported
-- `super[expr]` is not supported
+- assigning to `super` properties is not supported
 - `super` property assignment forms are not supported
 - non-class base expressions are rejected
 - the current backend requires `super(...)` to be the first statement in a derived constructor
@@ -271,6 +284,7 @@ Current runtime behavior:
 
 - private storage is attached to instances separately from ordinary public object properties
 - private static storage is attached to the class value separately from ordinary public static properties
+- private static storage remains owned by the declaring class across inheritance, so a derived class can reuse the same private spelling without sharing storage
 - private lowering uses dedicated runtime helpers instead of `get_property(...)` / `set_property(...)`
 - inherited classes do not gain private access through name matching
 - `super` does not expose private storage
@@ -314,21 +328,22 @@ Current limitations:
 Current destructuring support includes:
 
 - declaration destructuring such as `var [left, right] = value;` and `const { name, score: total } = value;`
+- array elisions such as `var [first, , third] = value;`
 - nested patterns such as `var [head, { nested: [left, right] }] = value;`
 - pattern defaults such as `var [left = 1] = value;` and `const { name = "Jayess" } = value;`
 - final rest bindings such as `var [head, ...tail] = value;` and `const { name, ...rest } = value;`
-- assignment destructuring into existing identifiers such as `([left, right] = value);`
+- assignment destructuring into existing identifiers and public member targets such as `([left, target.value] = value);`
 - destructuring declarations in `for` initializers
+- destructured parameters in function declarations, function expressions, arrow functions, methods, and constructors
 - the source expression is evaluated exactly once for each destructuring operation
+- parameter defaults apply when the argument is omitted before the parameter pattern is destructured
 - missing array elements or object properties yield Jayess `null`
 - defaults trigger only when the matched value is Jayess `null`
 
 Current limitations:
 
 - rest bindings must remain final within their immediate pattern level and bind to a single identifier
-- assignment destructuring still targets existing identifiers only
-- array elisions are not supported
-- destructured parameters are not supported
+- private member targets and other arbitrary assignment-only JavaScript targets remain outside the current destructuring slice
 
 ## Rest Parameters
 

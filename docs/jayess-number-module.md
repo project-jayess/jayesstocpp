@@ -71,4 +71,4 @@ This first slice does not attempt to provide:
 - formatting helpers
 - broader `Number` emulation
 
-Those remain separate future slices.
+Those are outside the current module surface.

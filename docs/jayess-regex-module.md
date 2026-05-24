@@ -10,9 +10,11 @@ It does not expose ambient JavaScript `RegExp`, regex literals, or constructor-s
 
 The shipped exports are:
 
-- `create(pattern, flags)`
+- `create(pattern, ...flags)`
 - `test(regex, text)`
 - `exec(regex, text)`
+- `split(regex, text)`
+- `matchAll(regex, text)`
 - `replaceFirst(regex, text, replacement)`
 - `replaceAll(regex, text, replacement)`
 - `isRegex(value)`
@@ -22,7 +24,7 @@ The shipped exports are:
 The current slice is intentionally narrow.
 
 - `create(pattern)` requires a string pattern and returns a Jayess regex value.
-- `create(pattern, flags)` accepts an optional string flags argument.
+- `create(pattern, ...flags)` accepts zero or more string flag arguments, which are combined before validation.
 - supported flags are `i`, `m`, and `s`.
 - `i` enables case-insensitive matching.
 - `m` enables multiline anchor matching for `^` and `$`.
@@ -33,6 +35,9 @@ The current slice is intentionally narrow.
 - `exec(regex, text)` returns Jayess `null` when no match exists.
 - `exec(regex, text)` returns a Jayess array of matched strings when a match exists.
 - that array contains the full match at index `0`, followed by any captured groups.
+- `split(regex, text)` returns a Jayess array of string segments split by regex matches.
+- `matchAll(regex, text)` returns a Jayess array of match arrays.
+- each `matchAll` match array contains the full match at index `0`, followed by any captured groups.
 - `replaceFirst(regex, text, replacement)` returns a new string with only the first match replaced.
 - `replaceAll(regex, text, replacement)` returns a new string with all matches replaced.
 - replacement helpers accept string replacement text only; callback replacement is not part of this slice.
@@ -57,8 +62,7 @@ This first slice does not attempt to provide:
 - regex literal syntax like `/abc/`
 - `new RegExp(...)`
 - ambient global `RegExp`
-- split helpers
 - callback replacement
 - broad JavaScript string/regex compatibility
 
-Those remain separate later slices.
+Those are outside the current module surface.

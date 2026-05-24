@@ -3,6 +3,7 @@ import {
   assignmentPattern,
   bindingProperty,
   literal,
+  memberExpression,
   objectPattern,
   restElement
 } from "../ast/nodes.js";
@@ -18,15 +19,36 @@ export function createBindingPatternParser({
   parserError,
   sourceText
 }) {
-  function parseBindingTarget() {
+  function parseMemberTargetSuffix(target) {
+    let currentTarget = target;
+    while (true) {
+      if (match(tokenTypes.punctuator, ".")) {
+        advance();
+        const property = parseIdentifier();
+        currentTarget = memberExpression(currentTarget, property, currentTarget.start, property.end, false);
+        continue;
+      }
+      if (match(tokenTypes.punctuator, "[")) {
+        advance();
+        const property = parseAssignment();
+        const end = expect(tokenTypes.punctuator, "]", "Expected ']' after computed destructuring assignment target").end;
+        currentTarget = memberExpression(currentTarget, property, currentTarget.start, end, true);
+        continue;
+      }
+      return currentTarget;
+    }
+  }
+
+  function parseBindingTarget(options = {}) {
     if (match(tokenTypes.identifier)) {
-      return parseIdentifier();
+      const identifier = parseIdentifier();
+      return options.allowMemberTargets ? parseMemberTargetSuffix(identifier) : identifier;
     }
     if (match(tokenTypes.punctuator, "[")) {
-      return parseArrayBindingPattern();
+      return parseArrayBindingPattern(options);
     }
     if (match(tokenTypes.punctuator, "{")) {
-      return parseObjectBindingPattern();
+      return parseObjectBindingPattern(options);
     }
     parserError(sourceText, currentToken(), "Expected binding target");
   }
@@ -35,8 +57,8 @@ export function createBindingPatternParser({
     return current();
   }
 
-  function parseBindingTargetWithDefault() {
-    const target = parseBindingTarget();
+  function parseBindingTargetWithDefault(options = {}) {
+    const target = parseBindingTarget(options);
     if (!match(tokenTypes.operator, "=")) {
       return target;
     }
@@ -45,7 +67,7 @@ export function createBindingPatternParser({
     return assignmentPattern(target, defaultValue, target.start, defaultValue.end);
   }
 
-  function parseArrayBindingPattern() {
+  function parseArrayBindingPattern(options = {}) {
     const start = expect(tokenTypes.punctuator, "[", "Expected '[' to start array binding pattern").start;
     const elements = [];
 
@@ -63,9 +85,14 @@ export function createBindingPatternParser({
         break;
       }
       if (match(tokenTypes.punctuator, ",")) {
-        parserError(sourceText, currentToken(), "Array destructuring elisions are not supported");
+        const comma = advance();
+        elements.push(null);
+        if (match(tokenTypes.punctuator, "]")) {
+          parserError(sourceText, comma, "Trailing array destructuring elisions require another binding element");
+        }
+        continue;
       }
-      elements.push(parseBindingTargetWithDefault());
+      elements.push(parseBindingTargetWithDefault(options));
       if (match(tokenTypes.punctuator, ",")) {
         advance();
       } else {
@@ -77,7 +104,7 @@ export function createBindingPatternParser({
     return arrayPattern(elements, start, end);
   }
 
-  function parseObjectBindingPattern() {
+  function parseObjectBindingPattern(options = {}) {
     const start = expect(tokenTypes.punctuator, "{", "Expected '{' to start object binding pattern").start;
     const properties = [];
 
@@ -102,7 +129,7 @@ export function createBindingPatternParser({
         value = key;
         if (match(tokenTypes.punctuator, ":")) {
           advance();
-          value = parseBindingTargetWithDefault();
+          value = parseBindingTargetWithDefault(options);
         } else if (match(tokenTypes.operator, "=")) {
           advance();
           const defaultValue = parseAssignment();
@@ -112,7 +139,7 @@ export function createBindingPatternParser({
         const token = advance();
         key = literal("string", token.value, token.start, token.end);
         expect(tokenTypes.punctuator, ":", "String-key object destructuring entries require a local binding");
-        value = parseBindingTargetWithDefault();
+        value = parseBindingTargetWithDefault(options);
       } else {
         parserError(sourceText, currentToken(), "Expected object binding property");
       }

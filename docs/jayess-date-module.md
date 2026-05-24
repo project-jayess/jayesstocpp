@@ -83,11 +83,11 @@ These helpers each take one Jayess date value and return one numeric UTC compone
 - returns `true` when `value` is a Jayess date value from the `jayess:date` module surface
 - returns `false` otherwise
 
-## Deliberate Non-Goals For The First Slice
+## Current Non-Goals
 
-The first `jayess:date` slice should not try to emulate the full JavaScript `Date` object.
+The shipped `jayess:date` module does not emulate the full JavaScript `Date` object.
 
-Out of scope for the first slice:
+Out of scope for the current module surface:
 
 - ambient global `Date`
 - JavaScript constructor overloading behavior
@@ -97,11 +97,9 @@ Out of scope for the first slice:
 - string parsing heuristics such as `Date.parse(...)`
 - mutation-heavy APIs such as `setHours(...)`
 
-Those can be added later as separate bounded slices after the core date value and timestamp conversion path are stable.
+## Current Layering
 
-## Intended Layering
-
-The first API surface is intentionally timestamp-centered so the module can start with a small primitive substrate and a small Jayess wrapper layer.
+The current API surface is timestamp-centered and uses a small primitive substrate with a small Jayess wrapper layer.
 
 ## Current Module Shape
 
@@ -120,13 +118,13 @@ Current resolution behavior:
 - `transpileFile()` resolves `jayess:date` through the repository-owned stdlib tree
 - `transpile()` string mode still requires explicit resolver support and rejects `jayess:date` by default
 
-## Primitive Boundary Decision
+## Primitive Boundary
 
-The first `jayess:date` slice should use mixed ownership:
+The shipped `jayess:date` module uses mixed ownership:
 
 ### Needs C++ Primitive Support
 
-- one first-class Jayess date value representation or a runtime-backed opaque date wrapper
+- one runtime-backed opaque date wrapper
 - one primitive clock hook for `now()`
 - one primitive constructor/conversion path from Unix milliseconds into a Jayess date value
 - one primitive conversion path from a Jayess date value back to Unix milliseconds
@@ -134,24 +132,22 @@ The first `jayess:date` slice should use mixed ownership:
 
 These belong in C++ because Jayess cannot manufacture a stable wall-clock instant or opaque native timestamp carrier safely by itself.
 
-### Can Live In Jayess Module Code
+### Jayess Module Code
 
 - the public `jayess:date` export surface
 - argument-count validation wrappers when the module shape chooses to keep those at the library layer
-- future convenience helpers that compose over the primitive timestamp/date conversions
-- future formatting or calendar helpers once the primitive date carrier exists
 
-The first slice should keep the Jayess module thin and let it forward into a small primitive layer.
+The Jayess module stays thin and forwards into a small primitive layer.
 
-### Explicit First-Slice Decision
+### Current Runtime Boundary
 
-- `now()` requires a C++ primitive clock hook
-- `fromUnixMillis(value)` requires a C++ primitive date-construction hook
-- `toUnixMillis(date)` requires a C++ primitive date-to-number hook
-- `isDate(value)` requires a C++ primitive/runtime-recognized type check
-- the `jayess:date` module file itself should still be written in Jayess and export those wrappers
+- `now()` uses a C++ primitive clock hook
+- `fromUnixMillis(value)` uses a C++ primitive date-construction hook
+- `toUnixMillis(date)` uses a C++ primitive date-to-number hook
+- `isDate(value)` uses a C++ primitive/runtime-recognized type check
+- the `jayess:date` module file is written in Jayess and exports those wrappers
 
-## Remaining Follow-Up
+## Current Boundaries
 
 The minimal primitive layer now uses a runtime-backed opaque wrapper:
 
@@ -159,15 +155,11 @@ The minimal primitive layer now uses a runtime-backed opaque wrapper:
 - the runtime marks that object with hidden private timestamp fields
 - public property lookup does not expose that hidden timestamp carrier
 
-Later work still needs to decide:
+The current date module keeps argument validation and native date storage at the primitive boundary while exposing explicit Jayess-owned wrapper functions.
 
-- how much argument validation belongs in the Jayess module versus the primitive entry points
-- how the first Jayess module file should import or bind those primitives
-- whether later calendar or formatting helpers stay in Jayess or need more native support
+## Current Non-Goals
 
-## Remaining Follow-Up
-
-The next `jayess:date` work is now narrower than before:
+The shipped `jayess:date` module does not currently include:
 
 - local-timezone or timezone-database behavior
 - broader parsing beyond the narrow ISO helper

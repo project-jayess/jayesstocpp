@@ -28,7 +28,7 @@ export function getMapRuntimeCppFragment() {
   return `namespace {
 map_ptr require_map_value(const value& input) {
   if (!std::holds_alternative<map_ptr>(input)) {
-    throw std::runtime_error("Expected a Jayess map value");
+    throw_unsupported_receiver("map", "operation", "map");
   }
   return std::get<map_ptr>(input);
 }

@@ -2,6 +2,12 @@ export function getArrayRuntimeHeaderFragment() {
   return `value array_slice(const value& input, const std::vector<value>& args);
 value array_concat(const value& left, const value& right);
 value array_index_of(const value& input, const value& needle);
+value array_find(const value& input, const value& callback);
+value array_find_index(const value& input, const value& callback);
+value array_some(const value& input, const value& callback);
+value array_every(const value& input, const value& callback);
+value array_reverse(const value& input);
+value array_sort(const value& input, const std::vector<value>& args);
 value array_map(const value& input, const value& callback);
 value array_filter(const value& input, const value& callback);
 value array_reduce(const value& input, const value& callback, const value& initial);`;
@@ -79,6 +85,83 @@ value array_index_of(const value& input, const value& needle) {
     }
   }
   return static_cast<double>(-1);
+}
+
+value array_find(const value& input, const value& callback) {
+  const auto array = require_array_value(input, "Jayess array find expects an array input");
+  const auto callable = require_array_callback(callback, "Jayess array find expects a callable callback");
+  for (std::size_t index = 0; index < array->items.size(); index += 1) {
+    const auto keep = callable->fn({array->items[index], static_cast<double>(index), input});
+    if (truthy(keep)) {
+      return array->items[index];
+    }
+  }
+  return value{};
+}
+
+value array_find_index(const value& input, const value& callback) {
+  const auto array = require_array_value(input, "Jayess array findIndex expects an array input");
+  const auto callable = require_array_callback(callback, "Jayess array findIndex expects a callable callback");
+  for (std::size_t index = 0; index < array->items.size(); index += 1) {
+    const auto keep = callable->fn({array->items[index], static_cast<double>(index), input});
+    if (truthy(keep)) {
+      return static_cast<double>(index);
+    }
+  }
+  return static_cast<double>(-1);
+}
+
+value array_some(const value& input, const value& callback) {
+  const auto array = require_array_value(input, "Jayess array some expects an array input");
+  const auto callable = require_array_callback(callback, "Jayess array some expects a callable callback");
+  for (std::size_t index = 0; index < array->items.size(); index += 1) {
+    const auto keep = callable->fn({array->items[index], static_cast<double>(index), input});
+    if (truthy(keep)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+value array_every(const value& input, const value& callback) {
+  const auto array = require_array_value(input, "Jayess array every expects an array input");
+  const auto callable = require_array_callback(callback, "Jayess array every expects a callable callback");
+  for (std::size_t index = 0; index < array->items.size(); index += 1) {
+    const auto keep = callable->fn({array->items[index], static_cast<double>(index), input});
+    if (!truthy(keep)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+value array_reverse(const value& input) {
+  const auto array = require_array_value(input, "Jayess array reverse expects an array input");
+  std::vector<value> items(array->items.rbegin(), array->items.rend());
+  return make_array(std::move(items));
+}
+
+value array_sort(const value& input, const std::vector<value>& args) {
+  const auto array = require_array_value(input, "Jayess array sort expects an array input");
+  std::vector<value> items = array->items;
+  if (args.empty()) {
+    std::stable_sort(items.begin(), items.end(), [](const value& left, const value& right) {
+      return stringify_value(left) < stringify_value(right);
+    });
+    return make_array(std::move(items));
+  }
+  if (args.size() > 1) {
+    throw std::runtime_error("Jayess array sort expects at most one comparator callback");
+  }
+  const auto callable = require_array_callback(args[0], "Jayess array sort expects a callable comparator");
+  std::stable_sort(items.begin(), items.end(), [callable](const value& left, const value& right) {
+    const auto compared = callable->fn({left, right});
+    if (!std::holds_alternative<double>(compared)) {
+      throw std::runtime_error("Jayess array sort comparator must return a number");
+    }
+    return std::get<double>(compared) < 0.0;
+  });
+  return make_array(std::move(items));
 }
 
 value array_map(const value& input, const value& callback) {

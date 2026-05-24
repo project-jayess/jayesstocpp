@@ -1,0 +1,102 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { transpileFile } from "../../src/api/transpile-file.js";
+import { createManagedTempDir } from "../support/temp-dir.js";
+
+function generatedStdlibCppPath(targetDir, subpath) {
+  const pathParts = subpath.split("/");
+  const stem = `stdlib_jayess_${pathParts.join("_")}_index_js`;
+  return path.join(targetDir, "generated-stdlib", "jayess", ...pathParts, `${stem}.cpp`);
+}
+
+test("transpileFile resolves built-in Jayess image module with runtime and native bridge output", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-image-output");
+  const fixture = path.resolve("test/fixtures/modules/image-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const imagePath = generatedStdlibCppPath(targetDir, "image");
+  const colorPath = generatedStdlibCppPath(targetDir, "color");
+  const primitivePath = path.join(targetDir, "native", "image-primitives.hpp");
+
+  assert.ok(result.files.some((file) => file.endsWith("image_main_js.cpp")));
+  assert.ok(result.files.includes(imagePath));
+  assert.ok(result.files.includes(colorPath));
+  assert.ok(fs.existsSync(primitivePath));
+
+  const headerSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.hpp"), "utf8");
+  const cppSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
+  const primitiveSource = fs.readFileSync(primitivePath, "utf8");
+  const imageSource = fs.readFileSync(imagePath, "utf8");
+
+  assert.match(headerSource, /struct image_state/);
+  assert.match(headerSource, /using image_ptr = std::shared_ptr<image_state>;/);
+  assert.match(headerSource, /value image_save_ppm\(const value& image, const value& path\);/);
+  assert.match(headerSource, /value image_save_bmp\(const value& image, const value& path\);/);
+  assert.match(headerSource, /value image_save_pgm\(const value& image, const value& path\);/);
+  assert.match(headerSource, /value image_save_tga\(const value& image, const value& path\);/);
+  assert.match(headerSource, /value image_load_ppm\(const value& path\);/);
+  assert.match(headerSource, /value image_load_bmp\(const value& path\);/);
+  assert.match(headerSource, /value image_load_pgm\(const value& path\);/);
+  assert.match(headerSource, /value image_load_tga\(const value& path\);/);
+  assert.match(headerSource, /value image_metadata_from_file\(const value& path\);/);
+  assert.match(headerSource, /value image_encode_ppm\(const value& image\);/);
+  assert.match(headerSource, /value image_decode_ppm\(const value& bytes\);/);
+  assert.match(headerSource, /value image_blit\(const value& target, const value& source, const value& x, const value& y\);/);
+  assert.match(headerSource, /value image_flip_horizontal\(const value& image\);/);
+  assert.match(headerSource, /value image_flip_vertical\(const value& image\);/);
+  assert.match(headerSource, /value image_rotate_90\(const value& image\);/);
+  assert.match(headerSource, /value image_transparent_blit\(const value& target, const value& source, const value& x, const value& y\);/);
+  assert.match(cppSource, /value image_create\(const value& widthValue, const value& heightValue, const value& backgroundValue\)/);
+  assert.match(cppSource, /value image_save_ppm\(const value& input, const value& pathValue\)/);
+  assert.match(cppSource, /value image_save_bmp\(const value& input, const value& pathValue\)/);
+  assert.match(cppSource, /value image_save_pgm\(const value& input, const value& pathValue\)/);
+  assert.match(cppSource, /value image_save_tga\(const value& input, const value& pathValue\)/);
+  assert.match(cppSource, /value image_load_ppm\(const value& pathValue\)/);
+  assert.match(cppSource, /value image_load_bmp\(const value& pathValue\)/);
+  assert.match(cppSource, /value image_load_pgm\(const value& pathValue\)/);
+  assert.match(cppSource, /value image_load_tga\(const value& pathValue\)/);
+  assert.match(cppSource, /value image_metadata_from_file\(const value& pathValue\)/);
+  assert.match(cppSource, /value image_encode_ppm\(const value& input\)/);
+  assert.match(cppSource, /value image_decode_ppm\(const value& input\)/);
+  assert.match(cppSource, /value image_crop\(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue\)/);
+  assert.match(cppSource, /value image_flip_horizontal\(const value& input\)/);
+  assert.match(cppSource, /value image_flip_vertical\(const value& input\)/);
+  assert.match(cppSource, /value image_rotate_90\(const value& input\)/);
+  assert.match(cppSource, /value image_transparent_blit\(const value& targetValue, const value& sourceValue, const value& xValue, const value& yValue\)/);
+  assert.match(primitiveSource, /jayessImageCreate/);
+  assert.match(primitiveSource, /jayessImageSavePpm/);
+  assert.match(primitiveSource, /jayessImageSaveBmp/);
+  assert.match(primitiveSource, /jayessImageSavePgm/);
+  assert.match(primitiveSource, /jayessImageSaveTga/);
+  assert.match(primitiveSource, /jayessImageLoadPpm/);
+  assert.match(primitiveSource, /jayessImageLoadBmp/);
+  assert.match(primitiveSource, /jayessImageLoadPgm/);
+  assert.match(primitiveSource, /jayessImageLoadTga/);
+  assert.match(primitiveSource, /jayessImageMetadataFromFile/);
+  assert.match(primitiveSource, /jayessImageEncodePpm/);
+  assert.match(primitiveSource, /jayessImageDecodePpm/);
+  assert.match(primitiveSource, /jayessImageCrop/);
+  assert.match(primitiveSource, /jayessImageResizeNearest/);
+  assert.match(primitiveSource, /jayessImageBlit/);
+  assert.match(primitiveSource, /jayessImageFlipHorizontal/);
+  assert.match(primitiveSource, /jayessImageFlipVertical/);
+  assert.match(primitiveSource, /jayessImageRotate90/);
+  assert.match(primitiveSource, /jayessImageTransparentBlit/);
+  assert.match(imageSource, /jayessImageSetPixel/);
+  assert.match(imageSource, /jayessImageSaveBmp/);
+  assert.match(imageSource, /jayessImageSavePgm/);
+  assert.match(imageSource, /jayessImageSaveTga/);
+  assert.match(imageSource, /jayessImageLoadPpm/);
+  assert.match(imageSource, /jayessImageLoadBmp/);
+  assert.match(imageSource, /jayessImageLoadPgm/);
+  assert.match(imageSource, /jayessImageLoadTga/);
+  assert.match(imageSource, /jayessImageMetadataFromFile/);
+  assert.match(imageSource, /jayessImageEncodePpm/);
+  assert.match(imageSource, /jayessImageDecodePpm/);
+  assert.match(imageSource, /jayessImageBlit/);
+  assert.match(imageSource, /jayessImageTransparentBlit/);
+  assert.match(imageSource, /metadata/);
+  assert.match(imageSource, /normalizeColor/);
+});

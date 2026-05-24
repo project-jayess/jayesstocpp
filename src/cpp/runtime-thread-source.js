@@ -27,7 +27,7 @@ export function getThreadRuntimeCppFragment() {
 namespace {
 thread_ptr require_thread_handle(const value& input) {
   if (!std::holds_alternative<thread_ptr>(input)) {
-    throw std::runtime_error("Expected Jayess thread handle");
+    throw_invalid_handle("thread", "thread");
   }
   return std::get<thread_ptr>(input);
 }
@@ -72,6 +72,7 @@ value transfer_thread_value(const value& input) {
     || std::holds_alternative<double>(input)
     || std::holds_alternative<bool>(input)
     || std::holds_alternative<std::string>(input)
+    || std::holds_alternative<channel_ptr>(input)
   ) {
     return input;
   }
@@ -127,7 +128,7 @@ value thread_spawn(const value& callback, const value& args) {
 value thread_join(const value& input) {
   const auto state = require_thread_handle(input);
   if (state->joined) {
-    throw std::runtime_error("Jayess thread handle has already been joined");
+    throw_completed_handle("thread", "thread", "joined");
   }
   if (state->worker.joinable()) {
     state->worker.join();

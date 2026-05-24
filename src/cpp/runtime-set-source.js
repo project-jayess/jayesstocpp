@@ -22,7 +22,7 @@ export function getSetRuntimeCppFragment() {
   return `namespace {
 set_ptr require_set_value(const value& input) {
   if (!std::holds_alternative<set_ptr>(input)) {
-    throw std::runtime_error("Expected a Jayess set value");
+    throw_unsupported_receiver("set", "operation", "set");
   }
   return std::get<set_ptr>(input);
 }

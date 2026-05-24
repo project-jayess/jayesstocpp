@@ -1,4 +1,4 @@
-import { create, exec, isRegex, replaceAll, replaceFirst, test as regexTest } from "jayess:regex";
+import { create, exec, isRegex, matchAll, replaceAll, replaceFirst, split, test as regexTest } from "jayess:regex";
 
 export function run(text) {
   var regex = create("a(b+)");
@@ -11,6 +11,8 @@ export function run(text) {
     regexTest(dotAll, "a\nb"),
     exec(regex, text),
     exec(regex, "zzz"),
+    split(create("-"), "a-b-c"),
+    matchAll(create("a(b+)"), text),
     replaceFirst(regex, text, "x"),
     replaceAll(regex, text, "x")
   ];

@@ -34,6 +34,22 @@ inline jayess::value jayessArrayIndexOf(const std::vector<jayess::value>& jayess
   return jayess::array_index_of(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }
 
+inline jayess::value jayessArrayFind(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_find(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessArrayFindIndex(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_find_index(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessArraySome(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_some(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessArrayEvery(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_every(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
 inline jayess::value jayessArrayIncludes(const std::vector<jayess::value>& jayessArgs) {
   const auto items = jayess::argument_at(jayessArgs, 0);
   const auto needle = jayess::argument_at(jayessArgs, 1);
@@ -46,6 +62,15 @@ inline jayess::value jayessArrayJoin(const std::vector<jayess::value>& jayessArg
     throw std::runtime_error("Jayess array join expects at most one separator argument");
   }
   return jayess::array_join(jayess::argument_at(jayessArgs, 0), separatorArgs);
+}
+
+inline jayess::value jayessArrayReverse(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::array_reverse(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessArraySort(const std::vector<jayess::value>& jayessArgs) {
+  auto comparatorArgs = jayessArrayOptionalRestArgs(jayessArgs, 1, "Jayess array sort expects optional comparator arguments");
+  return jayess::array_sort(jayess::argument_at(jayessArgs, 0), comparatorArgs);
 }
 
 inline jayess::value jayessArrayMap(const std::vector<jayess::value>& jayessArgs) {

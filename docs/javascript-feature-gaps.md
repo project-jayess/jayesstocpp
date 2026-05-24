@@ -77,7 +77,7 @@ The following familiar JavaScript syntax is not currently documented as supporte
 
 Unsupported-by-design features such as `let`, dynamic `import()`, `eval(...)`, `Function(...)`, and `with` now fail with focused diagnostics. Remaining unimplemented forms may still fail with narrower generic unsupported diagnostics until their own slices are defined and shipped.
 
-Destructuring now supports nested patterns, pattern defaults, assignment destructuring into existing identifiers, and destructuring declarations in `for` initializers.
+Destructuring now supports nested patterns, array elisions, pattern defaults, assignment destructuring into existing identifiers and public member targets, destructuring declarations in `for` initializers, and destructured parameters.
 
 Some JavaScript features are not merely “not implemented yet”; they are intentionally unsupported because Jayess is a compiled language with closed module resolution. That currently includes:
 
@@ -91,7 +91,7 @@ Some JavaScript features are not merely “not implemented yet”; they are inte
 
 See [../Jayess.md](../Jayess.md) for the language-direction policy behind those non-goals.
 
-`async` / `await` now has a narrow shipped slice through `async function` declarations, async function expressions, async arrow functions, and `await expr` inside those async function bodies. JavaScript `Promise` is unsupported by design, and the first shipped Jayess-owned composition surface is `resolved`, `rejected`, `all`, `race`, and `isAsync` through `jayess:async`.
+`async` / `await` now has a narrow shipped slice through `async function` declarations, async function expressions, async arrow functions, async class methods, and `await expr` inside those async function bodies. JavaScript `Promise` is unsupported by design, and the shipped Jayess-owned composition surface is `resolved`, `rejected`, `all`, `allSettled`, `any`, `race`, `sleep`, `timeout`, and `isAsync` through `jayess:async`.
 
 Generators now have a narrow shipped slice through generator declarations, generator function expressions, generator class methods, and direct `yield` / `yield*`.
 
@@ -129,7 +129,7 @@ Jayess also does not currently claim broad JavaScript runtime compatibility. Com
 These JavaScript ecosystem expectations are also intentionally narrower today:
 
 - Node built-ins such as `node:fs`, `node:path`, and `node:url` are not automatically available inside Jayess source.
-- Jayess instead grows host-facing behavior through explicit `jayess:fs`, `jayess:path`, and `jayess:process` slices, and the shipped follow-up work is still narrow rather than broad Node compatibility.
+- Jayess instead grows host-facing behavior through explicit `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:system`, and `jayess:thread` modules, and the shipped surface stays narrow rather than broad Node compatibility.
 
 `node:` imports now fail with explicit unsupported diagnostics instead of being treated like ordinary package imports.
 - npm package resolution exists, but not every JavaScript package is a valid Jayess package.
@@ -140,7 +140,7 @@ Module/export hardening direction is also explicit now:
 
 - `export *` remains named-only and does not forward default exports
 - package `exports` support stays intentionally narrower than full Node conditional-exports behavior for now
-- async module-initialization cycle semantics remain deferred until top-level `await` is ever approved
+- top-level `await` remains unsupported, so source module initialization stays closed and compile-time ordered
 - duplicate exported names are rejected explicitly
 - packages that expose only unsupported conditional export branches now fail with focused diagnostics
 

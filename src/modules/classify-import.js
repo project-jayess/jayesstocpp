@@ -36,5 +36,9 @@ export function classifyImport(source) {
     return { kind: "jayess-module", source };
   }
 
+  if (source.startsWith("#")) {
+    return { kind: "package-import", source };
+  }
+
   return { kind: "package", source };
 }

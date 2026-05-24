@@ -66,20 +66,41 @@ Current repository decision:
 - explicit import is the default model
 - repository-defined opt-in inclusion hooks are allowed later, but implicit ambient inclusion should not be the default behavior
 
-If the repository adopts a built-in-module namespace later, the preferred reserved form is:
+The repository-owned built-in module namespace is:
 
 - `jayess:*`
 
 Examples:
 
+- `jayess:assert`
+- `jayess:array`
+- `jayess:string`
+- `jayess:object`
+- `jayess:number`
+- `jayess:math`
 - `jayess:date`
 - `jayess:json`
-- `jayess:collections`
+- `jayess:collections/map`
+- `jayess:collections/set`
 - `jayess:async`
 - `jayess:iter`
+- `jayess:console`
+- `jayess:bytes`
+- `jayess:buffer`
+- `jayess:encoding`
+- `jayess:events`
+- `jayess:crypto`
+- `jayess:url`
 - `jayess:fs`
 - `jayess:path`
 - `jayess:process`
+- `jayess:subprocess`
+- `jayess:system`
+- `jayess:os`
+- `jayess:stream`
+- `jayess:time`
+- `jayess:thread`
+- `jayess:timers`
 
 That namespace must stay distinct from:
 
@@ -108,17 +129,33 @@ Resolution order should remain deliberate:
 - no implicit loading of repository-provided core modules by default
 - if code references repository-defined core-library modules in string-only mode, resolution should require explicit options or an explicit resolver policy
 
-The current bootstrap filesystem layout for future built-in modules is:
+The current repository-owned standard-library filesystem layout is:
 
+- `stdlib/jayess/array/`
+- `stdlib/jayess/assert/`
+- `stdlib/jayess/string/`
+- `stdlib/jayess/object/`
+- `stdlib/jayess/number/`
+- `stdlib/jayess/math/`
 - `stdlib/jayess/date/`
 - `stdlib/jayess/json/`
-- `stdlib/jayess/number/`
-- `stdlib/jayess/object/`
 - `stdlib/jayess/collections/map/`
 - `stdlib/jayess/collections/set/`
+- `stdlib/jayess/async/`
+- `stdlib/jayess/iter/`
+- `stdlib/jayess/console/`
+- `stdlib/jayess/bytes/`
+- `stdlib/jayess/encoding/`
+- `stdlib/jayess/crypto/`
+- `stdlib/jayess/url/`
 - `stdlib/jayess/fs/`
 - `stdlib/jayess/path/`
 - `stdlib/jayess/process/`
+- `stdlib/jayess/subprocess/`
+- `stdlib/jayess/system/`
+- `stdlib/jayess/os/`
+- `stdlib/jayess/time/`
+- `stdlib/jayess/thread/`
 
 This is better than treating every feature as:
 
@@ -160,22 +197,26 @@ Current shipped example in this category:
 - private instance fields already use C++ runtime hidden-storage primitives, while broader private-member forms remain follow-up work
 - computed class member names, static blocks, and public static inheritance use C++ runtime-backed class construction and class-side property helpers
 
-Current planned example in this category:
+Current shipped examples in this category:
 
-- `jayess:date` should use a small C++ primitive layer for the date carrier, clock hook, and timestamp conversion paths, while the public module surface stays in Jayess
-- `jayess:json` should expose a Jayess-owned module surface first, with a small native parse/stringify helper layer under it
-- `jayess:collections/map` should use a dedicated runtime value kind for key identity and insertion-order storage, while the public module surface stays in Jayess
-- `jayess:collections/set` should use a dedicated runtime value kind for membership identity and insertion-order storage, while the public module surface stays in Jayess
-- `jayess:fs`, `jayess:path`, and `jayess:process` should use Jayess-owned module surfaces over a small set of explicit host adapter primitives
+- `jayess:date` uses a small C++ primitive layer for the date carrier, clock hook, and timestamp conversion paths, while the public module surface stays in Jayess
+- `jayess:json` exposes a Jayess-owned module surface with a small native parse/stringify helper layer under it
+- `jayess:collections/map` uses a dedicated runtime value kind for key identity and insertion-order storage, while the public module surface stays in Jayess
+- `jayess:collections/set` uses a dedicated runtime value kind for membership identity and insertion-order storage, while the public module surface stays in Jayess
+- `jayess:time` uses monotonic clock primitives for millisecond duration helpers, while wall-clock behavior stays in `jayess:date`
+- `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:stream`, `jayess:system`, and `jayess:thread` use Jayess-owned module surfaces over a small set of explicit host adapter primitives
+- `jayess:subprocess` uses a Jayess-owned module surface for explicit process execution over small host adapter primitives
+- `jayess:assert`, `jayess:array`, `jayess:string`, `jayess:object`, `jayess:number`, `jayess:math`, `jayess:iter`, `jayess:console`, `jayess:bytes`, `jayess:buffer`, `jayess:encoding`, `jayess:events`, `jayess:crypto`, `jayess:url`, and `jayess:regex` ship as explicit module surfaces rather than ambient JavaScript or Node globals
 
 Examples of features that can likely live mostly in Jayess after primitives exist:
 
 - higher-level async helpers
 - date/json convenience APIs
 - collection helpers
+- subprocess helpers over explicit process handles
 - future core-library wrappers around runtime primitives
 
-The first planned example of this pattern is:
+Shipped examples of this pattern include:
 
 - `jayess:async` for composition helpers over Jayess async handles
 - `jayess:iter` for higher-level generator and iterator helpers over Jayess generator handles
@@ -205,7 +246,7 @@ These features need foundational runtime support before Jayess modules can carry
 
 - async result storage and scheduling
 - generator suspension/state storage
-- inheritance follow-up work such as static inheritance and broader `super` forms
+- inheritance follow-up work such as broader `super` forms
 - private-member hidden storage
 - new first-class runtime value kinds if `Map` or `Set` require them
 
@@ -217,11 +258,12 @@ These features should prefer Jayess-owned modules or wrappers once the primitive
 - `Date` module APIs
 - `JSON` helper APIs
 - collection convenience layers for `Map` / `Set`
-- filesystem/path/process library APIs
+- filesystem/path/process/subprocess/system/thread library APIs
 
 Current shipped example in this category:
 
-- `jayess:fs`, `jayess:path`, and `jayess:process` now use Jayess-owned module wrappers over a narrow native adapter layer
+- `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:stream`, `jayess:system`, and `jayess:thread` now use Jayess-owned module wrappers over a narrow native adapter layer
+- `jayess:subprocess` follows the same pattern with explicit command, args, process handle, and completion-result adapters
 
 ### Mixed Ownership
 
@@ -231,7 +273,7 @@ Some features require a primitive substrate plus Jayess-facing modules:
 - generators and iterator helpers
 - `Map`
 - `Set`
-- system modules such as `jayess:fs`
+- system modules such as `jayess:fs`, `jayess:subprocess`, `jayess:system`, and `jayess:thread`
 
 The default rule is:
 
@@ -281,7 +323,7 @@ The current first generator slice uses:
 
 1. C++ runtime primitives for generator handle storage and resumable state
 2. generated C++ state-slot lowering for declaration-only generators
-3. a planned Jayess-owned `jayess:iter` layer for higher-level iterator and generator helpers
+3. a Jayess-owned `jayess:iter` layer for higher-level iterator and generator helpers
 
 This keeps the shipped generator core explicit:
 

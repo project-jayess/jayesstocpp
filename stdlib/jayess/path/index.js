@@ -1,12 +1,16 @@
 import {
   jayessPathBasename,
+  jayessPathDelimiter,
   jayessPathDirname,
   jayessPathExtname,
+  jayessPathFormat,
   jayessPathIsAbsolute,
   jayessPathJoin,
   jayessPathNormalize,
+  jayessPathParse,
   jayessPathRelative,
-  jayessPathResolve
+  jayessPathResolve,
+  jayessPathSeparator
 } from "./path-primitives.hpp";
 
 export function join(...parts) {
@@ -27,6 +31,22 @@ export function extname(path) {
 
 export function normalize(path) {
   return jayessPathNormalize(path);
+}
+
+export function parse(path) {
+  return jayessPathParse(path);
+}
+
+export function format(parts) {
+  return jayessPathFormat(parts);
+}
+
+export function separator() {
+  return jayessPathSeparator();
+}
+
+export function delimiter() {
+  return jayessPathDelimiter();
 }
 
 export function resolve(...parts) {

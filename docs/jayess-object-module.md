@@ -49,7 +49,7 @@ This matches the repository rule that higher-level standard-library APIs prefer 
 
 This slice does not attempt to emulate the full JavaScript `Object` global.
 
-Still separate later work:
+Outside the current module surface:
 
 - ambient `Object.keys(...)` / `Object.values(...)` / `Object.entries(...)`
 - descriptor/reflection helpers

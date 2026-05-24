@@ -14,14 +14,17 @@ function isSuperConstructorStatement(node) {
   return node?.type === "ExpressionStatement" && isSuperConstructorCallExpression(node.expression);
 }
 
-export function renderSuperMemberExpression(node, context) {
-  if (node.computed) {
-    throw new Error("Computed super member access is not implemented yet");
-  }
+export function renderSuperMemberExpression(node, context, renderExpression) {
   if (context.classSelfAlias == null || context.thisAlias == null) {
     throw new Error("super member access requires class and this aliases");
   }
-  return `jayess::bind_method(${context.thisAlias}, jayess::find_class_method(jayess::get_base_class(${context.classSelfAlias}), ${JSON.stringify(node.property.name)}))`;
+  const keyExpr = node.computed
+    ? `jayess::property_key_string(${renderExpression(node.property, context)})`
+    : JSON.stringify(node.property.name);
+  if (context.staticMethod === true) {
+    return `jayess::find_static_class_member(jayess::get_base_class(${context.classSelfAlias}), ${keyExpr})`;
+  }
+  return `jayess::bind_method(${context.thisAlias}, jayess::find_class_method(jayess::get_base_class(${context.classSelfAlias}), ${keyExpr}))`;
 }
 
 export function renderSuperConstructorCall(argumentNodes, context, renderExpression, hasSpreadArgument, pushRenderedCallArguments) {
@@ -43,24 +46,25 @@ export function renderSuperConstructorCall(argumentNodes, context, renderExpress
 }
 
 function renderBoundStaticMethodClosure(node, context, emitParameterInitialization, emitStatement, renderExpression, thisAlias = "class_value") {
+  const methodContext = { ...context, staticMethod: true };
   const captureList = context.classSelfAlias != null ? `${thisAlias}` : thisAlias;
   const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
   if (node.async) {
-    emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, thisAlias, 0);
+    emitAsyncMethodClosureBody(node, methodContext, lines, emitParameterInitialization, emitStatement, thisAlias, 0);
     lines.push("})");
     return lines.join("\n");
   }
   if (node.generator) {
-    return renderGeneratorMethodClosure(node, context, renderExpression, emitParameterInitialization, thisAlias, 0, [thisAlias], null);
+    return renderGeneratorMethodClosure(node, methodContext, renderExpression, emitParameterInitialization, thisAlias, 0, [thisAlias], null);
   }
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
 
   for (const [index, param] of node.params.entries()) {
-    emitMethodParameterInitialization(param, index, { ...context, thisAlias }, lines, emitParameterInitialization);
+    emitMethodParameterInitialization(param, index, { ...methodContext, thisAlias }, lines, emitParameterInitialization);
   }
 
   const bodyLines = [];
-  emitStatement(node.body, { ...context, thisAlias }, bodyLines, 1);
+  emitStatement(node.body, { ...methodContext, thisAlias }, bodyLines, 1);
   lines.push(...bodyLines);
   lines.push("  return jayess::value(std::monostate{});");
   lines.push("})");

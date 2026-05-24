@@ -34,6 +34,18 @@ inline jayess::value jayessRegexExec(const std::vector<jayess::value>& jayessArg
   return jayess::regex_exec(regex, text);
 }
 
+inline jayess::value jayessRegexSplit(const std::vector<jayess::value>& jayessArgs) {
+  const auto regex = jayess::argument_at(jayessArgs, 0);
+  const auto text = jayess::argument_at(jayessArgs, 1);
+  return jayess::regex_split(regex, text);
+}
+
+inline jayess::value jayessRegexMatchAll(const std::vector<jayess::value>& jayessArgs) {
+  const auto regex = jayess::argument_at(jayessArgs, 0);
+  const auto text = jayess::argument_at(jayessArgs, 1);
+  return jayess::regex_match_all(regex, text);
+}
+
 inline jayess::value jayessRegexReplaceFirst(const std::vector<jayess::value>& jayessArgs) {
   const auto regex = jayess::argument_at(jayessArgs, 0);
   const auto text = jayess::argument_at(jayessArgs, 1);

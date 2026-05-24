@@ -1,329 +1,45 @@
 import { collectBindingIdentifiers, isBindingPattern } from "../ast/binding-patterns.js";
 import { throwDiagnostics } from "../diagnostics.js";
 import { createSemanticDiagnostic } from "../diagnostics/semantic-diagnostic.js";
-import { classifyImport } from "../modules/classify-import.js";
-import { getSupportedBuiltinProperty, unsupportedBuiltinIdentifierMessage } from "./builtins.js";
+import { validatePrivateMemberAccess, walkClassDeclaration, walkClassMember } from "./classes.js";
+import { validateLoopControlStatement } from "./control-flow-statements.js";
+import { walkDestructuringPattern } from "./destructuring.js";
+import {
+  validateAssignmentExpressionShape,
+  validateArrayExpressionShape,
+  validateBinaryExpressionShape,
+  validateCallExpressionShape,
+  validateGeneratorExpressionYieldShape,
+  validateMemberExpressionShape,
+  validateObjectExpressionShape,
+  validateUnaryExpressionShape,
+  validateUpdateExpressionShape
+} from "./expressions.js";
 import { validateFinallyControlFlow } from "./finally-control-flow.js";
-import { collectNativeHeaderStems, validateImportBindings, validateNativeLibraryHeaderPair } from "./imports.js";
-import { createScope, defineBinding, resolveBinding } from "./scope.js";
-
-function addScopedBinding(scope, diagnostics, sourceText, node, name, binding) {
-  if (!defineBinding(scope, name, binding)) {
-    diagnostics.push(createSemanticDiagnostic(sourceText, node, `Duplicate declaration '${name}'`));
-  }
-}
-
-function registerExport(exports, diagnostics, sourceText, node, exportedName, localName, kind, source = null) {
-  if (exportedName !== "*" && exports.some((entry) => entry.exportedName === exportedName)) {
-    diagnostics.push(createSemanticDiagnostic(sourceText, node, `Duplicate export '${exportedName}'`));
-    return;
-  }
-  exports.push({ exportedName, localName, kind, source });
-}
-
-function scopeBelongsToFunction(scope, functionScope) {
-  let current = scope;
-  while (current != null) {
-    if (current === functionScope) {
-      return true;
-    }
-    current = current.parent;
-  }
-  return false;
-}
-
-function bindBlockDeclarations(statements, scope, diagnostics, sourceText) {
-  for (const statement of statements) {
-    if (statement.type === "VariableDeclaration") {
-      for (const declaration of statement.declarations) {
-        for (const identifier of collectBindingIdentifiers(declaration.id)) {
-          addScopedBinding(scope, diagnostics, sourceText, identifier, identifier.name, {
-            name: identifier.name,
-            kind: statement.kind,
-            node: identifier
-          });
-        }
-      }
-    }
-    if (statement.type === "FunctionDeclaration") {
-      addScopedBinding(scope, diagnostics, sourceText, statement.id, statement.id.name, {
-        name: statement.id.name,
-        kind: "function",
-        node: statement.id
-      });
-    }
-    if (statement.type === "ClassDeclaration") {
-      addScopedBinding(scope, diagnostics, sourceText, statement.id, statement.id.name, {
-        name: statement.id.name,
-        kind: "class",
-        node: statement.id
-      });
-    }
-  }
-}
-
-function currentClassLabel(currentClass) {
-  return currentClass?.id?.name != null ? `class '${currentClass.id.name}'` : "the current class";
-}
-
-function privateMemberKindLabel(member) {
-  if (member.type === "ClassFieldDefinition") {
-    return "field";
-  }
-  if (member.type === "MethodDefinition") {
-    return "method";
-  }
-  return "member";
-}
-
-function initializePrivateMemberMap(classNode, diagnostics, sourceText) {
-  if (classNode.privateMemberMap != null) {
-    return classNode.privateMemberMap;
-  }
-
-  const privateMemberMap = new Map();
-  for (const member of classNode.methods) {
-    if (member.key?.type !== "PrivateIdentifier") {
-      continue;
-    }
-
-    if (privateMemberMap.has(member.key.name)) {
-      const existing = privateMemberMap.get(member.key.name);
-      diagnostics.push(
-        createSemanticDiagnostic(
-          sourceText,
-          member.key,
-          `Duplicate private ${privateMemberKindLabel(member)} '#${member.key.name}' conflicts with existing private ${privateMemberKindLabel(existing)} in ${currentClassLabel(classNode)}`
-        )
-      );
-      continue;
-    }
-    privateMemberMap.set(member.key.name, member);
-  }
-
-  classNode.privateMemberMap = privateMemberMap;
-  return privateMemberMap;
-}
-
-function validatePrivateMemberAccess(node, currentClass, currentMethod, diagnostics, sourceText) {
-  if (node.property?.type !== "PrivateIdentifier") {
-    return;
-  }
-
-  if (currentClass == null) {
-    diagnostics.push(
-      createSemanticDiagnostic(
-        sourceText,
-        node.property,
-        "Jayess private member access is only valid inside methods or field initializers of the declaring class"
-      )
-    );
-    return;
-  }
-
-  const privateMemberMap = currentClass.privateMemberMap ?? new Map();
-  if (!privateMemberMap.has(node.property.name)) {
-    diagnostics.push(
-      createSemanticDiagnostic(
-        sourceText,
-        node.property,
-        `Private member '#${node.property.name}' is not declared in ${currentClassLabel(currentClass)}`
-      )
-    );
-    return;
-  }
-
-  const member = privateMemberMap.get(node.property.name);
-  const staticAccess = isPrivateStaticAccessTarget(node.object, currentClass, currentMethod);
-  if (member.static && !staticAccess) {
-    diagnostics.push(
-      createSemanticDiagnostic(
-        sourceText,
-        node.property,
-        `Private static member '#${node.property.name}' must be accessed through the declaring class`
-      )
-    );
-  }
-  if (!member.static && staticAccess) {
-    diagnostics.push(
-      createSemanticDiagnostic(
-        sourceText,
-        node.property,
-        `Private instance member '#${node.property.name}' must be accessed through an instance`
-      )
-    );
-  }
-}
-
-function isPrivateStaticAccessTarget(objectNode, currentClass, currentMethod) {
-  if (objectNode?.type === "Identifier" && currentClass?.id?.name === objectNode.name) {
-    return true;
-  }
-  return objectNode?.type === "ThisExpression" && currentMethod?.static === true;
-}
+import { containsYieldExpression } from "./generator-forms.js";
+import {
+  canLowerFocusedGeneratorCatchBodyYield,
+  canLowerFocusedGeneratorTryCatchYield,
+  canLowerFocusedGeneratorTryFinallyYield,
+  canLowerMultiYieldGeneratorTryCatch
+} from "./generator-try-shapes.js";
+import { resolveSemanticIdentifier } from "./identifiers.js";
+import { addScopedBinding, bindBlockDeclarations, bindParameter, collectModuleSurface } from "./module-surface.js";
+import { createScope, resolveBinding } from "./scope.js";
 
 export function analyzeModule(ast, sourceText, options = {}) {
   const diagnostics = [];
-  const imports = [];
-  const exports = [];
   const moduleScope = createScope(null, "module");
-  const localExportsToValidate = [];
-
-  function addModuleBinding(node, name, kind, exported = false, metadata = {}) {
-    const binding = { name, kind, node, exported, ...metadata };
-    addScopedBinding(moduleScope, diagnostics, sourceText, node, name, binding);
-    if (exported) {
-      registerExport(exports, diagnostics, sourceText, node, name, name, kind);
-    }
-    return binding;
-  }
-
-  for (const statement of ast.body) {
-    if (statement.type === "ImportDeclaration") {
-      const classification = classifyImport(statement.source);
-      const localNames = new Set();
-      const importedHeaderStems = collectNativeHeaderStems(ast.body, classifyImport);
-
-      validateNativeLibraryHeaderPair(sourceText, statement, classification, importedHeaderStems, diagnostics);
-
-      validateImportBindings(sourceText, statement, classification, diagnostics);
-
-      for (const specifier of statement.specifiers) {
-        if (localNames.has(specifier.local)) {
-          diagnostics.push(createSemanticDiagnostic(sourceText, statement, `Duplicate imported local name '${specifier.local}'`));
-          continue;
-        }
-        localNames.add(specifier.local);
-        addModuleBinding(statement, specifier.local, "import", false, {
-          importedName: specifier.imported,
-          importSource: statement.source,
-          importKind: specifier.kind
-        });
-      }
-
-      imports.push({
-        source: statement.source,
-        kind: classification.kind,
-        specifiers: statement.specifiers
-      });
-      continue;
-    }
-
-      if (statement.type === "VariableDeclaration") {
-        for (const declaration of statement.declarations) {
-          for (const identifier of collectBindingIdentifiers(declaration.id)) {
-            addModuleBinding(identifier, identifier.name, statement.kind, statement.exported);
-          }
-        }
-        continue;
-      }
-
-    if (statement.type === "FunctionDeclaration") {
-      addModuleBinding(statement.id, statement.id.name, "function", statement.exported);
-      continue;
-    }
-
-    if (statement.type === "ClassDeclaration") {
-      if (statement.id != null) {
-        addModuleBinding(statement.id, statement.id.name, "class", statement.exported);
-      }
-      continue;
-    }
-
-    if (statement.type === "ExportNamedDeclaration") {
-      if (statement.declaration != null) {
-        if (statement.declaration.type === "FunctionDeclaration") {
-          addModuleBinding(statement.declaration.id, statement.declaration.id.name, "function", true);
-        }
-        if (statement.declaration.type === "VariableDeclaration") {
-          for (const declaration of statement.declaration.declarations) {
-            for (const identifier of collectBindingIdentifiers(declaration.id)) {
-              addModuleBinding(identifier, identifier.name, statement.declaration.kind, true);
-            }
-          }
-        }
-        if (statement.declaration.type === "ClassDeclaration") {
-          if (statement.declaration.id != null) {
-            addModuleBinding(statement.declaration.id, statement.declaration.id.name, "class", true);
-          }
-        }
-        continue;
-      }
-
-      if (statement.source == null) {
-        for (const specifier of statement.specifiers) {
-          registerExport(exports, diagnostics, sourceText, specifier, specifier.exportedName, specifier.localName, "local-export");
-          localExportsToValidate.push(specifier);
-        }
-        continue;
-      }
-
-      const classification = classifyImport(statement.source);
-      imports.push({
-        source: statement.source,
-        kind: classification.kind,
-        specifiers: statement.specifiers.map((specifier) => ({
-          imported: specifier.localName,
-          local: specifier.exportedName,
-          kind: "re-export"
-        }))
-      });
-
-      for (const specifier of statement.specifiers) {
-        registerExport(exports, diagnostics, sourceText, specifier, specifier.exportedName, specifier.localName, "re-export", statement.source);
-      }
-      continue;
-    }
-
-    if (statement.type === "ExportAllDeclaration") {
-      const classification = classifyImport(statement.source);
-      imports.push({
-        source: statement.source,
-        kind: classification.kind,
-        specifiers: []
-      });
-      registerExport(exports, diagnostics, sourceText, statement, "*", "*", "export-all", statement.source);
-      continue;
-    }
-
-    if (statement.type === "ExportDefaultDeclaration") {
-      if (statement.declaration?.type === "FunctionDeclaration") {
-        addModuleBinding(statement.declaration.id, statement.declaration.id.name, "function");
-      }
-      if (statement.declaration?.type === "ClassDeclaration") {
-        if (statement.declaration.id != null) {
-          addModuleBinding(statement.declaration.id, statement.declaration.id.name, "class");
-        }
-      }
-      registerExport(exports, diagnostics, sourceText, statement, "default", "__default_export__", "default");
-    }
-  }
+  const { imports, exports, localExportsToValidate } = collectModuleSurface(ast, sourceText, moduleScope, diagnostics);
 
   function resolveIdentifier(node, activeScope, functionScope = null, functionNode = null) {
-    const binding = resolveBinding(activeScope, node.name);
-    if (binding == null || binding.node?.start > node.start) {
-      diagnostics.push(
-        createSemanticDiagnostic(
-          sourceText,
-          node,
-          unsupportedBuiltinIdentifierMessage(node.name) ?? `Undefined identifier '${node.name}'`
-        )
-      );
-      return null;
-    }
-    if (
-      functionScope != null
-      && functionNode != null
-      && binding.scope != null
-      && binding.scope.kind !== "module"
-      && binding.scope.kind !== "module-body"
-      && !scopeBelongsToFunction(binding.scope, functionScope)
-    ) {
-      const captures = new Set(functionNode.captures ?? []);
-      captures.add(node.name);
-      functionNode.captures = [...captures].sort();
-    }
-    return binding;
+    return resolveSemanticIdentifier(node, {
+      activeScope,
+      diagnostics,
+      functionNode,
+      functionScope,
+      sourceText
+    });
   }
 
   function walkBindingPattern(
@@ -339,118 +55,23 @@ export function analyzeModule(ast, sourceText, options = {}) {
     currentMethod,
     declarationMode
   ) {
-    if (node == null) {
-      return;
-    }
-
-    if (node.type === "Identifier") {
-      if (!declarationMode) {
-        const binding = resolveIdentifier(node, activeScope, functionScope, functionNode);
-        if (binding?.kind === "const") {
-          diagnostics.push(createSemanticDiagnostic(sourceText, node, `Cannot reassign const '${node.name}'`));
-        }
-      }
-      return;
-    }
-
-    if (node.type === "RestElement") {
-      walkBindingPattern(
-        node.argument,
-        activeScope,
-        loopDepth,
-        switchDepth,
-        functionScope,
-        functionNode,
-        inAsyncFunction,
-        inGeneratorFunction,
-        currentClass,
-        currentMethod,
-        declarationMode
-      );
-      return;
-    }
-
-    if (node.type === "AssignmentPattern") {
-      walk(
-        node.right,
-        activeScope,
-        loopDepth,
-        switchDepth,
-        functionScope,
-        functionNode,
-        inAsyncFunction,
-        inGeneratorFunction,
-        currentClass,
-        currentMethod
-      );
-      walkBindingPattern(
-        node.left,
-        activeScope,
-        loopDepth,
-        switchDepth,
-        functionScope,
-        functionNode,
-        inAsyncFunction,
-        inGeneratorFunction,
-        currentClass,
-        currentMethod,
-        declarationMode
-      );
-      return;
-    }
-
-    if (node.type === "ArrayPattern") {
-      for (const element of node.elements) {
-        walkBindingPattern(
-          element,
-          activeScope,
-          loopDepth,
-          switchDepth,
-          functionScope,
-          functionNode,
-          inAsyncFunction,
-          inGeneratorFunction,
-          currentClass,
-          currentMethod,
-          declarationMode
-        );
-      }
-      return;
-    }
-
-    if (node.type === "ObjectPattern") {
-      for (const property of node.properties) {
-        if (property.type === "RestElement") {
-          walkBindingPattern(
-            property,
-            activeScope,
-            loopDepth,
-            switchDepth,
-            functionScope,
-            functionNode,
-            inAsyncFunction,
-            inGeneratorFunction,
-            currentClass,
-            currentMethod,
-            declarationMode
-          );
-          continue;
-        }
-        walkBindingPattern(
-          property.value,
-          activeScope,
-          loopDepth,
-          switchDepth,
-          functionScope,
-          functionNode,
-          inAsyncFunction,
-          inGeneratorFunction,
-          currentClass,
-          currentMethod,
-          declarationMode
-        );
-      }
-    }
+    walkDestructuringPattern(node, {
+      activeScope,
+      createSemanticDiagnostic,
+      currentClass,
+      currentMethod,
+      declarationMode,
+      diagnostics,
+      functionNode,
+      functionScope,
+      inAsyncFunction,
+      inGeneratorFunction,
+      loopDepth,
+      resolveIdentifier,
+      sourceText,
+      switchDepth,
+      walk
+    });
   }
 
   function walk(
@@ -484,100 +105,66 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       }
       case "FunctionDeclaration": {
+        if (node.async === true && node.generator === true) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.id, "Jayess does not support async generator functions"));
+        }
         const nestedFunctionScope = createScope(activeScope, "function");
         for (const param of node.params) {
           walk(param.defaultValue, nestedFunctionScope, 0, 0, nestedFunctionScope, null, node.async === true, node.generator === true, currentClass, null);
-          addScopedBinding(nestedFunctionScope, diagnostics, sourceText, param, param.name, {
-            name: param.name,
-            kind: "param",
-            node: param
-          });
+          walkBindingPattern(param.id, nestedFunctionScope, 0, 0, nestedFunctionScope, null, node.async === true, node.generator === true, currentClass, null, true);
+          bindParameter(param, nestedFunctionScope, diagnostics, sourceText);
         }
         walk(node.body, nestedFunctionScope, 0, 0, nestedFunctionScope, null, node.async === true, node.generator === true, currentClass, null);
         return;
       }
       case "ClassDeclaration": {
-        if (node.base != null) {
-          if (node.base.type !== "Identifier") {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.base,
-                "Jayess inheritance currently supports only named Jayess class bases in the first semantic slice"
-              )
-            );
-          } else {
-            const baseBinding = resolveIdentifier(node.base, activeScope, functionScope, functionNode);
-            if (baseBinding != null && baseBinding.kind !== "class") {
-              diagnostics.push(
-                createSemanticDiagnostic(
-                  sourceText,
-                  node.base,
-                  `Base class '${node.base.name}' must resolve to a Jayess class`
-                )
-              );
-            }
-          }
-        }
-        initializePrivateMemberMap(node, diagnostics, sourceText);
-        const classScope = createScope(activeScope, "class");
-        for (const method of node.methods) {
-          if (method.type === "MethodDefinition" && method.static && method.key.name === "constructor") {
-            diagnostics.push(createSemanticDiagnostic(sourceText, method.key, "Constructors cannot be declared static"));
-            continue;
-          }
-          walk(method, classScope, 0, 0, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, node, null);
-        }
-        return;
-      }
-      case "ClassFieldDefinition": {
-        if (node.computed) {
-          walk(node.key, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
-        }
-        const fieldScope = createScope(activeScope, "class-field");
-        if (!node.static) {
-          addScopedBinding(fieldScope, diagnostics, sourceText, node.key, "this", {
-            name: "this",
-            kind: "this",
-            node: node.key
-          });
-        }
-        walk(node.init, fieldScope, 0, 0, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, null);
-        return;
-      }
-      case "MethodDefinition": {
-        if (node.computed) {
-          walk(node.key, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
-        }
-        if (node.async === true && node.kind === "constructor") {
-          diagnostics.push(createSemanticDiagnostic(sourceText, node.key, "Jayess does not support async constructors"));
-        }
-        const methodScope = createScope(activeScope, "function");
-        addScopedBinding(methodScope, diagnostics, sourceText, node.key, "this", {
-          name: "this",
-          kind: "this",
-          node: node.key
+        walkClassDeclaration(node, {
+          activeScope,
+          addScopedBinding,
+          bindBlockDeclarations,
+          bindParameter,
+          createScope,
+          diagnostics,
+          functionNode,
+          functionScope,
+          inAsyncFunction,
+          inGeneratorFunction,
+          loopDepth,
+          resolveIdentifier,
+          sourceText,
+          switchDepth,
+          walk,
+          walkBindingPattern
         });
-        for (const param of node.params) {
-          walk(param.defaultValue, methodScope, 0, 0, methodScope, node, node.async === true, node.generator === true, currentClass, node);
-          addScopedBinding(methodScope, diagnostics, sourceText, param, param.name, {
-            name: param.name,
-            kind: "param",
-            node: param
-          });
-        }
-        walk(node.body, methodScope, 0, 0, methodScope, node, node.async === true, node.generator === true, currentClass, node);
         return;
       }
-      case "StaticInitializationBlock": {
-        const staticBlockScope = createScope(activeScope, "class-static-block");
-        bindBlockDeclarations(node.body.body, staticBlockScope, diagnostics, sourceText);
-        for (const statement of node.body.body) {
-          walk(statement, staticBlockScope, 0, 0, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, null);
-        }
+      case "ClassFieldDefinition":
+      case "MethodDefinition":
+      case "StaticInitializationBlock":
+        walkClassMember(node, {
+          activeScope,
+          addScopedBinding,
+          bindBlockDeclarations,
+          bindParameter,
+          createScope,
+          currentClass,
+          currentMethod,
+          diagnostics,
+          functionNode,
+          functionScope,
+          inAsyncFunction,
+          inGeneratorFunction,
+          loopDepth,
+          sourceText,
+          switchDepth,
+          walk,
+          walkBindingPattern
+        });
         return;
-      }
       case "FunctionExpression": {
+        if (node.async === true && node.generator === true) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.id ?? node, "Jayess does not support async generator functions"));
+        }
         node.captures = [];
         const nestedFunctionScope = createScope(activeScope, "function");
         if (node.id != null) {
@@ -589,11 +176,8 @@ export function analyzeModule(ast, sourceText, options = {}) {
         }
         for (const param of node.params) {
           walk(param.defaultValue, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null);
-          addScopedBinding(nestedFunctionScope, diagnostics, sourceText, param, param.name, {
-            name: param.name,
-            kind: "param",
-            node: param
-          });
+          walkBindingPattern(param.id, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null, true);
+          bindParameter(param, nestedFunctionScope, diagnostics, sourceText);
         }
         walk(node.body, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null);
         return;
@@ -603,11 +187,8 @@ export function analyzeModule(ast, sourceText, options = {}) {
         const nestedFunctionScope = createScope(activeScope, "function");
         for (const param of node.params) {
           walk(param.defaultValue, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null);
-          addScopedBinding(nestedFunctionScope, diagnostics, sourceText, param, param.name, {
-            name: param.name,
-            kind: "param",
-            node: param
-          });
+          walkBindingPattern(param.id, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null, true);
+          bindParameter(param, nestedFunctionScope, diagnostics, sourceText);
         }
         walk(node.body, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null);
         return;
@@ -639,12 +220,16 @@ export function analyzeModule(ast, sourceText, options = {}) {
         walk(node.argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "ThrowStatement":
+        if (inGeneratorFunction && containsYieldExpression(node.argument)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.argument, "Jayess generator lowering does not support 'yield' inside throw expressions"));
+        }
         walk(node.argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "ExpressionStatement":
         walk(node.expression, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "AssignmentExpression": {
+        validateAssignmentExpressionShape(node, inGeneratorFunction, diagnostics, sourceText);
         if (isBindingPattern(node.left) || node.left.type === "AssignmentPattern") {
           walkBindingPattern(
             node.left,
@@ -664,7 +249,9 @@ export function analyzeModule(ast, sourceText, options = {}) {
         }
         if (node.left.type === "MemberExpression") {
           validatePrivateMemberAccess(node.left, currentClass, currentMethod, diagnostics, sourceText);
-          walk(node.left.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
+          if (node.left.object.type !== "SuperExpression") {
+            walk(node.left.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
+          }
           if (node.left.computed) {
             walk(node.left.property, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
           }
@@ -673,7 +260,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
             createSemanticDiagnostic(
               sourceText,
               node.left,
-              `Jayess semantic analysis does not support '${node.operator}' on this assignment target`
+              `Invalid assignment target for '${node.operator}'; expected an identifier, member access, or destructuring pattern`
             )
           );
         }
@@ -688,15 +275,18 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       }
       case "BinaryExpression":
+        validateBinaryExpressionShape(node, inGeneratorFunction, diagnostics, sourceText);
         walk(node.left, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         walk(node.right, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "ConditionalExpression":
+        validateGeneratorExpressionYieldShape(node, inGeneratorFunction, diagnostics, sourceText);
         walk(node.test, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         walk(node.consequent, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         walk(node.alternate, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "UnaryExpression":
+        validateUnaryExpressionShape(node, inGeneratorFunction, diagnostics, sourceText);
         walk(node.argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "AwaitExpression":
@@ -712,6 +302,8 @@ export function analyzeModule(ast, sourceText, options = {}) {
         walk(node.argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "UpdateExpression": {
+        validateUpdateExpressionShape(node, diagnostics, sourceText);
+        validateGeneratorExpressionYieldShape(node, inGeneratorFunction, diagnostics, sourceText);
         if (node.argument.type === "MemberExpression") {
           validatePrivateMemberAccess(node.argument, currentClass, currentMethod, diagnostics, sourceText);
           walk(node.argument.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
@@ -725,7 +317,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
             createSemanticDiagnostic(
               sourceText,
               node.argument,
-              `Jayess semantic analysis does not support '${node.operator}' on this update target`
+              `Invalid update target for '${node.operator}'; expected an identifier or member access`
             )
           );
           return;
@@ -738,103 +330,16 @@ export function analyzeModule(ast, sourceText, options = {}) {
       }
       case "CallExpression":
       case "OptionalCallExpression":
-        if (node.callee.type === "SuperExpression") {
-          const validSuperConstructorCall = (
-            currentClass?.base != null
-            && currentMethod?.kind === "constructor"
-            && currentMethod?.static !== true
-          );
-          if (!validSuperConstructorCall) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee,
-                "Jayess currently allows 'super(...)' only inside derived constructors"
-              )
-            );
-          }
+        validateCallExpressionShape(node, inGeneratorFunction, currentClass, currentMethod, diagnostics, sourceText);
+        if (node.callee.type !== "SuperExpression") {
+          walk(node.callee, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
-        if (node.callee.type === "MemberExpression") {
-          const builtin = getSupportedBuiltinProperty(node.callee);
-          if (builtin?.property === "length") {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} property '${builtin.property}' is not callable`
-              )
-            );
-          }
-          if (builtin?.property === "toString" && node.arguments.length > 0) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} method '${builtin.property}' does not accept arguments`
-              )
-            );
-          }
-          if (builtin?.property === "pop" && node.arguments.length > 0) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} method '${builtin.property}' does not accept arguments`
-              )
-            );
-          }
-          if (builtin?.property === "join" && node.arguments.length > 1) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} method '${builtin.property}' accepts at most one argument`
-              )
-            );
-          }
-          if (builtin?.property === "includes" && node.arguments.length !== 1) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} method '${builtin.property}' requires exactly one argument`
-              )
-            );
-          }
-          if ((builtin?.property === "slice" || builtin?.property === "substring") && (node.arguments.length < 1 || node.arguments.length > 2)) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} method '${builtin.property}' requires one or two arguments`
-              )
-            );
-          }
-          if (builtin?.property === "startsWith" && node.arguments.length !== 1) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} method '${builtin.property}' requires exactly one argument`
-              )
-            );
-          }
-          if ((builtin?.property === "includes" || builtin?.property === "indexOf" || builtin?.property === "endsWith") && builtin.receiver === "string" && node.arguments.length !== 1) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.callee.property,
-                `${builtin.receiver} method '${builtin.property}' requires exactly one argument`
-              )
-            );
-          }
-        }
-        walk(node.callee, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         for (const argument of node.arguments) {
           walk(argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
         return;
       case "NewExpression":
+        validateGeneratorExpressionYieldShape(node, inGeneratorFunction, diagnostics, sourceText);
         walk(node.callee, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         for (const argument of node.arguments) {
           walk(argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
@@ -842,48 +347,32 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       case "MemberExpression":
       case "OptionalMemberExpression":
-          validatePrivateMemberAccess(node, currentClass, currentMethod, diagnostics, sourceText);
-        if (node.object.type === "SuperExpression") {
-          const validSuperMemberLookup = (
-            currentClass?.base != null
-            && currentMethod?.kind === "method"
-            && currentMethod?.static !== true
-          );
-          if (!validSuperMemberLookup) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.object,
-                "Jayess currently allows 'super.name' only inside derived instance methods"
-              )
-            );
-          }
+        validateGeneratorExpressionYieldShape(node, inGeneratorFunction, diagnostics, sourceText);
+        validatePrivateMemberAccess(node, currentClass, currentMethod, diagnostics, sourceText);
+        validateMemberExpressionShape(node, currentClass, currentMethod, diagnostics, sourceText);
+        if (node.object.type !== "SuperExpression") {
+          walk(node.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
-        {
-          const builtin = getSupportedBuiltinProperty(node);
-          if (builtin?.unsupported) {
-            diagnostics.push(
-              createSemanticDiagnostic(
-                sourceText,
-                node.property,
-                `Unsupported built-in ${builtin.receiver} property '${builtin.property}'`
-              )
-            );
-          }
-        }
-        walk(node.object, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         if (node.computed) {
           walk(node.property, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
         return;
       case "ArrayExpression":
+        validateArrayExpressionShape(node, inGeneratorFunction, diagnostics, sourceText);
         for (const element of node.elements) {
+          if (inGeneratorFunction && element.type === "SpreadElement" && containsYieldExpression(element.argument)) {
+            diagnostics.push(createSemanticDiagnostic(sourceText, element, "Jayess generator lowering does not support array spread elements containing 'yield'"));
+          }
           walk(element, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
         return;
       case "ObjectExpression":
+        validateObjectExpressionShape(node, inGeneratorFunction, diagnostics, sourceText);
         for (const property of node.properties) {
           if (property.type === "SpreadElement") {
+            if (inGeneratorFunction && containsYieldExpression(property.argument)) {
+              diagnostics.push(createSemanticDiagnostic(sourceText, property, "Jayess generator lowering does not support object spread properties containing 'yield'"));
+            }
             walk(property.argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
             continue;
           }
@@ -891,6 +380,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
         }
         return;
       case "TemplateLiteral":
+        validateGeneratorExpressionYieldShape(node, inGeneratorFunction, diagnostics, sourceText);
         for (const expression of node.expressions) {
           walk(expression, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
@@ -899,11 +389,17 @@ export function analyzeModule(ast, sourceText, options = {}) {
         walk(node.argument, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "IfStatement":
+        if (inGeneratorFunction && containsYieldExpression(node.test)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.test, "Jayess generator lowering does not support 'yield' inside if tests"));
+        }
         walk(node.test, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         walk(node.consequent, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         walk(node.alternate, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "SwitchStatement": {
+        if (inGeneratorFunction && containsYieldExpression(node.discriminant)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.discriminant, "Jayess generator lowering does not support 'yield' inside switch discriminants"));
+        }
         walk(node.discriminant, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         for (const clause of node.cases) {
           const clauseScope = createScope(activeScope, "switch-case");
@@ -915,6 +411,16 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       }
       case "TryStatement": {
+        if (
+          inGeneratorFunction
+          && containsYieldExpression(node)
+          && !canLowerFocusedGeneratorTryCatchYield(node, containsYieldExpression)
+          && !canLowerMultiYieldGeneratorTryCatch(node, containsYieldExpression)
+          && !canLowerFocusedGeneratorCatchBodyYield(node, containsYieldExpression)
+          && !canLowerFocusedGeneratorTryFinallyYield(node, containsYieldExpression)
+        ) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node, "Jayess generator lowering supports only direct try-body yields, single direct catch-body yields, or direct try/finally yields with non-yielding surrounding statements"));
+        }
         walk(node.block, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         if (node.handler != null) {
           const catchScope = createScope(activeScope, "catch");
@@ -937,15 +443,30 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       }
       case "WhileStatement":
+        if (inGeneratorFunction && containsYieldExpression(node.test)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.test, "Jayess generator lowering does not support 'yield' inside while tests"));
+        }
         walk(node.test, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         walk(node.body, activeScope, loopDepth + 1, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "DoWhileStatement":
+        if (inGeneratorFunction && containsYieldExpression(node.test)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.test, "Jayess generator lowering does not support 'yield' inside do/while tests"));
+        }
         walk(node.body, activeScope, loopDepth + 1, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         walk(node.test, activeScope, loopDepth + 1, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;
       case "ForStatement": {
         const loopScope = createScope(activeScope, "loop");
+        if (inGeneratorFunction && node.init != null && containsYieldExpression(node.init)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.init, "Jayess generator lowering does not support 'yield' inside for-loop initializers"));
+        }
+        if (inGeneratorFunction && node.test != null && containsYieldExpression(node.test)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.test, "Jayess generator lowering does not support 'yield' inside for-loop tests"));
+        }
+        if (inGeneratorFunction && node.update != null && containsYieldExpression(node.update)) {
+          diagnostics.push(createSemanticDiagnostic(sourceText, node.update, "Jayess generator lowering does not support 'yield' inside for-loop updates"));
+        }
         if (node.init?.type === "VariableDeclaration") {
           for (const declaration of node.init.declarations) {
             for (const identifier of collectBindingIdentifiers(declaration.id)) {
@@ -964,14 +485,10 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       }
       case "BreakStatement":
-        if (loopDepth === 0 && switchDepth === 0) {
-          diagnostics.push(createSemanticDiagnostic(sourceText, node, "break is only valid inside a loop or switch"));
-        }
+        validateLoopControlStatement(node, loopDepth, switchDepth, diagnostics, sourceText, createSemanticDiagnostic);
         return;
       case "ContinueStatement":
-        if (loopDepth === 0) {
-          diagnostics.push(createSemanticDiagnostic(sourceText, node, "continue is only valid inside a loop"));
-        }
+        validateLoopControlStatement(node, loopDepth, switchDepth, diagnostics, sourceText, createSemanticDiagnostic);
         return;
       case "Identifier":
         if (functionNode?.type === "ArrowFunctionExpression" && node.name === "arguments") {
@@ -990,15 +507,13 @@ export function analyzeModule(ast, sourceText, options = {}) {
         resolveIdentifier({ ...node, name: "this" }, activeScope, functionScope, functionNode);
         return;
       case "SuperExpression":
-        if (currentClass?.base == null || currentMethod == null) {
-          diagnostics.push(
-            createSemanticDiagnostic(
-              sourceText,
-              node,
-              "Jayess currently allows 'super' only inside derived classes"
-            )
-          );
-        }
+        diagnostics.push(
+          createSemanticDiagnostic(
+            sourceText,
+            node,
+            "Bare 'super' expressions are not supported; use super(...) in derived constructors or super.name/super[expr] in derived methods"
+          )
+        );
         return;
       default:
         return;
@@ -1007,7 +522,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
 
   const rootScope = createScope(null, "module-body");
   for (const [name, binding] of moduleScope.bindings.entries()) {
-    defineBinding(rootScope, name, binding);
+    addScopedBinding(rootScope, diagnostics, sourceText, binding.node, name, binding);
   }
   walk(ast, rootScope);
 

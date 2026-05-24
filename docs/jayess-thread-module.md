@@ -14,7 +14,7 @@
 
 - `spawn(callback, args)` requires a callable callback and an array of arguments.
 - worker arguments are transferred across the thread boundary.
-- transferable values are `null`, numbers, booleans, strings, arrays of transferable values, and plain objects containing transferable values.
+- transferable values are `null`, numbers, booleans, strings, channel handles, arrays of transferable values, and plain objects containing transferable values.
 - non-transferable values throw focused diagnostics before a worker is launched.
 - `join(handle)` waits for a thread and returns the worker result.
 - joining the same handle more than once is invalid.
@@ -32,3 +32,8 @@ The module is split across:
 - `src/cpp/runtime-thread-source.js`
 
 Threading is explicit module behavior. Jayess does not expose ambient worker globals or shared mutable state in this first slice.
+
+Related coordination helpers live in:
+
+- [jayess-channel-module.md](./jayess-channel-module.md)
+- [jayess-workqueue-module.md](./jayess-workqueue-module.md)

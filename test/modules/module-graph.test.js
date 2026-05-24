@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { buildModuleGraph } from "../../src/modules/module-graph.js";
 import { JayessError } from "../../src/diagnostics.js";
+import { resolvePackageImportDetailed, resolvePackageImportsDetailed } from "../../src/modules/resolve-package-import.js";
 
 test("module graph resolves relative imports", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/main.js"));
@@ -44,6 +45,194 @@ test("module graph detects cycles", () => {
 test("module graph resolves bare and scoped packages", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/main.js"));
   assert.equal(graph.modules.length, 3);
+});
+
+test("module graph resolves scoped package subpath imports", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/scoped-subpath-main.js"));
+
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageName, "@scope/math");
+  assert.ok(graph.modules[1].filename.endsWith("node_modules/@scope/math/feature/index.js"));
+});
+
+test("module graph resolves package self-reference imports", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/self-reference-main.js"));
+
+  assert.equal(graph.modules.length, 3);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => ({
+      source: dependency.source,
+      mode: dependency.packageResolutionMode,
+      key: dependency.packageExportKey
+    })),
+    [
+      { source: "package-project", mode: "self-reference", key: "." },
+      { source: "package-project/feature", mode: "self-reference", key: "./feature" }
+    ]
+  );
+});
+
+test("module graph prefers jayess package export conditions", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/jayess-condition-main.js"));
+  assert.equal(graph.modules.length, 3);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => dependency.packageExportCondition),
+    ["jayess", "jayess"]
+  );
+  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("jayess-condition-lib/src/jayess.js")));
+  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("jayess-condition-lib/src/feature-jayess.js")));
+});
+
+test("module graph falls back to default package export conditions", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/default-condition-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageExportCondition, "default");
+  assert.ok(graph.modules[1].filename.endsWith("default-condition-lib/src/default.js"));
+});
+
+test("module graph preserves direct subpath package resolution without exports", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/direct-subpath-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageField, undefined);
+  assert.ok(graph.modules[1].filename.endsWith("direct-subpath-lib/feature/index.js"));
+});
+
+test("module graph reports direct subpath fallback trace when package subpaths are missing", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/direct-subpath-missing-main.js")),
+    (error) =>
+      error instanceof JayessError
+      && /package subpath '.\/missing' was not found/.test(error.diagnostics[0].message)
+      && /missing\.js/.test(error.diagnostics[0].message)
+      && /missing\/index\.js/.test(error.diagnostics[0].message)
+  );
+});
+
+test("package resolver reports failure trace metadata for missing subpaths", () => {
+  const result = resolvePackageImportDetailed(
+    path.resolve("test/fixtures/package-project/src/direct-subpath-missing-main.js"),
+    "direct-subpath-lib/missing"
+  );
+
+  assert.equal(result.reason, "package-subpath-not-found");
+  assert.equal(result.requestedSubpath, "missing");
+  assert.deepEqual(result.allowedExtensions, [".js", ".mjs"]);
+  assert.ok(result.packageResolutionTrace.some((candidate) => candidate.endsWith("missing.js")));
+});
+
+test("module graph resolves package export patterns", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/pattern-main.js"));
+
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageExportKey, "./features/*");
+  assert.equal(graph.modules[0].dependencies[0].packageExportPatternMatch, "math");
+  assert.equal(graph.modules[0].dependencies[0].packageExportCondition, "jayess");
+  assert.ok(graph.modules[1].filename.endsWith("pattern-lib/src/features/math.js"));
+});
+
+test("module graph resolves package self-reference export patterns", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/self-reference-pattern-main.js"));
+
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageResolutionMode, "self-reference");
+  assert.equal(graph.modules[0].dependencies[0].packageExportKey, "./features/*");
+  assert.equal(graph.modules[0].dependencies[0].packageExportPatternMatch, "tools");
+  assert.ok(graph.modules[1].filename.endsWith("package-project/src/self-tools.js"));
+});
+
+test("module graph resolves package self-reference imports from nested package files", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/nested/self-reference-nested-main.js"));
+
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageResolutionMode, "self-reference");
+  assert.equal(graph.modules[0].dependencies[0].packageExportKey, "./feature");
+  assert.ok(graph.modules[1].filename.endsWith("package-project/src/self-feature.js"));
+});
+
+test("module graph resolves package imports mappings", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/package-import-main.js"));
+
+  assert.equal(graph.modules.length, 3);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => ({
+      source: dependency.source,
+      kind: dependency.kind,
+      mode: dependency.packageResolutionMode,
+      key: dependency.packageImportKey,
+      match: dependency.packageImportPatternMatch,
+      condition: dependency.packageImportCondition
+    })),
+    [
+      { source: "#tools", kind: "package-import", mode: "package-import", key: "#tools", match: null, condition: null },
+      { source: "#condition", kind: "package-import", mode: "package-import", key: "#condition", match: null, condition: "jayess" },
+      { source: "#features/tools", kind: "package-import", mode: "package-import", key: "#features/*", match: "tools", condition: null }
+    ]
+  );
+  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("package-project/src/self-tools.js")));
+  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("package-project/src/self-import.js")));
+});
+
+test("module graph rejects package imports outside the package root", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/package-import-outside-main.js")),
+    (error) =>
+      error instanceof JayessError
+      && /points outside its package root/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects missing package imports targets", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/package-import-missing-main.js")),
+    (error) =>
+      error instanceof JayessError
+      && /imports target/.test(error.diagnostics[0].message)
+  );
+});
+
+test("package resolver reports failed imports pattern metadata", () => {
+  const result = resolvePackageImportsDetailed(
+    path.resolve("test/fixtures/package-project/src/package-import-missing-main.js"),
+    "#missing"
+  );
+
+  assert.equal(result.reason, "package-import-target-missing");
+  assert.equal(result.packageField, "imports");
+  assert.equal(result.requestedSubpath, "#missing");
+  assert.deepEqual(result.allowedExtensions, [".js", ".mjs"]);
+  assert.ok(result.attemptedPath.endsWith("missing.js"));
+});
+
+test("module graph rejects package export patterns outside the package root", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/pattern-outside-main.js")),
+    (error) =>
+      error instanceof JayessError
+      && /points outside its package root/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects missing package export pattern targets", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/pattern-missing-main.js")),
+    (error) =>
+      error instanceof JayessError
+      && /does not exist/.test(error.diagnostics[0].message)
+  );
+});
+
+test("package resolver reports failed exports pattern metadata", () => {
+  const result = resolvePackageImportDetailed(
+    path.resolve("test/fixtures/package-project/src/pattern-missing-main.js"),
+    "pattern-lib/features/missing"
+  );
+
+  assert.equal(result.reason, "package-export-target-missing");
+  assert.equal(result.packageField, "exports");
+  assert.equal(result.exportKey, "./features/*");
+  assert.equal(result.exportPatternMatch, "missing");
+  assert.equal(result.requestedSubpath, "features/missing");
+  assert.deepEqual(result.allowedExtensions, [".js", ".mjs"]);
 });
 
 test("module graph resolves repository-owned built-in modules", () => {
@@ -98,18 +287,37 @@ test("module graph resolves repository-owned built-in path modules", () => {
   assert.equal(graph.modules[0].dependencies[0].source, "jayess:path");
 });
 
+test("module graph resolves repository-owned built-in os modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/os-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:os");
+});
+
 test("module graph resolves repository-owned built-in filesystem modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/fs-main.js"));
-  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules.length, 13);
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
   assert.equal(graph.modules[0].dependencies[0].source, "jayess:fs");
 });
 
+test("module graph resolves repository-owned filesystem binary helper modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/fs-binary-main.js"));
+  assert.equal(graph.modules.length, 13);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => dependency.source),
+    ["jayess:bytes", "jayess:fs"]
+  );
+});
+
 test("module graph resolves repository-owned built-in string modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/string-main.js"));
-  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules.length, 3);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => dependency.source),
+    ["jayess:string", "jayess:regex"]
+  );
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
-  assert.equal(graph.modules[0].dependencies[0].source, "jayess:string");
 });
 
 test("module graph resolves repository-owned built-in array modules", () => {
@@ -125,6 +333,22 @@ test("module graph resolves repository-owned built-in async modules", () => {
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
 });
 
+test("module graph resolves repository-owned built-in time modules", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/time-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:time");
+});
+
+test("module graph preserves closed dependencies for async module initialization", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/system-modules-main.js"));
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => dependency.source),
+    ["jayess:fs", "jayess:path", "jayess:process"]
+  );
+  assert.ok(graph.modules.every((moduleRecord) => path.isAbsolute(moduleRecord.filename)));
+});
+
 test("module graph resolves repository-owned built-in regex modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/regex-main.js"));
   assert.equal(graph.modules.length, 2);
@@ -134,7 +358,7 @@ test("module graph resolves repository-owned built-in regex modules", () => {
 
 test("module graph resolves repository-owned system modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/system-modules-main.js"));
-  assert.equal(graph.modules.length, 4);
+  assert.equal(graph.modules.length, 14);
   assert.deepEqual(
     graph.modules[0].dependencies.map((dependency) => dependency.kind),
     ["builtin-module", "builtin-module", "builtin-module"]
@@ -155,6 +379,54 @@ test("module graph resolves repository-owned built-in thread module", () => {
   assert.equal(graph.modules[0].dependencies[0].source, "jayess:thread");
 });
 
+test("module graph resolves repository-owned built-in console module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/console-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:console");
+});
+
+test("module graph resolves repository-owned built-in bytes module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/bytes-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:bytes");
+});
+
+test("module graph resolves repository-owned built-in encoding module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/encoding-main.js"));
+  assert.equal(graph.modules.length, 3);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => dependency.source),
+    ["jayess:bytes", "jayess:encoding"]
+  );
+  assert.equal(graph.modules[0].dependencies[1].kind, "builtin-module");
+});
+
+test("module graph resolves repository-owned built-in crypto module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/crypto-main.js"));
+  assert.equal(graph.modules.length, 4);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => dependency.source),
+    ["jayess:bytes", "jayess:encoding", "jayess:crypto"]
+  );
+  assert.equal(graph.modules[0].dependencies[2].kind, "builtin-module");
+});
+
+test("module graph resolves repository-owned built-in url module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/url-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:url");
+});
+
+test("module graph resolves repository-owned built-in assert module", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/modules/assert-main.js"));
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
+  assert.equal(graph.modules[0].dependencies[0].source, "jayess:assert");
+});
+
 test("module graph rejects missing packages clearly", () => {
   assert.throws(
     () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/missing-package.js")),
@@ -165,7 +437,10 @@ test("module graph rejects missing packages clearly", () => {
 test("module graph rejects package targets that are not Jayess source files", () => {
   assert.throws(
     () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/bad-file-type.js")),
-    (error) => error instanceof JayessError && /unsupported file type '.json'/.test(error.diagnostics[0].message)
+    (error) =>
+      error instanceof JayessError
+      && /unsupported file type '.json'/.test(error.diagnostics[0].message)
+      && /package root/.test(error.diagnostics[0].message)
   );
 });
 
@@ -182,7 +457,41 @@ test("module graph rejects Node built-in imports clearly", () => {
 test("module graph rejects packages with missing entry files clearly", () => {
   assert.throws(
     () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/missing-entry-package.js")),
-    (error) => error instanceof JayessError && /has no transpileable entry file/.test(error.diagnostics[0].message)
+    (error) =>
+      error instanceof JayessError
+      && /has no transpileable entry file/.test(error.diagnostics[0].message)
+      && /package.json/.test(error.diagnostics[0].message)
+      && /package root/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects package entries that point outside the package root", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/outside-package.js")),
+    (error) =>
+      error instanceof JayessError
+      && /points outside its package root/.test(error.diagnostics[0].message)
+      && /outside-lib/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects jayess condition targets outside the package root", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/outside-jayess-condition.js")),
+    (error) =>
+      error instanceof JayessError
+      && /points outside its package root/.test(error.diagnostics[0].message)
+      && /outside-jayess-condition-lib/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects unsupported package self-reference targets clearly", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/self-reference-missing.js")),
+    (error) =>
+      error instanceof JayessError
+      && /package export target/.test(error.diagnostics[0].message)
+      && /self-missing\.js/.test(error.diagnostics[0].message)
   );
 });
 
@@ -224,6 +533,97 @@ test("module graph rejects packages that expose only unsupported conditional exp
       error instanceof JayessError
       && /unsupported package\.json exports mapping/.test(error.diagnostics[0].message)
       && /conditional-only-lib/.test(error.diagnostics[0].message)
+  );
+});
+
+test("package resolver reports rejected condition metadata", () => {
+  const result = resolvePackageImportDetailed(
+    path.resolve("test/fixtures/package-project/src/conditional-only-package.js"),
+    "conditional-only-lib"
+  );
+
+  assert.equal(result.reason, "package-export-unsupported");
+  assert.equal(result.exportKey, ".");
+  assert.deepEqual(result.exportConditionTrace, ["jayess", "import", "default"]);
+  assert.deepEqual(result.allowedExtensions, [".js", ".mjs"]);
+});
+
+test("module graph resolves package export target arrays", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/array-target-package.js"));
+
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageExportKey, ".");
+  assert.equal(graph.modules[0].dependencies[0].packageExportArrayTrace[0].selected, true);
+  assert.ok(graph.modules[1].filename.endsWith("array-target-lib/index.js"));
+});
+
+test("module graph resolves package export arrays with condition objects", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/array-condition-package.js"));
+
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageExportArrayTrace.length, 3);
+  assert.deepEqual(
+    graph.modules[0].dependencies[0].packageExportArrayTrace.map((entry) => ({
+      index: entry.index,
+      kind: entry.kind,
+      selected: entry.selected,
+      reason: entry.reason,
+      condition: entry.condition
+    })),
+    [
+      { index: 0, kind: "number", selected: false, reason: "unsupported", condition: null },
+      { index: 1, kind: "conditions", selected: false, reason: "unsupported", condition: null },
+      { index: 2, kind: "conditions", selected: true, reason: null, condition: "default" }
+    ]
+  );
+  assert.ok(graph.modules[1].filename.endsWith("array-condition-lib/src/default.js"));
+});
+
+test("module graph rejects package export arrays without supported transpileable targets", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/array-empty-package.js")),
+    (error) =>
+      error instanceof JayessError
+      && /exports array contains no supported transpileable target/.test(error.diagnostics[0].message)
+      && /array-empty-lib/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects invalid package export target value types", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/invalid-target-package.js")),
+    (error) =>
+      error instanceof JayessError
+      && /unsupported package\.json exports mapping/.test(error.diagnostics[0].message)
+      && /invalid-target-lib/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph resolves package import target arrays", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/package-import-array-main.js"));
+
+  assert.equal(graph.modules.length, 2);
+  assert.equal(graph.modules[0].dependencies[0].packageImportKey, "#array");
+  assert.equal(graph.modules[0].dependencies[0].packageImportArrayTrace[0].selected, true);
+});
+
+test("module graph rejects package import arrays without supported transpileable targets", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/package-import-array-invalid-main.js")),
+    (error) =>
+      error instanceof JayessError
+      && /imports array contains no supported transpileable target/.test(error.diagnostics[0].message)
+      && /#arrayInvalid/.test(error.diagnostics[0].message)
+  );
+});
+
+test("module graph rejects invalid package import target value types", () => {
+  assert.throws(
+    () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/package-import-invalid-main.js")),
+    (error) =>
+      error instanceof JayessError
+      && /unsupported package\.json imports mapping/.test(error.diagnostics[0].message)
+      && /#invalid/.test(error.diagnostics[0].message)
   );
 });
 

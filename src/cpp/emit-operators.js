@@ -1,3 +1,16 @@
+export function renderUnary(operator, argument) {
+  if (operator === "!") {
+    return `jayess::value(!jayess::truthy(${argument}))`;
+  }
+  if (operator === "+") {
+    return `jayess::positive(${argument})`;
+  }
+  if (operator === "-") {
+    return `jayess::subtract(jayess::value(static_cast<double>(0)), ${argument})`;
+  }
+  throw new Error(`Unsupported unary operator '${operator}'`);
+}
+
 export function renderBinary(operator, left, right) {
   if (operator === "&&") {
     return `([&]() -> jayess::value {

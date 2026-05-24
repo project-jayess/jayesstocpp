@@ -27,6 +27,16 @@ export function emitDestructuringAssignments(pattern, sourceExpr, context, lines
     return;
   }
 
+  if (pattern.type === "MemberExpression") {
+    const object = renderExpression(pattern.object, context);
+    if (pattern.computed) {
+      lines.push(`${indent}jayess::set_index(${object}, ${renderExpression(pattern.property, context)}, ${sourceExpr});`);
+      return;
+    }
+    lines.push(`${indent}jayess::set_property(${object}, ${renderPatternKey(pattern.property)}, ${sourceExpr});`);
+    return;
+  }
+
   if (pattern.type === "AssignmentPattern") {
     const valueTemp = nextTempName(context);
     lines.push(`${indent}${declareTemps ? "jayess::value " : ""}${valueTemp} = ${sourceExpr};`);
@@ -39,6 +49,9 @@ export function emitDestructuringAssignments(pattern, sourceExpr, context, lines
 
   if (pattern.type === "ArrayPattern") {
     for (const [index, element] of pattern.elements.entries()) {
+      if (element == null) {
+        continue;
+      }
       if (element.type === "RestElement") {
         const restTemp = nextTempName(context);
         lines.push(`${indent}${declareTemps ? "jayess::value " : ""}${restTemp} = jayess::destructure_rest_array(${sourceExpr}, ${index});`);

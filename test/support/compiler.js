@@ -49,3 +49,37 @@ export function compileCppFiles(files, includeDir) {
     env: { ...process.env, TMPDIR: os.tmpdir(), TEMP: os.tmpdir(), TMP: os.tmpdir() }
   });
 }
+
+export function compileAndRunCppExecutable(files, includeDir, mainSource, executableName = "jayess-runtime-probe") {
+  const compiler = findAvailableCompiler();
+  if (compiler == null) {
+    throw new Error("No supported C++ compiler found. Install clang++, c++, or g++ to run runtime-validation tests.");
+  }
+
+  const mainPath = path.join(includeDir, `${executableName}.cpp`);
+  const executablePath = path.join(includeDir, executableName);
+  fs.writeFileSync(mainPath, mainSource, "utf8");
+
+  execFileSync(compiler, [
+    "-std=c++17",
+    "-pthread",
+    ...files,
+    mainPath,
+    "-I",
+    includeDir,
+    "-o",
+    executablePath
+  ], {
+    stdio: "pipe",
+    encoding: "utf8",
+    cwd: includeDir,
+    env: { ...process.env, TMPDIR: includeDir, TEMP: includeDir, TMP: includeDir }
+  });
+
+  return execFileSync(executablePath, [], {
+    stdio: "pipe",
+    encoding: "utf8",
+    cwd: includeDir,
+    env: { ...process.env, TMPDIR: includeDir, TEMP: includeDir, TMP: includeDir }
+  });
+}

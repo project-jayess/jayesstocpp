@@ -50,6 +50,14 @@ test("escape analysis marks captured closure values as escaping", () => {
   assert.equal(result.escaping.has("x"), true);
 });
 
+test("escape analysis marks closure captures of block-scoped var bindings as escaping", () => {
+  const sourceText = createSourceText("function outer() { if (true) { var x = 1; return function() { return x; }; } return null; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("x"), true);
+});
+
 test("escape analysis marks named default-exported declarations as escaping", () => {
   const ast = parse(createSourceText("export default function add(a, b) { return a + b; }"));
   const result = analyzeEscapes(ast);
@@ -94,6 +102,58 @@ test("escape analysis marks captures from async arrows as escaping", () => {
   analyzeModule(ast, sourceText, { throwOnError: false });
   const result = analyzeEscapes(ast);
   assert.equal(result.escaping.has("x"), true);
+});
+
+test("escape analysis marks generator captures that outlive the defining scope", () => {
+  const sourceText = createSourceText("function outer(x) { var make = function* run(y) { yield x + y; }; return make; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("x"), true);
+});
+
+test("escape analysis marks async captures that settle after the defining scope", () => {
+  const sourceText = createSourceText("function outer(x) { return async function run() { return await x; }; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("x"), true);
+});
+
+test("escape analysis marks class method closure context values as escaping", () => {
+  const sourceText = createSourceText("function build(secret) { class Box { static #seed = secret; #value = secret; read() { return this.#value + Box.#seed; } } return Box; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("secret"), true);
+  assert.equal(result.escaping.has("Box"), true);
+});
+
+test("escape analysis marks thread worker handoff values as escaping", () => {
+  const sourceText = createSourceText("function run(x) { var worker = () => x; var handle = spawn(worker, [x]); return handle; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("worker"), true);
+  assert.equal(result.escaping.has("x"), true);
+});
+
+test("escape analysis marks module-exported closures and classes as escaping", () => {
+  const sourceText = createSourceText("export var make = function(value) { return () => value; }; export class Box { value = 1; }");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("make"), true);
+  assert.equal(result.escaping.has("Box"), true);
+});
+
+test("escape analysis marks module exports exposing initializer-scope values as escaping", () => {
+  const sourceText = createSourceText("var value = 1; export var read = function() { return value; };");
+  const ast = parse(sourceText);
+  analyzeModule(ast, sourceText, { throwOnError: false });
+  const result = analyzeEscapes(ast);
+  assert.equal(result.escaping.has("read"), true);
+  assert.equal(result.escaping.has("value"), true);
 });
 
 test("escape analysis marks class field initializer values as escaping", () => {

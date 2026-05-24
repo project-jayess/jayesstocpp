@@ -9,7 +9,7 @@ import { classifyImport } from "./classify-import.js";
 import { getSupportedJayessSourceExtensions, isSupportedJayessSourceFile } from "./jayess-source-file.js";
 import { readPackageJson } from "./read-package-json.js";
 import { resolveBuiltinModule } from "./resolve-builtin-module.js";
-import { resolvePackageImportDetailed } from "./resolve-package-import.js";
+import { resolvePackageImportDetailed, resolvePackageImportsDetailed } from "./resolve-package-import.js";
 import { resolveRelativeImport } from "./resolve-relative-import.js";
 import { validateModuleGraph } from "./validate-module-graph.js";
 
@@ -21,12 +21,13 @@ function throwCycle(filename) {
   throwDiagnostics([createModuleFileDiagnostic(filename, `Import cycle detected at '${filename}'`)]);
 }
 
-function throwUnsupportedPackageTarget(source, resolved) {
+function throwUnsupportedPackageTarget(source, resolved, failure) {
   const supported = getSupportedJayessSourceExtensions().join(", ");
+  const packageContext = failure?.packageRoot == null ? "" : ` from package root '${failure.packageRoot}'`;
   throwDiagnostics([
     createModuleFileDiagnostic(
       resolved,
-      `Package import '${source}' resolved to unsupported file type '${path.extname(resolved)}'; only Jayess source files (${supported}) are transpileable`,
+      `Package import '${source}' resolved${packageContext} to unsupported file type '${path.extname(resolved)}'; only Jayess source files (${supported}) are transpileable`,
       source
     )
   ]);
@@ -44,10 +45,13 @@ function throwPackageResolutionFailure(source, failure) {
   }
 
   if (failure?.reason === "package-subpath-not-found") {
+    const trace = failure.packageResolutionTrace?.length > 0
+      ? `; checked ${failure.packageResolutionTrace.map((candidate) => `'${candidate}'`).join(", ")}`
+      : "";
     throwDiagnostics([
       createModuleFileDiagnostic(
         source,
-        `Cannot resolve package import '${source}': package subpath './${failure.subpath}' was not found in '${failure.packageName}'`,
+        `Cannot resolve package import '${source}': package subpath './${failure.subpath}' was not found in '${failure.packageName}' at '${failure.packageRoot}'${trace}`,
         source
       )
     ]);
@@ -57,17 +61,20 @@ function throwPackageResolutionFailure(source, failure) {
     throwDiagnostics([
       createModuleFileDiagnostic(
         source,
-        `Cannot resolve package import '${source}': package export target '${failure.attemptedPath}' does not exist`,
+        `Cannot resolve package import '${source}': package export target '${failure.attemptedPath}' from package root '${failure.packageRoot}' does not exist`,
         source
       )
     ]);
   }
 
   if (failure?.reason === "package-export-unsupported") {
+    const arrayDetail = failure.packageUnsupportedReason === "array-no-supported-target"
+      ? "; the exports array contains no supported transpileable target"
+      : "";
     throwDiagnostics([
       createModuleFileDiagnostic(
         source,
-        `Cannot resolve package import '${source}': package '${failure.packageName}' uses an unsupported package.json exports mapping for '${failure.exportKey}'. Jayess currently supports only direct transpileable string targets or narrow import/default targets`,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' at '${failure.packageRoot}' uses an unsupported package.json exports mapping for '${failure.exportKey}'${arrayDetail}. Jayess currently supports direct transpileable string targets, narrow jayess/import/default targets, and arrays of those targets`,
         source
       )
     ]);
@@ -77,7 +84,60 @@ function throwPackageResolutionFailure(source, failure) {
     throwDiagnostics([
       createModuleFileDiagnostic(
         source,
-        `Cannot resolve package import '${source}': package '${failure.packageName}' has no transpileable entry file (checked '${failure.mainField}')`,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' at package root '${failure.packageRoot}' has no transpileable entry file from package.json ${failure.packageField} field (checked '${failure.mainField}')`,
+        source
+      )
+    ]);
+  }
+
+  if (failure?.reason === "package-target-outside-root") {
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        source,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' points outside its package root '${failure.packageRoot}' at '${failure.attemptedPath}'`,
+        source
+      )
+    ]);
+  }
+
+  if (failure?.reason === "package-import-scope-not-found") {
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        source,
+        `Cannot resolve package import '${source}': no package.json scope was found for private package import specifier`,
+        source
+      )
+    ]);
+  }
+
+  if (failure?.reason === "package-import-not-found") {
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        source,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' at '${failure.packageRoot}' has no package.json imports mapping for '${source}'`,
+        source
+      )
+    ]);
+  }
+
+  if (failure?.reason === "package-import-target-missing") {
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        source,
+        `Cannot resolve package import '${source}': package imports target '${failure.attemptedPath}' from package root '${failure.packageRoot}' does not exist`,
+        source
+      )
+    ]);
+  }
+
+  if (failure?.reason === "package-import-unsupported") {
+    const arrayDetail = failure.packageUnsupportedReason === "array-no-supported-target"
+      ? "; the imports array contains no supported transpileable target"
+      : "";
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        source,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' at '${failure.packageRoot}' uses an unsupported package.json imports mapping for '${failure.importKey}'${arrayDetail}. Jayess currently supports direct transpileable string targets, narrow jayess/import/default targets, and arrays of those targets`,
         source
       )
     ]);
@@ -112,6 +172,11 @@ function resolveImportTarget(fromFilename, source) {
     return { resolved: result.resolved, failure: result };
   }
 
+  if (classification.kind === "package-import") {
+    const result = resolvePackageImportsDetailed(fromFilename, source);
+    return { resolved: result.resolved, failure: result };
+  }
+
   return { resolved: null, failure: null };
 }
 
@@ -121,7 +186,7 @@ export function buildModuleGraph(entryFilename) {
   const projectRoot = path.dirname(root);
   const projectPackageJson = readPackageJson(path.join(projectRoot, "package.json"));
 
-  function visit(filename, stack = []) {
+  function visit(filename, stack = [], source = null) {
     if (stack.includes(filename)) {
       throwCycle(filename);
     }
@@ -135,15 +200,15 @@ export function buildModuleGraph(entryFilename) {
     const sourceText = createSourceText(fs.readFileSync(filename, "utf8"), filename);
     const ast = parse(sourceText);
     const analysis = analyzeModule(ast, sourceText);
-    const moduleRecord = { filename, sourceText, ast, analysis, dependencies: [] };
+    const moduleRecord = { filename, source, sourceText, ast, analysis, dependencies: [] };
     visited.set(filename, moduleRecord);
 
     for (const entry of analysis.imports) {
       const classification = classifyImport(entry.source);
       const { resolved, failure } = resolveImportTarget(filename, entry.source);
 
-      if ((classification.kind === "jayess-module" || classification.kind === "builtin-module" || classification.kind === "package") && resolved == null) {
-        if (classification.kind === "package") {
+      if ((classification.kind === "jayess-module" || classification.kind === "builtin-module" || classification.kind === "package" || classification.kind === "package-import") && resolved == null) {
+        if (classification.kind === "package" || classification.kind === "package-import") {
           throwPackageResolutionFailure(entry.source, failure);
         }
         if (classification.kind === "builtin-module") {
@@ -152,19 +217,39 @@ export function buildModuleGraph(entryFilename) {
         throwMissingModule(entry.source);
       }
 
-      if (classification.kind === "package" && resolved != null && !isSupportedJayessSourceFile(resolved)) {
-        throwUnsupportedPackageTarget(entry.source, resolved);
+      if ((classification.kind === "package" || classification.kind === "package-import") && resolved != null && !isSupportedJayessSourceFile(resolved)) {
+        throwUnsupportedPackageTarget(entry.source, resolved, failure);
       }
 
       moduleRecord.dependencies.push({
         source: entry.source,
         kind: classification.kind,
         resolved,
-        specifiers: entry.specifiers
+        specifiers: entry.specifiers,
+        packageName: classification.kind === "package" || classification.kind === "package-import" ? failure?.packageName : undefined,
+        packageRoot: classification.kind === "package" || classification.kind === "package-import" ? failure?.packageRoot : undefined,
+        packageResolutionMode: classification.kind === "package" || classification.kind === "package-import" ? failure?.packageResolutionMode : undefined,
+        packageField: classification.kind === "package" || classification.kind === "package-import" ? failure?.packageField : undefined,
+        packageExportKey: classification.kind === "package" ? failure?.exportKey : undefined,
+        packageExportPatternMatch: classification.kind === "package" ? failure?.exportPatternMatch : undefined,
+        packageExportCondition: classification.kind === "package" ? failure?.exportCondition : undefined,
+        packageExportConditionTrace: classification.kind === "package" ? failure?.exportConditionTrace : undefined,
+        packageExportRejectedConditions: classification.kind === "package" ? failure?.exportRejectedConditions : undefined,
+        packageExportArrayTrace: classification.kind === "package" ? failure?.exportArrayTrace : undefined,
+        packageImportKey: classification.kind === "package-import" ? failure?.importKey : undefined,
+        packageImportPatternMatch: classification.kind === "package-import" ? failure?.importPatternMatch : undefined,
+        packageImportCondition: classification.kind === "package-import" ? failure?.importCondition : undefined,
+        packageImportConditionTrace: classification.kind === "package-import" ? failure?.importConditionTrace : undefined,
+        packageImportRejectedConditions: classification.kind === "package-import" ? failure?.importRejectedConditions : undefined,
+        packageImportArrayTrace: classification.kind === "package-import" ? failure?.importArrayTrace : undefined,
+        packageMainField: classification.kind === "package" ? failure?.mainField : undefined,
+        packageResolutionTrace: classification.kind === "package" ? failure?.packageResolutionTrace : undefined,
+        packageRequestedSubpath: classification.kind === "package" || classification.kind === "package-import" ? failure?.requestedSubpath : undefined,
+        packageAllowedExtensions: classification.kind === "package" || classification.kind === "package-import" ? failure?.allowedExtensions : undefined
       });
 
       if (resolved != null) {
-        visit(resolved, [...stack, filename]);
+        visit(resolved, [...stack, filename], entry.source);
       }
     }
   }

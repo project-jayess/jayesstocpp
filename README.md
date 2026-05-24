@@ -14,6 +14,16 @@ That means future standard-library and core-language support does not have to be
 
 The preferred future built-in-module direction is a reserved Jayess-owned namespace such as `jayess:*`, distinct from both `node:*` and `cpp:*`.
 
+Jayess also targets cross-platform native rendering through Jayess-owned standard-library modules. The planned rendering family is:
+
+- `jayess:color` for color values, parsing, conversion, and blending
+- `jayess:image` for pixel buffers and image file output
+- `jayess:canvas` for off-screen 2D drawing over image buffers
+- `jayess:window` for live native windows, frame presentation, and input events
+- `jayess:gpu` for optional GPU-accelerated resources, pipelines, and draw commands
+
+The current canvas implementation renders into an off-screen software image buffer and can save deterministic PPM files; it does not draw to the screen yet. The intended GUI direction is a Jayess-owned cross-platform toolkit: portable CPU rendering first, live native window support second, and optional GPU acceleration third. GPU support should expose a Jayess-owned API while using focused backend adapters for platform graphics APIs such as Direct3D, Metal, Vulkan, or OpenGL where appropriate, rather than copying a broad third-party GUI or graphics toolkit into the repository.
+
 Language-policy note:
 
 - Jayess `var` already fills the block-scoped mutable-binding role, so `let` is not part of the language.
@@ -39,4 +49,4 @@ Current implemented slice:
 - native source side-effect imports
 - `cpp:<header>` imports for C++ standard library headers
 
-See [Jayess.md](./Jayess.md), [docs/overview.md](docs/overview.md), [docs/stdlib-and-core-model.md](docs/stdlib-and-core-model.md), [docs/testing.md](docs/testing.md), [docs/shared-library.md](docs/shared-library.md), [docs/limitations.md](docs/limitations.md), [docs/workflow.md](docs/workflow.md), and [docs/review-discipline.md](docs/review-discipline.md).
+See [Jayess.md](./Jayess.md), [docs/overview.md](docs/overview.md), [docs/stdlib-and-core-model.md](docs/stdlib-and-core-model.md), [docs/jayess-native-gui.md](docs/jayess-native-gui.md), [docs/testing.md](docs/testing.md), [docs/shared-library.md](docs/shared-library.md), [docs/limitations.md](docs/limitations.md), [docs/workflow.md](docs/workflow.md), and [docs/review-discipline.md](docs/review-discipline.md).

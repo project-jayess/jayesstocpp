@@ -1,8 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
-
-const builtinRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../stdlib/jayess");
+import { builtinRoot } from "./builtin-root.js";
 
 export function resolveBuiltinModule(source) {
   if (!source.startsWith("jayess:")) {

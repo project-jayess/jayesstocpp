@@ -1,12 +1,12 @@
 import {
-  createDirectories,
-  exists,
-  list,
-  readText,
-  remove,
-  rename,
-  stat,
-  writeText
+  createDirectoriesSync,
+  existsSync,
+  listSync,
+  readTextSync,
+  removeSync,
+  renameSync,
+  statSync,
+  writeTextSync
 } from "jayess:fs";
 import {
   basename,
@@ -38,15 +38,15 @@ export function run() {
   var absolute = isAbsolute(resolved);
   var moved = join(tempDir, "jayess-moved.txt");
 
-  createDirectories(tempDir);
-  writeText(normalized, current);
-  if (exists(normalized)) {
-    var entries = list(tempDir);
-    var before = stat(normalized);
-    rename(normalized, moved);
-    var text = readText(moved);
-    var after = stat(moved);
-    remove(moved);
+  createDirectoriesSync(tempDir);
+  writeTextSync(normalized, current);
+  if (existsSync(normalized)) {
+    var entries = listSync(tempDir);
+    var before = statSync(normalized);
+    renameSync(normalized, moved);
+    var text = readTextSync(moved);
+    var after = statSync(moved);
+    removeSync(moved);
     return name + ext + folder + text + envValue + resolved + rel + absolute + args.length + entries.length + before.size + after.isFile;
   }
   return current;

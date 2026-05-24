@@ -38,6 +38,23 @@ inline jayess::value jayessPathNormalize(const std::vector<jayess::value>& jayes
   return jayess::path_normalize(jayessPathString(pathText, "Jayess path normalize expects a string path"));
 }
 
+inline jayess::value jayessPathParse(const std::vector<jayess::value>& jayessArgs) {
+  const auto pathText = jayess::argument_at(jayessArgs, 0);
+  return jayess::path_parse(jayessPathString(pathText, "Jayess path parse expects a string path"));
+}
+
+inline jayess::value jayessPathFormat(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::path_format(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessPathSeparator(const std::vector<jayess::value>&) {
+  return jayess::path_separator();
+}
+
+inline jayess::value jayessPathDelimiter(const std::vector<jayess::value>&) {
+  return jayess::path_delimiter();
+}
+
 inline jayess::value jayessPathResolve(const std::vector<jayess::value>& jayessArgs) {
   std::vector<std::string> parts;
   parts.reserve(jayessArgs.size());

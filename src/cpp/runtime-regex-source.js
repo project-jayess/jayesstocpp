@@ -4,6 +4,8 @@ value regex_create(const value& pattern, const value& flags);
 bool is_regex_value(const value& input);
 value regex_test(const value& regexValue, const value& text);
 value regex_exec(const value& regexValue, const value& text);
+value regex_split(const value& regexValue, const value& text);
+value regex_match_all(const value& regexValue, const value& text);
 value regex_replace_first(const value& regexValue, const value& text, const value& replacement);
 value regex_replace_all(const value& regexValue, const value& text, const value& replacement);`;
 }
@@ -213,6 +215,34 @@ value regex_exec(const value& regexValue, const value& text) {
     items.push_back(entry.str());
   }
   return make_array(std::move(items));
+}
+
+value regex_split(const value& regexValue, const value& text) {
+  const auto compiled = require_compiled_regex(regexValue);
+  const auto input = require_regex_text_argument(text);
+  std::vector<value> items;
+  std::sregex_token_iterator current(input.begin(), input.end(), compiled, -1);
+  std::sregex_token_iterator end;
+  for (; current != end; ++current) {
+    items.push_back(current->str());
+  }
+  return make_array(std::move(items));
+}
+
+value regex_match_all(const value& regexValue, const value& text) {
+  const auto compiled = require_compiled_regex(regexValue);
+  const auto input = require_regex_text_argument(text);
+  std::vector<value> matches;
+  for (std::sregex_iterator current(input.begin(), input.end(), compiled), end; current != end; ++current) {
+    const auto& match = *current;
+    std::vector<value> groups;
+    groups.reserve(match.size());
+    for (const auto& entry : match) {
+      groups.push_back(entry.str());
+    }
+    matches.push_back(make_array(std::move(groups)));
+  }
+  return make_array(std::move(matches));
 }
 
 value regex_replace_first(const value& regexValue, const value& text, const value& replacement) {
