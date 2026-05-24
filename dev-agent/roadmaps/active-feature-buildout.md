@@ -23,12 +23,6 @@ Each active feature slice should implement:
 
 ## Current Priorities
 
-The active roadmap should describe concrete build progress:
-
-- regex flags through `jayess:regex`
-- one generator follow-up slice
-- one async follow-up slice
-- one class-system follow-up slice
-- one system-module follow-up slice
+The repository-root [checklist.md](../../checklist.md) is the current source of truth for active implementation sections. This policy file should stay generic and should not duplicate or lag behind the current active slices.
 
 Checklist entries should name work to build, test, and document. They should not include explanations of why other work is not being built.

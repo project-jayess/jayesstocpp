@@ -14,6 +14,43 @@ test("semantic analysis rejects Node built-in imports inside Jayess source", () 
   );
 });
 
+test("semantic analysis points node:path imports at jayess:path", () => {
+  const sourceText = createSourceText('import { join } from "node:path";');
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /jayess:path/
+  );
+});
+
+test("semantic analysis points node:child_process imports at jayess:subprocess", () => {
+  const sourceText = createSourceText('import { spawn } from "node:child_process";');
+  const ast = parse(sourceText);
+  assert.throws(
+    () => analyzeModule(ast, sourceText),
+    /jayess:subprocess/
+  );
+});
+
+test("semantic analysis points supported Node host imports at the matching Jayess-owned modules", () => {
+  const cases = [
+    ['import { cwd } from "node:process";', /jayess:process/],
+    ['import { platform } from "node:os";', /jayess:os/],
+    ['import { parse } from "node:url";', /jayess:url/],
+    ['import { setTimeout } from "node:timers";', /jayess:timers/],
+    ['import { Worker } from "node:worker_threads";', /jayess:thread/]
+  ];
+  for (const [source, pattern] of cases) {
+    const sourceText = createSourceText(source);
+    const ast = parse(sourceText);
+    assert.throws(
+      () => analyzeModule(ast, sourceText),
+      pattern,
+      source
+    );
+  }
+});
+
 test("semantic analysis accepts supported composite built-ins", () => {
   const sourceText = createSourceText('var values = [1, 2]; var size = values.length; values.push(3); values.pop(); values.join("-"); values.includes(2); var nameSize = "Jayess".length; "Jayess".slice(1, 3); "Jayess".substring(2); "Jayess".startsWith("Ja"); "Jayess".includes("aye"); "Jayess".indexOf("ye"); "Jayess".endsWith("ss");');
   const ast = parse(sourceText);
@@ -55,6 +92,26 @@ test("semantic analysis rejects ambient global Object helpers with a focused mod
   );
 });
 
+test("semantic analysis rejects ambient globals that already have Jayess-owned module replacements", () => {
+  const cases = [
+    ["parseFloat(\"12.5\");", /import \{ parseFloat \} from 'jayess:number'/],
+    ["Date.now();", /import helpers from 'jayess:date'/],
+    ["JSON.stringify({ value: 1 });", /import helpers from 'jayess:json'/],
+    ["Map;", /import helpers from 'jayess:collections\/map'/],
+    ["Set;", /import helpers from 'jayess:collections\/set'/],
+    ["Promise.resolve(1);", /jayess:async/]
+  ];
+  for (const [source, pattern] of cases) {
+    const sourceText = createSourceText(source);
+    const ast = parse(sourceText);
+    assert.throws(
+      () => analyzeModule(ast, sourceText),
+      pattern,
+      source
+    );
+  }
+});
+
 test("semantic analysis rejects ambient global RegExp with a focused module diagnostic", () => {
   const sourceText = createSourceText("RegExp;");
   const ast = parse(sourceText);
@@ -62,6 +119,18 @@ test("semantic analysis rejects ambient global RegExp with a focused module diag
     () => analyzeModule(ast, sourceText),
     /import helpers from 'jayess:regex'/
   );
+});
+
+test("semantic analysis rejects ambient RegExp calls and construction with a focused module diagnostic", () => {
+  for (const source of ['RegExp("a");', 'new RegExp("a");']) {
+    const sourceText = createSourceText(source);
+    const ast = parse(sourceText);
+    assert.throws(
+      () => analyzeModule(ast, sourceText),
+      /import helpers from 'jayess:regex'/,
+      source
+    );
+  }
 });
 
 test("semantic analysis rejects ambient global eval with an unsupported-by-design diagnostic", () => {

@@ -9,7 +9,7 @@
 - `close(watcher)`
 - `isWatcher(value)`
 
-The first implementation uses portable filesystem polling. `watch(path, options)` snapshots a file or one directory level.
+The current shipped implementation uses portable filesystem polling. `watch(path, options)` snapshots a file or one directory level.
 
 `poll(watcher)` returns event objects with:
 

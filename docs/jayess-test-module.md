@@ -32,7 +32,7 @@
 }
 ```
 
-Each result has `name`, `passed`, `failed`, `error`, and `durationMillis`. The first slice records `durationMillis` as `0` so the shape is stable without adding timing policy to the module.
+Each result has `name`, `passed`, `failed`, `error`, and `durationMillis`. The current shipped surface records `durationMillis` as `0` so the shape is stable without adding timing policy to the module.
 
 ## Async Behavior
 

@@ -26,7 +26,7 @@ Examples:
 - `../node_modules/jayess-lib/index.js` → `_node_modules_jayess_lib_index_js`
 - `../node_modules/@scope/math/src/index.js` → `_node_modules__scope_math_src_index_js`
 
-This keeps package and scoped-package identity visible without flattening everything to ambiguous short names.
+This keeps package and scoped-package identity visible without flattening everything to ambiguous short names, while still keeping generated package-module outputs at the target root instead of recreating nested `node_modules/` directory trees inside the generated project.
 
 Repository-owned standard-library modules keep their source identity in the output directory:
 
@@ -56,6 +56,12 @@ Native artifacts are copied under deterministic bucket directories:
 - headers and native source files under `native/`
 - shared/static library artifacts under `libraries/`
 
+Mixed native imports keep those buckets stable:
+
+- header and native source imports are copied into `native/`
+- shared and static library imports are copied into `libraries/`
+- generated Jayess module headers and sources still stay at the target root (or under `generated-stdlib/jayess/` for repository stdlib modules)
+
 ## Runtime Fragment Selection
 
 `transpileFile()` emits a closed runtime for the generated module graph. The core Jayess value model and module-initialization async handle support are always included. Optional runtime fragments are selected from parsed syntax and imported `jayess:*` modules.
@@ -67,8 +73,11 @@ Examples:
 - importing `jayess:async` adds the async composition helpers such as `all`, `race`, `sleep`, and `timeout`
 - generator syntax or importing `jayess:iter` adds generator runtime helpers
 - importing `jayess:regex` adds regex helpers; importing `jayess:string` also includes regex support because string replacement accepts regex values
+- importing `jayess:image` adds one focused image/runtime bridge that covers file I/O, deterministic PPM/PGM bytes helpers, clipped bulk rectangle helpers, and copy-based subimage support without adding extra generated project buckets
 
 Fragment order and fragment dependencies are fixed in source so generated runtime files stay deterministic for the same input graph. Tests that intentionally inspect the complete runtime can request all fragments through the public transpile-file options used by the test harness.
+
+The always-present runtime core is also kept split internally into focused source fragments such as control/exception scaffolding and value/composite helpers. That internal organization does not change the emitted project layout, but it is intended to keep `runtime/jayess_runtime.*` generation deterministic and maintainable as the shipped runtime surface grows.
 
 ## Dependency Plan
 
@@ -78,14 +87,43 @@ The plan includes:
 
 - the entry filename
 - the project root
+- the entry module first, then the remaining modules in stable source-filename order for reviewability
 - each source module filename
 - each source module kind, such as user/package source or repository stdlib source
 - each generated module stem
 - each generated header/source output path relative to `targetDirname`
 - each dependency source string, kind, resolved filename, source kind, generated output paths, and generated module stem when one exists
 - each dependency inclusion reason and any runtime features included by that dependency
-- platform adapter requirements for native-backed `jayess:*` modules such as `net`, `window`, `gpu`, `clipboard`, `watch`, and `subprocess`
+- platform adapter requirements for native-backed `jayess:*` modules such as `dialog`, `net`, `window`, `gpu`, `clipboard`, `watch`, and `subprocess`
+
+For `jayess:window`, the generated metadata now distinguishes adapter families explicitly rather than treating Linux windowing as one bucket. The current adapter list includes `win32`, `cocoa`, `x11`, and `wayland`.
+
+For `jayess:dialog`, the generated metadata now distinguishes dialog adapter families explicitly too. The current dialog runtime reports:
+
+- `windows: ["win32-dialog"]`
+- `macos: ["cocoa-dialog"]`
+- `linux: ["linux-portal-dialog"]`
+
+The Linux entry names the focused `xdg-desktop-portal` adapter family boundary and still allows the runtime to report the normalized unavailable-host diagnostic when that host path cannot be used.
+
+The same metadata now also reports the compiled adapter set by host platform when that matters. For the current window runtime, generated projects report:
+
+- `windows: ["win32"]`
+- `macos: ["cocoa"]`
+- `linux: ["x11", "wayland"]`
+
+The current Linux selection policy is also recorded in metadata: prefer Wayland when `WAYLAND_DISPLAY` is set and the Wayland client path is available; otherwise fall back to X11 when available.
+
+That metadata shape now matches the emitted runtime and the executable verification layer: Linux projects compile both adapter families into the guarded runtime, then host-conditional runtime probes verify X11 and Wayland separately where the local host can actually open those adapters.
+- `jayess:gpu` now records `validation` alongside the host backend families in generated metadata. `validation` is the deterministic always-available backend used for command execution and executable verification, while `direct3d`, `metal`, `vulkan`, and `opengl` remain explicit host backend families behind guarded adapter files.
+- the generated GPU metadata now also reports the currently compiled backend set by platform:
+  windows: `["validation", "direct3d"]`
+  macos: `["validation", "metal"]`
+  linux: `["validation", "opengl", "vulkan"]`
+- the generated GPU metadata also records current `createSurface(window)` host selection rules:
+  Windows prefers `direct3d`, macOS prefers `metal`, and Linux still falls back to `validation` until the Linux host-backed GPU slice lands
 - package metadata for package imports, including package name, package root, selected package field, export key, export condition, package array trace metadata, and main field when applicable
+- native import dependency entries for copied headers, native source files, and shared/static libraries
 
 The file is emitted under `targetDirname` and is deterministic for the same input graph.
 

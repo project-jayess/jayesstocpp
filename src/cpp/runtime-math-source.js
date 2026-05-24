@@ -48,7 +48,7 @@ value math_min(const std::vector<value>& inputs) {
   require_math_values(inputs, "min");
   double result = std::get<double>(inputs[0]);
   for (std::size_t index = 1; index < inputs.size(); index += 1) {
-    result = std::min(result, std::get<double>(inputs[index]));
+    result = (std::min)(result, std::get<double>(inputs[index]));
   }
   return result;
 }
@@ -57,7 +57,7 @@ value math_max(const std::vector<value>& inputs) {
   require_math_values(inputs, "max");
   double result = std::get<double>(inputs[0]);
   for (std::size_t index = 1; index < inputs.size(); index += 1) {
-    result = std::max(result, std::get<double>(inputs[index]));
+    result = (std::max)(result, std::get<double>(inputs[index]));
   }
   return result;
 }

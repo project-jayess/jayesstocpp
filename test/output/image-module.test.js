@@ -43,6 +43,10 @@ test("transpileFile resolves built-in Jayess image module with runtime and nativ
   assert.match(headerSource, /value image_metadata_from_file\(const value& path\);/);
   assert.match(headerSource, /value image_encode_ppm\(const value& image\);/);
   assert.match(headerSource, /value image_decode_ppm\(const value& bytes\);/);
+  assert.match(headerSource, /value image_encode_pgm\(const value& image\);/);
+  assert.match(headerSource, /value image_decode_pgm\(const value& bytes\);/);
+  assert.match(headerSource, /value image_fill_rect\(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color\);/);
+  assert.match(headerSource, /value image_fill_rect_alpha\(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color\);/);
   assert.match(headerSource, /value image_blit\(const value& target, const value& source, const value& x, const value& y\);/);
   assert.match(headerSource, /value image_flip_horizontal\(const value& image\);/);
   assert.match(headerSource, /value image_flip_vertical\(const value& image\);/);
@@ -60,6 +64,10 @@ test("transpileFile resolves built-in Jayess image module with runtime and nativ
   assert.match(cppSource, /value image_metadata_from_file\(const value& pathValue\)/);
   assert.match(cppSource, /value image_encode_ppm\(const value& input\)/);
   assert.match(cppSource, /value image_decode_ppm\(const value& input\)/);
+  assert.match(cppSource, /value image_encode_pgm\(const value& input\)/);
+  assert.match(cppSource, /value image_decode_pgm\(const value& input\)/);
+  assert.match(cppSource, /value image_fill_rect\(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue, const value& colorValue\)/);
+  assert.match(cppSource, /value image_fill_rect_alpha\(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue, const value& colorValue\)/);
   assert.match(cppSource, /value image_crop\(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue\)/);
   assert.match(cppSource, /value image_flip_horizontal\(const value& input\)/);
   assert.match(cppSource, /value image_flip_vertical\(const value& input\)/);
@@ -77,6 +85,10 @@ test("transpileFile resolves built-in Jayess image module with runtime and nativ
   assert.match(primitiveSource, /jayessImageMetadataFromFile/);
   assert.match(primitiveSource, /jayessImageEncodePpm/);
   assert.match(primitiveSource, /jayessImageDecodePpm/);
+  assert.match(primitiveSource, /jayessImageEncodePgm/);
+  assert.match(primitiveSource, /jayessImageDecodePgm/);
+  assert.match(primitiveSource, /jayessImageFillRect/);
+  assert.match(primitiveSource, /jayessImageFillRectAlpha/);
   assert.match(primitiveSource, /jayessImageCrop/);
   assert.match(primitiveSource, /jayessImageResizeNearest/);
   assert.match(primitiveSource, /jayessImageBlit/);
@@ -95,8 +107,13 @@ test("transpileFile resolves built-in Jayess image module with runtime and nativ
   assert.match(imageSource, /jayessImageMetadataFromFile/);
   assert.match(imageSource, /jayessImageEncodePpm/);
   assert.match(imageSource, /jayessImageDecodePpm/);
+  assert.match(imageSource, /jayessImageEncodePgm/);
+  assert.match(imageSource, /jayessImageDecodePgm/);
+  assert.match(imageSource, /jayessImageFillRect/);
+  assert.match(imageSource, /jayessImageFillRectAlpha/);
   assert.match(imageSource, /jayessImageBlit/);
   assert.match(imageSource, /jayessImageTransparentBlit/);
   assert.match(imageSource, /metadata/);
   assert.match(imageSource, /normalizeColor/);
+  assert.match(imageSource, /subimage/);
 });

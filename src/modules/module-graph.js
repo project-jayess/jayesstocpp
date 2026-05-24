@@ -24,13 +24,49 @@ function throwCycle(filename) {
 function throwUnsupportedPackageTarget(source, resolved, failure) {
   const supported = getSupportedJayessSourceExtensions().join(", ");
   const packageContext = failure?.packageRoot == null ? "" : ` from package root '${failure.packageRoot}'`;
+  const packageDetail = failure?.packageName == null ? "" : ` package '${failure.packageName}'`;
+  let resolutionDetail = "";
+  if (failure?.packageField === "exports") {
+    resolutionDetail = ` via package.json exports key '${failure.exportKey ?? "."}'`;
+  } else if (failure?.packageField === "main" || failure?.packageField === "index") {
+    resolutionDetail = ` via package.json ${failure.packageField} entry '${failure.mainField}'`;
+  } else if (failure?.subpath?.length > 0) {
+    resolutionDetail = ` via package subpath './${failure.subpath}'`;
+  }
   throwDiagnostics([
     createModuleFileDiagnostic(
       resolved,
-      `Package import '${source}' resolved${packageContext} to unsupported file type '${path.extname(resolved)}'; only Jayess source files (${supported}) are transpileable`,
+      `Package import '${source}' resolved${packageContext} through${packageDetail}${resolutionDetail} to unsupported file type '${path.extname(resolved)}' at '${resolved}'; this installed package is not a transpileable Jayess package. Only Jayess source files (${supported}) are transpileable package targets`,
       source
     )
   ]);
+}
+
+function describeUnsupportedPackageReason(failure, mappingKind) {
+  const arrayLabel = mappingKind === "exports" ? "exports array" : "imports array";
+
+  if (failure?.packageUnsupportedReason === "array-no-supported-target") {
+    return `; the ${arrayLabel} contains no supported transpileable target`;
+  }
+  if (failure?.packageUnsupportedReason === "unsupported-conditions") {
+    const checked = failure.exportConditionTrace ?? failure.importConditionTrace ?? [];
+    if (checked.length > 0) {
+      return `; checked conditions ${checked.map((condition) => `'${condition}'`).join(", ")} but none resolved to a supported Jayess source target`;
+    }
+    return "; no supported Jayess export conditions resolved";
+  }
+  if (failure?.packageUnsupportedReason === "nested-array-not-supported") {
+    return "; nested arrays are not supported in this mapping";
+  }
+  if (failure?.packageUnsupportedReason === "invalid-pattern-target") {
+    return "; the selected target could not be expanded into a supported file path";
+  }
+  if (failure?.packageUnsupportedReason?.startsWith("invalid-target-value-type:")) {
+    const targetType = failure.packageUnsupportedReason.split(":")[1];
+    return `; the selected target value type '${targetType}' is not supported`;
+  }
+
+  return "";
 }
 
 function throwPackageResolutionFailure(source, failure) {
@@ -68,13 +104,11 @@ function throwPackageResolutionFailure(source, failure) {
   }
 
   if (failure?.reason === "package-export-unsupported") {
-    const arrayDetail = failure.packageUnsupportedReason === "array-no-supported-target"
-      ? "; the exports array contains no supported transpileable target"
-      : "";
+    const reasonDetail = describeUnsupportedPackageReason(failure, "exports");
     throwDiagnostics([
       createModuleFileDiagnostic(
         source,
-        `Cannot resolve package import '${source}': package '${failure.packageName}' at '${failure.packageRoot}' uses an unsupported package.json exports mapping for '${failure.exportKey}'${arrayDetail}. Jayess currently supports direct transpileable string targets, narrow jayess/import/default targets, and arrays of those targets`,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' at '${failure.packageRoot}' uses an unsupported package.json exports mapping for '${failure.exportKey}'${reasonDetail}. Jayess currently supports direct transpileable string targets, narrow jayess/import/default targets, and arrays of those targets`,
         source
       )
     ]);
@@ -84,7 +118,7 @@ function throwPackageResolutionFailure(source, failure) {
     throwDiagnostics([
       createModuleFileDiagnostic(
         source,
-        `Cannot resolve package import '${source}': package '${failure.packageName}' at package root '${failure.packageRoot}' has no transpileable entry file from package.json ${failure.packageField} field (checked '${failure.mainField}')`,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' is installed at package root '${failure.packageRoot}' but is not a transpileable Jayess package. It has no transpileable entry file from package.json ${failure.packageField} field (checked '${failure.mainField}')`,
         source
       )
     ]);
@@ -131,13 +165,11 @@ function throwPackageResolutionFailure(source, failure) {
   }
 
   if (failure?.reason === "package-import-unsupported") {
-    const arrayDetail = failure.packageUnsupportedReason === "array-no-supported-target"
-      ? "; the imports array contains no supported transpileable target"
-      : "";
+    const reasonDetail = describeUnsupportedPackageReason(failure, "imports");
     throwDiagnostics([
       createModuleFileDiagnostic(
         source,
-        `Cannot resolve package import '${source}': package '${failure.packageName}' at '${failure.packageRoot}' uses an unsupported package.json imports mapping for '${failure.importKey}'${arrayDetail}. Jayess currently supports direct transpileable string targets, narrow jayess/import/default targets, and arrays of those targets`,
+        `Cannot resolve package import '${source}': package '${failure.packageName}' at '${failure.packageRoot}' uses an unsupported package.json imports mapping for '${failure.importKey}'${reasonDetail}. Jayess currently supports direct transpileable string targets, narrow jayess/import/default targets, and arrays of those targets`,
         source
       )
     ]);

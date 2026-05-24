@@ -8,7 +8,7 @@ The repository-owned built-in namespace is:
 
 - `jayess:*`
 
-First planned examples:
+Representative shipped examples:
 
 - `jayess:date`
 - `jayess:json`
@@ -57,7 +57,7 @@ Current repository contract:
 
 This keeps string-mode deterministic and avoids hidden filesystem coupling.
 
-## Bootstrap Layout
+## Repository Layout
 
 The repository bootstrap layout for built-in Jayess modules is:
 
@@ -76,7 +76,7 @@ This layout is intentionally Jayess-source-first:
 - helper metadata or resolver maps may be added later
 - runtime-only support should stay outside this tree unless a module requires generated native artifacts explicitly
 
-The bootstrap layout does not imply those modules are already fully implemented. It exists so later slices have a stable home and so resolver work does not need to invent paths ad hoc.
+This layout now hosts a broad shipped `jayess:*` module surface. The document focuses on the resolver and generated-output contract rather than trying to list every built-in module directory.
 
 ## Current Status
 

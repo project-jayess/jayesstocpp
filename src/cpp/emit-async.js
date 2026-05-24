@@ -30,17 +30,37 @@ export function emitAsyncCallableBody(node, context, lines, emitParameterInitial
   lines.push("  }");
 }
 
-export function renderAsyncCallableExpression(node, context, captureList, emitParameterInitialization, emitStatement, renderExpression) {
+export function renderAsyncCallableClosure(
+  node,
+  context,
+  captureList,
+  emitParameterInitialization,
+  emitStatement,
+  renderExpression,
+  options = {}
+) {
   const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
-  emitAsyncCallableBody(node, context, lines, emitParameterInitialization, emitStatement, renderExpression);
+  emitAsyncCallableBody(node, context, lines, emitParameterInitialization, emitStatement, renderExpression, options);
   lines.push("})");
   return lines.join("\n");
 }
 
+export function renderAsyncCallableExpression(node, context, captureList, emitParameterInitialization, emitStatement, renderExpression) {
+  return renderAsyncCallableClosure(
+    node,
+    context,
+    captureList,
+    emitParameterInitialization,
+    emitStatement,
+    renderExpression
+  );
+}
+
 export function emitAsyncFunction(node, context, lines, emitParameterInitialization, emitStatement) {
-  lines.push(`jayess::value ${node.id.name}(const std::vector<jayess::value>& jayess_args) {`);
+  lines.push(`jayess::value ${toCppIdentifier(node.id.name)}(const std::vector<jayess::value>& jayess_args) {`);
   emitAsyncCallableBody(node, context, lines, emitParameterInitialization, emitStatement, () => {
     throw new Error("Async function declarations should not use expression bodies");
   });
   lines.push("}");
 }
+import { toCppIdentifier } from "./cpp-identifiers.js";

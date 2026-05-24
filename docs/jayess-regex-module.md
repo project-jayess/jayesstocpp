@@ -1,10 +1,10 @@
 # Jayess `jayess:regex` Module
 
-The first shipped regex surface in Jayess is a small Jayess-owned module:
+The current shipped regex surface in Jayess is a small Jayess-owned module:
 
 - `jayess:regex`
 
-It does not expose ambient JavaScript `RegExp`, regex literals, or constructor-style compatibility.
+It does not expose ambient JavaScript `RegExp`, regex literals, or constructor-style compatibility, and Jayess keeps regex support module-owned rather than ambient.
 
 ## Exports
 
@@ -21,10 +21,10 @@ The shipped exports are:
 
 ## Current Semantics
 
-The current slice is intentionally narrow.
+The current shipped surface is intentionally narrow.
 
 - `create(pattern)` requires a string pattern and returns a Jayess regex value.
-- `create(pattern, ...flags)` accepts zero or more string flag arguments, which are combined before validation.
+- `create(pattern, ...flags)` currently accepts a pattern plus one optional string flags argument.
 - supported flags are `i`, `m`, and `s`.
 - `i` enables case-insensitive matching.
 - `m` enables multiline anchor matching for `^` and `$`.
@@ -38,16 +38,18 @@ The current slice is intentionally narrow.
 - `split(regex, text)` returns a Jayess array of string segments split by regex matches.
 - `matchAll(regex, text)` returns a Jayess array of match arrays.
 - each `matchAll` match array contains the full match at index `0`, followed by any captured groups.
+- `matchAll(regex, text)` returns an empty Jayess array when no matches exist.
 - `replaceFirst(regex, text, replacement)` returns a new string with only the first match replaced.
 - `replaceAll(regex, text, replacement)` returns a new string with all matches replaced.
-- replacement helpers accept string replacement text only; callback replacement is not part of this slice.
+- replacement helpers accept string replacement text only; callback replacement is not part of this slice and non-string replacements throw.
+- `replaceFirst` and `replaceAll` return the original string unchanged when no match exists.
 - regex creation and operations require string inputs where appropriate.
 - invalid regex patterns throw a focused runtime error.
 - malformed regex flags throw a focused runtime error.
 
 ## Ownership Split
 
-The shipped first slice is split across:
+The current shipped surface is split across:
 
 - `stdlib/jayess/regex/index.js`
 - `stdlib/jayess/regex/regex-primitives.hpp`
@@ -57,7 +59,7 @@ The C++ runtime owns pattern compilation, flag validation, and matching. The pub
 
 ## Non-Goals For This Slice
 
-This first slice does not attempt to provide:
+This current shipped surface does not attempt to provide:
 
 - regex literal syntax like `/abc/`
 - `new RegExp(...)`

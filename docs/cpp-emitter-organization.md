@@ -6,6 +6,7 @@ Current focused helpers include:
 
 - `src/cpp/emit-assignment.js` for ordinary assignment, destructuring assignment, member assignment, and compound assignment lowering.
 - `src/cpp/emit-call.js` for ordinary calls, optional calls, `new` call lowering, spread argument assembly, and `super(...)` constructor forwarding.
+- `src/cpp/emit-callable-closure.js` for shared sync callable-closure scaffolding used by function expressions, arrow functions, and class-method closures before async/generator-specialized lowering takes over.
 - `src/cpp/emit-member.js` for ordinary and optional member reads, namespace-import member reads, private-member reads, `super.method` reads, and built-in `.length` reads.
 - `src/cpp/emit-operators.js` for unary operators, binary operators, logical short-circuiting, and nullish coalescing expression lowering.
 - `src/cpp/emit-control-flow.js` for return, throw, break, continue, and block statement emission.
@@ -18,6 +19,7 @@ Current focused helpers include:
 - `src/cpp/module-imports.js` for import binding maps and native/header include collection.
 - `src/cpp/module-init.js` for `jayess_module_init()` and `jayess_module_init_async()` emission.
 - `src/cpp/runtime-core-value-source.js` for runtime truthiness, null checks, string conversion, and exact equality helpers.
+- `src/cpp/runtime-core-control-source.js` for runtime scope cleanup frames, finally guards/signals, and thrown-value bridge types.
 - `src/cpp/runtime-core-composite-source.js` for runtime destructuring, spread, array push, and member/index assignment helpers.
 - `src/cpp/runtime-async-scheduler-source.js` for async scheduler queues, timers, async handle validation, and cancellation token validation used by the async runtime fragment.
 - `src/cpp/runtime-async-core-source.js` for async handle creation, settlement, continuations, and synchronous await helpers.

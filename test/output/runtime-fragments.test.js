@@ -360,12 +360,14 @@ test("transpileFile writes runtime bytes helpers into the generated runtime", (t
   assert.match(headerSource, /value bytes_slice\(const value& input, const std::vector<value>& args\);/);
   assert.match(headerSource, /value bytes_concat\(const value& left, const value& right\);/);
   assert.match(headerSource, /value bytes_equals\(const value& left, const value& right\);/);
+  assert.match(headerSource, /value bytes_secure_equals\(const value& left, const value& right\);/);
   assert.match(headerSource, /bool is_bytes_value\(const value& input\);/);
   assert.match(cppSource, /bytes_ptr require_bytes_value\(const value& input, const std::string& message\)/);
   assert.match(cppSource, /value bytes_from_utf8\(const value& text\)/);
   assert.match(cppSource, /value bytes_to_utf8\(const value& input\)/);
   assert.match(cppSource, /value bytes_concat\(const value& left, const value& right\)/);
   assert.match(cppSource, /value bytes_equals\(const value& left, const value& right\)/);
+  assert.match(cppSource, /value bytes_secure_equals\(const value& left, const value& right\)/);
 });
 
 test("transpileFile writes runtime encoding helpers into the generated runtime", (t) => {
@@ -400,12 +402,16 @@ test("transpileFile writes runtime crypto helpers into the generated runtime", (
   const cppSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
 
   assert.match(headerSource, /value crypto_sha256\(const value& input\);/);
+  assert.match(headerSource, /value crypto_sha512\(const value& input\);/);
   assert.match(headerSource, /value crypto_sha1\(const value& input\);/);
   assert.match(headerSource, /value crypto_random_bytes\(const value& count\);/);
   assert.match(cppSource, /std::vector<unsigned char> sha256_digest\(const std::vector<unsigned char>& input\)/);
+  assert.match(cppSource, /std::vector<unsigned char> sha512_digest\(const std::vector<unsigned char>& input\)/);
   assert.match(cppSource, /std::vector<unsigned char> sha1_digest\(const std::vector<unsigned char>& input\)/);
-  assert.match(cppSource, /std::random_device device;/);
+  assert.match(cppSource, /fill_crypto_random_bytes/);
+  assert.match(cppSource, /CRYPTO_RANDOM_UNAVAILABLE_MESSAGE/);
   assert.match(cppSource, /value crypto_sha256\(const value& input\)/);
+  assert.match(cppSource, /value crypto_sha512\(const value& input\)/);
   assert.match(cppSource, /value crypto_sha1\(const value& input\)/);
   assert.match(cppSource, /value crypto_random_bytes\(const value& count\)/);
 });

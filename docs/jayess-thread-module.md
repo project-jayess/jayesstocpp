@@ -31,7 +31,7 @@ The module is split across:
 - `stdlib/jayess/thread/thread-primitives.hpp`
 - `src/cpp/runtime-thread-source.js`
 
-Threading is explicit module behavior. Jayess does not expose ambient worker globals or shared mutable state in this first slice.
+Threading is explicit module behavior. Jayess does not expose ambient worker globals or shared mutable state in the current shipped surface.
 
 Related coordination helpers live in:
 

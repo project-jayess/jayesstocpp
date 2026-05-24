@@ -1,4 +1,5 @@
 import {
+  jayessHttpBeginStream,
   jayessHttpRequestBody,
   jayessHttpRequestHeaders,
   jayessHttpRequestMethod,
@@ -8,20 +9,22 @@ import {
   jayessHttpCreateServer,
   jayessHttpCloseServer,
   jayessHttpEnd,
+  jayessHttpEndStream,
   jayessHttpRequest,
   jayessHttpSetHeader,
   jayessHttpSetStatus,
-  jayessHttpWrite
+  jayessHttpWrite,
+  jayessHttpWriteStream
 } from "./http-primitives.hpp";
-import { fromUtf8 as bytesFromUtf8 } from "jayess:bytes";
-import { readBytesSync, statSync } from "jayess:fs";
+import { fromUtf8 as bytesFromUtf8, length as bytesLength } from "jayess:bytes";
+import { readBytesSync, removeSync, statSync } from "jayess:fs";
 import { parse as parseJson, stringify as stringifyJson } from "jayess:json";
 import { lookup as lookupMime } from "jayess:mime";
 import { has as objectHas, keys } from "jayess:object";
 import { join } from "jayess:path";
 import { parse as parseQuery } from "jayess:querystring";
-import { includes, slice, split, startsWith } from "jayess:string";
-import { toBytes as streamToBytes, toText as streamToText } from "jayess:stream";
+import { includes, slice, split, startsWith, toLower } from "jayess:string";
+import { readChunk } from "jayess:stream";
 import { timeoutWithCancellation, withCancellation, withTimeout } from "jayess:async";
 
 export function request(options) {
@@ -158,6 +161,18 @@ export function end(response, body) {
   return jayessHttpEnd(response, body);
 }
 
+function beginStream(response) {
+  return jayessHttpBeginStream(response);
+}
+
+function writeStream(response, body) {
+  return jayessHttpWriteStream(response, body);
+}
+
+function endStream(response) {
+  return jayessHttpEndStream(response);
+}
+
 function applyResponseOptions(response, options) {
   if (options === null) {
     return response;
@@ -199,12 +214,39 @@ export function sendBytes(response, value, options) {
   return end(response, value);
 }
 
+function responseStreamChunkSize(chunkSize) {
+  if (chunkSize === null) {
+    return 65536;
+  }
+  if (chunkSize < 1) {
+    throw "jayess:http stream chunkSize must be at least 1";
+  }
+  return chunkSize;
+}
+
+async function sendResponseStream(response, stream, options, chunkSize, defaultContentType) {
+  applyResponseOptions(response, options);
+  if (defaultContentType !== null && (options === null || !objectHas(options, "contentType"))) {
+    setHeader(response, "Content-Type", defaultContentType);
+  }
+  var resolvedChunkSize = responseStreamChunkSize(chunkSize);
+  beginStream(response);
+  while (true) {
+    var chunk = await readChunk(stream, resolvedChunkSize);
+    if (bytesLength(chunk) === 0) {
+      endStream(response);
+      return null;
+    }
+    writeStream(response, chunk);
+  }
+}
+
 export async function sendTextStream(response, stream, options, chunkSize) {
-  return sendText(response, await streamToText(stream, chunkSize), options);
+  return sendResponseStream(response, stream, options, chunkSize, "text/plain");
 }
 
 export async function sendBytesStream(response, stream, options, chunkSize) {
-  return sendBytes(response, await streamToBytes(stream, chunkSize), options);
+  return sendResponseStream(response, stream, options, chunkSize, null);
 }
 
 export function notFound(response, message) {
@@ -217,12 +259,28 @@ export function redirect(response, location, status) {
   return end(response, "");
 }
 
+function staticContentType(filename) {
+  var contentType = lookupMime(filename);
+  if (contentType === null || contentType === "") {
+    return "application/octet-stream";
+  }
+  return contentType;
+}
+
 export function sendFile(response, filename, options) {
   applyResponseOptions(response, options);
   if (options === null || !objectHas(options, "contentType")) {
-    setHeader(response, "Content-Type", lookupMime(filename));
+    setHeader(response, "Content-Type", staticContentType(filename));
   }
-  return end(response, readBytesSync(filename));
+  try {
+    return end(response, readBytesSync(filename));
+  } catch (error) {
+    var details = statSync(filename);
+    if (!details.exists) {
+      return notFound(response, "not found");
+    }
+    return sendText(response, "file read failed", { status: 500, contentType: "text/plain" });
+  }
 }
 
 function requireStaticRoot(root) {
@@ -260,8 +318,16 @@ function pathname(requestPath) {
   return slice(requestPath, 0, index);
 }
 
+function encodedUnsafeStaticPath(requestPathname) {
+  var lowerPath = toLower(requestPathname);
+  return includes(lowerPath, "%2e") || includes(lowerPath, "%2f") || includes(lowerPath, "%5c");
+}
+
 function safeStaticPath(root, requestPath) {
   var requestPathname = pathname(requestPath);
+  if (encodedUnsafeStaticPath(requestPathname)) {
+    return null;
+  }
   var parts = split(requestPathname, "/");
   var resolved = root;
 
@@ -309,15 +375,20 @@ export function serveStatic(root, options) {
     }
 
     if (cacheControl === "") {
-      return sendFile(response, filename, { contentType: lookupMime(filename) });
+      return sendFile(response, filename, { contentType: staticContentType(filename) });
     }
     return sendFile(response, filename, {
-      contentType: lookupMime(filename),
+      contentType: staticContentType(filename),
       headers: {
         "Cache-Control": cacheControl
       }
     });
   };
+}
+
+export function deleteThenSendFile(response, filename, options) {
+  removeSync(filename);
+  return sendFile(response, filename, options);
 }
 
 export function serveFiles(root, options) {
@@ -362,6 +433,26 @@ export function router(routes) {
   };
 }
 
+function matchRoutePath(routePath, requestPath) {
+  var routeParts = split(routePath, "/");
+  var requestParts = split(requestPath, "/");
+  if (routeParts.length !== requestParts.length) {
+    return null;
+  }
+
+  var captured = {};
+  for (var index = 0; index < routeParts.length; index = index + 1) {
+    var routePart = routeParts[index];
+    var requestPart = requestParts[index];
+    if (startsWith(routePart, ":")) {
+      captured[slice(routePart, 1, routePart.length)] = requestPart;
+    } else if (routePart !== requestPart) {
+      return null;
+    }
+  }
+  return captured;
+}
+
 export function match(routerValue, requestValue) {
   if (routerValue === null || routerValue.routes === null) {
     throw "jayess:http match requires a router";
@@ -387,26 +478,6 @@ export function match(routerValue, requestValue) {
   }
 
   return null;
-}
-
-function matchRoutePath(routePath, requestPath) {
-  var routeParts = split(routePath, "/");
-  var requestParts = split(requestPath, "/");
-  if (routeParts.length !== requestParts.length) {
-    return null;
-  }
-
-  var captured = {};
-  for (var index = 0; index < routeParts.length; index = index + 1) {
-    var routePart = routeParts[index];
-    var requestPart = requestParts[index];
-    if (startsWith(routePart, ":")) {
-      captured[slice(routePart, 1, routePart.length)] = requestPart;
-    } else if (routePart !== requestPart) {
-      return null;
-    }
-  }
-  return captured;
 }
 
 export function handle(routerValue, requestValue, response) {

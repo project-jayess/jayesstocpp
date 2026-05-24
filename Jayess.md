@@ -29,6 +29,9 @@ The following JavaScript features are not part of Jayess by design:
 - JavaScript-style `var` hoisting and function-scoped `var`
 - runtime module loading by computed source path
 - implicit browser-style script/global loading
+- regex literal syntax such as `/abc/`
+- ambient/global `RegExp`
+- `new RegExp(...)`
 
 ## Unsupported By Design
 
@@ -42,6 +45,9 @@ In practical terms, these are the JavaScript features Jayess should continue to 
 - `Function(...)`
 - `with`
 - JavaScript-style hoisted/function-scoped `var`
+- regex literal syntax such as `/abc/`
+- ambient/global `RegExp`
+- `new RegExp(...)`
 
 Jayess uses `null` as its only built-in “missing” sentinel in the current language direction.
 Jayess also keeps `async` / `await` as Jayess-owned language/runtime behavior rather than adopting JavaScript `Promise` programming style.
@@ -51,6 +57,7 @@ Jayess also keeps truthiness, equality, and numeric operators explicit rather th
 - empty arrays, empty objects, empty maps, and empty sets are falsey
 - equality is exact-type and identity-based for composite/runtime-handle values
 - JavaScript-style numeric coercion such as `"5" + 1`, `"5" - 1`, or `true + 1` is not part of the language
+- regex support is module-owned through `jayess:regex`, not ambient syntax or globals
 
 ## General Rule
 

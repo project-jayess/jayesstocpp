@@ -149,6 +149,26 @@ test("module graph resolves package self-reference imports from nested package f
   assert.ok(graph.modules[1].filename.endsWith("package-project/src/self-feature.js"));
 });
 
+test("module graph resolves hoisted workspace package imports from a nested package", () => {
+  const graph = buildModuleGraph(path.resolve("test/fixtures/workspace-project/packages/app/src/main.js"));
+  const moduleFilenames = graph.modules.map((moduleRecord) => moduleRecord.filename.split(path.sep).join("/"));
+
+  assert.equal(graph.modules.length, 3);
+  assert.deepEqual(
+    graph.modules[0].dependencies.map((dependency) => ({
+      source: dependency.source,
+      mode: dependency.packageResolutionMode,
+      key: dependency.packageExportKey
+    })),
+    [
+      { source: "workspace-lib", mode: "node-modules", key: "." },
+      { source: "workspace-app/self", mode: "self-reference", key: "./self" }
+    ]
+  );
+  assert.ok(moduleFilenames.some((filename) => filename.endsWith("workspace-project/node_modules/workspace-lib/src/index.js")));
+  assert.ok(moduleFilenames.some((filename) => filename.endsWith("workspace-project/packages/app/src/self.js")));
+});
+
 test("module graph resolves package imports mappings", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/package-import-main.js"));
 
@@ -440,7 +460,10 @@ test("module graph rejects package targets that are not Jayess source files", ()
     (error) =>
       error instanceof JayessError
       && /unsupported file type '.json'/.test(error.diagnostics[0].message)
+      && /package\.json main entry 'data\.json'/.test(error.diagnostics[0].message)
+      && /at '.*data\.json'/.test(error.diagnostics[0].message)
       && /package root/.test(error.diagnostics[0].message)
+      && /not a transpileable Jayess package/.test(error.diagnostics[0].message)
   );
 });
 
@@ -460,6 +483,7 @@ test("module graph rejects packages with missing entry files clearly", () => {
     (error) =>
       error instanceof JayessError
       && /has no transpileable entry file/.test(error.diagnostics[0].message)
+      && /not a transpileable Jayess package/.test(error.diagnostics[0].message)
       && /package.json/.test(error.diagnostics[0].message)
       && /package root/.test(error.diagnostics[0].message)
   );
@@ -532,6 +556,7 @@ test("module graph rejects packages that expose only unsupported conditional exp
     (error) =>
       error instanceof JayessError
       && /unsupported package\.json exports mapping/.test(error.diagnostics[0].message)
+      && /checked conditions 'jayess', 'import', 'default'/.test(error.diagnostics[0].message)
       && /conditional-only-lib/.test(error.diagnostics[0].message)
   );
 });
@@ -544,6 +569,7 @@ test("package resolver reports rejected condition metadata", () => {
 
   assert.equal(result.reason, "package-export-unsupported");
   assert.equal(result.exportKey, ".");
+  assert.equal(result.packageUnsupportedReason, "unsupported-conditions");
   assert.deepEqual(result.exportConditionTrace, ["jayess", "import", "default"]);
   assert.deepEqual(result.allowedExtensions, [".js", ".mjs"]);
 });
@@ -595,6 +621,7 @@ test("module graph rejects invalid package export target value types", () => {
     (error) =>
       error instanceof JayessError
       && /unsupported package\.json exports mapping/.test(error.diagnostics[0].message)
+      && /selected target value type 'number'/.test(error.diagnostics[0].message)
       && /invalid-target-lib/.test(error.diagnostics[0].message)
   );
 });

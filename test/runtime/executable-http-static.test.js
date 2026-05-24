@@ -39,9 +39,11 @@ double statusCode(const jayess::value& response) {
 }
 
 int main() {
-  const auto root = std::filesystem::path("${targetDir}") / "static-root";
+  const auto root = std::filesystem::path(${JSON.stringify(targetDir)}) / "static-root";
   writeText(root / "index.html", "home");
   writeText(root / "assets" / "app.js", "console.log('jayess');");
+  writeText(root / "mystery.unknown", "mystery");
+  writeText(root / "volatile.txt", "volatile");
 
   ${namespace}::jayess_module_init();
   const int port = 45686;
@@ -63,6 +65,18 @@ int main() {
 
   auto unsafeResponse = request("http://127.0.0.1:45686/../secret.txt");
   require(statusCode(unsafeResponse) == 400.0, "unsafe status");
+
+  auto encodedUnsafeResponse = request("http://127.0.0.1:45686/%2e%2e/secret.txt");
+  require(statusCode(encodedUnsafeResponse) == 400.0, "encoded unsafe status");
+
+  auto unknownMimeResponse = request("http://127.0.0.1:45686/unknown.bin");
+  require(statusCode(unknownMimeResponse) == 200.0, "unknown mime status");
+  const auto& unknownMimeHeaders = std::get<jayess::object_ptr>(std::get<jayess::object_ptr>(unknownMimeResponse)->fields.at("headers"))->fields;
+  require(std::get<std::string>(unknownMimeHeaders.at("Content-Type")) == "application/octet-stream", "unknown mime fallback");
+  require(std::get<std::string>(jayess::http_response_text(unknownMimeResponse)) == "mystery", "unknown mime body");
+
+  auto volatileResponse = request("http://127.0.0.1:45686/volatile");
+  require(statusCode(volatileResponse) == 404.0, "volatile deleted file status");
 
   ${namespace}::stop(std::vector<jayess::value>{server});
   std::cout << "ok\\n";

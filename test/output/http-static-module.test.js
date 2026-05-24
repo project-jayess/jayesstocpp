@@ -26,8 +26,12 @@ test("transpileFile emits http serveStatic helper dependencies", (t) => {
   assert.match(moduleSource, /serveStatic/);
   assert.match(moduleSource, /serveFiles/);
   assert.match(moduleSource, /staticCacheControl/);
+  assert.match(moduleSource, /encodedUnsafeStaticPath/);
+  assert.match(moduleSource, /staticContentType/);
+  assert.match(moduleSource, /deleteThenSendFile/);
   assert.match(moduleSource, /Cache-Control/);
   assert.match(moduleSource, /safeStaticPath/);
   assert.match(moduleSource, /jayess:http serveStatic root must be non-empty/);
+  assert.match(moduleSource, /file read failed/);
   assert.match(moduleSource, /unsafe path/);
 });

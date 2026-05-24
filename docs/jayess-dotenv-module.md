@@ -14,4 +14,4 @@
 - The first `=` separates key from value.
 - Keys and values are trimmed.
 
-The first slice keeps quoting and escape handling outside the helper surface.
+The current shipped surface keeps quoting and escape handling outside the helper surface.

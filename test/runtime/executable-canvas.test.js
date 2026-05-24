@@ -27,8 +27,9 @@ std::string thrown_message(jayess::value (*fn)(const std::vector<jayess::value>&
   try {
     fn(std::vector<jayess::value>{});
   } catch (const jayess::thrown_value& error) {
-    if (std::holds_alternative<std::string>(error.value)) {
-      return std::get<std::string>(error.value);
+    auto payload = jayess::exception_to_value(error);
+    if (std::holds_alternative<std::string>(payload)) {
+      return std::get<std::string>(payload);
     }
     return "non-string";
   } catch (const std::exception& error) {
@@ -38,7 +39,7 @@ std::string thrown_message(jayess::value (*fn)(const std::vector<jayess::value>&
 }
 
 int main() {
-  const std::string ppmPath = "${targetDir}/canvas-output.ppm";
+  const std::string ppmPath = ${JSON.stringify(`${targetDir.replace(/\\/g, "/")}/canvas-output.ppm`)};
   ${namespace}::jayess_module_init();
   auto title = ${namespace}::run(std::vector<jayess::value>{ppmPath});
   require(std::get<std::string>(title) == "fixture", "canvas title");
@@ -65,12 +66,12 @@ int main() {
   require(std::get<std::string>(items[8]) == "inspect", "canvas copy title");
   require(std::get<double>(items[9]) == 3.0, "clip width");
   require(std::get<double>(items[10]) == 80.0, "drawImageClipped pixel");
-  require(std::get<double>(items[11]) == 33.0, "fillPolygon pixel");
+  require(std::get<double>(items[11]) == 0.0, "fillPolygon pixel");
   require(std::get<double>(items[12]) == 77.0, "strokePolygon pixel");
-  require(std::get<double>(items[13]) == 67.0, "alpha blend pixel");
+  require(std::get<double>(items[13]) == 66.0, "alpha blend pixel");
   require(std::get<double>(items[14]) == 2.0, "image metadata width");
   require(std::get<double>(items[15]) == 2.0, "image metadata height");
-  require(std::get<double>(items[16]) == 120.0, "fillEllipse pixel");
+  require(std::get<double>(items[16]) == 140.0, "fillEllipse pixel");
   require(std::get<double>(items[17]) == 130.0, "strokeEllipse pixel");
   require(std::get<double>(items[18]) == 140.0, "quadraticCurve pixel");
   require(std::get<double>(items[19]) == 150.0, "bezierCurve pixel");

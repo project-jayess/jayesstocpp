@@ -1,6 +1,6 @@
 # Jayess Overview
 
-This repository contains a small but working first milestone of the Jayess to C++ transpiler.
+This repository contains a working Jayess to C++ transpiler with a broad but intentionally curated language and standard-library surface.
 
 ## Environment
 
@@ -101,7 +101,7 @@ This repository contains a small but working first milestone of the Jayess to C+
 - anonymous default-exported class declarations across modules
 - default imports across modules
 - optional shared-library-oriented output layout for `transpileFile(..., { projectKind: "shared-library" })`
-- Jayess-owned system modules:
+- selected shipped Jayess-owned system modules:
   - `jayess:fs`
   - `jayess:os`
   - `jayess:path`
@@ -109,7 +109,7 @@ This repository contains a small but working first milestone of the Jayess to C+
   - `jayess:system`
   - `jayess:thread`
   - `jayess:timers`
-- Jayess-owned standard-library modules:
+- selected shipped Jayess-owned standard-library modules:
   - `jayess:assert`
   - `jayess:array`
   - `jayess:async`
@@ -118,8 +118,9 @@ This repository contains a small but working first milestone of the Jayess to C+
   - `jayess:console`
   - `jayess:crypto`
   - `jayess:date`
-  - `jayess:encoding`
-  - `jayess:iter`
+- `jayess:encoding`
+- `jayess:gui`
+- `jayess:iter`
   - `jayess:json`
   - `jayess:math`
   - `jayess:number`
@@ -163,6 +164,8 @@ When practical, standard-library and core-library behavior should be written in 
 
 The remaining larger language/runtime gaps are treated as active implementation work. Until a slice is actually shipped, the transpiler should keep explicit diagnostics rather than implying partial support.
 
+Jayess's default GUI direction is now explicit too: a Jayess-owned toolkit over `jayess:layout`, `jayess:canvas`, and `jayess:window`, not browser DOM compatibility and not Node.js GUI-package compatibility.
+
 Jayess also has explicit permanent non-goals that come from being a compiled language rather than a runtime source-evaluation environment. `let` is not part of the language because Jayess `var` already fills that role, and Jayess does not support dynamic `import()`, `eval(...)`, `Function(...)`, or `with`.
 
 Jayess also does not aim to add a separate JavaScript-style `undefined` value. The current language direction is to keep `null` as the only built-in missing-value sentinel and keep equality/truthiness rules explicit rather than coercive.
@@ -178,7 +181,9 @@ The current semantics direction is also explicit on truthiness and coercion:
 See [../Jayess.md](../Jayess.md) for the current language-direction rules and explicit permanently unsupported JavaScript features.
 See [javascript-feature-gaps.md](./javascript-feature-gaps.md) for a broader list of unsupported or intentionally different JavaScript features.
 See [stdlib-and-core-model.md](./stdlib-and-core-model.md) for the intended split between low-level C++ runtime support and Jayess-written standard-library/core modules.
-See [standard-library.md](./standard-library.md) for the current `jayess:*` module index and export list.
+See [feature-matrix.md](./feature-matrix.md) for the authoritative quick syntax-support matrix.
+See [standard-library.md](./standard-library.md) for the authoritative `jayess:*` export index.
+See [standard-library-matrix.md](./standard-library-matrix.md) for the authoritative quick standard-library/module matrix.
 See [runtime-verification.md](./runtime-verification.md) for the local executable checks that compile generated C++ and run selected exported functions.
 See [feature-matrix.md](./feature-matrix.md), [standard-library-matrix.md](./standard-library-matrix.md), [unsupported-by-design.md](./unsupported-by-design.md), and [generated-project-layout.md](./generated-project-layout.md) for concise project indexes.
 See [semantics.md](./semantics.md) for the current truthiness, equality, and numeric-operator rules that Jayess implements today.
@@ -198,6 +203,7 @@ See [jayess-json-module.md](./jayess-json-module.md) for the shipped `jayess:jso
 See [jayess-map-module.md](./jayess-map-module.md) for the shipped `jayess:collections/map` module surface and runtime-boundary decision.
 See [jayess-set-module.md](./jayess-set-module.md) for the shipped `jayess:collections/set` module surface and runtime-boundary decision.
 See [jayess-regex-module.md](./jayess-regex-module.md) for the shipped `jayess:regex` helper surface.
+See [regex-roadmap.md](./regex-roadmap.md) for the current regex boundary and shipped first expansion slice.
 See [jayess-console-module.md](./jayess-console-module.md) for the shipped `jayess:console` output surface.
 See [jayess-bytes-module.md](./jayess-bytes-module.md) for the shipped `jayess:bytes` binary-data surface.
 See [jayess-buffer-module.md](./jayess-buffer-module.md) for the shipped `jayess:buffer` range-checked byte-buffer surface.
@@ -269,21 +275,25 @@ Current system-module note:
 
 - Jayess-owned `jayess:*` standard-library modules are supported through explicit imports
 - system-facing modules include `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:system`, `jayess:thread`, and `jayess:timers`
-- `jayess:fs` currently exports default async filesystem helpers plus matching `Sync` variants: `exists`, `readText`, `readBytes`, `writeText`, `writeBytes`, `appendText`, `copy`, `copyRecursive`, `createDirectories`, `remove`, `removeRecursive`, `list`, `walk`, `rename`, `stat`, and their `Sync` forms
+- `jayess:fs` currently exports default async filesystem helpers plus matching `Sync` variants for `exists`, `readText`, `readBytes`, `writeText`, `writeBytes`, `appendText`, `copy`, `createDirectories`, `remove`, `list`, `rename`, and `stat`
 - `jayess:os` currently exports `platform`, `arch`, `homeDir`, `tmpDir`, `hostname`, and `newline`
-- `jayess:path` currently exports `join`, `dirname`, `basename`, `extname`, `normalize`, `parse`, `format`, `separator`, `delimiter`, `resolve`, `relative`, and `isAbsolute`
+- `jayess:path` currently exports `join`, `dirname`, `basename`, `extname`, `normalize`, `resolve`, `relative`, and `isAbsolute`
 - `jayess:process` currently exports `argv`, `cwd`, `getEnv`, and `exit`
 - `jayess:system` currently exports `args`, `cwd`, `getEnv`, `hasEnv`, and `exitCode`
 - `jayess:thread` currently exports `spawn`, `join`, `sleep`, `hardwareConcurrency`, and `currentId`
-- `jayess:timers` currently exports `sleep`, `setTimeout`, and `clearTimeout`
-- `jayess:stream` currently exports `openRead`, `openWrite`, `readChunk`, `writeChunk`, `close`, `pipe`, `copy`, `chunks`, and `readText`
+- `jayess:timers` currently exports `sleep`, `setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval`
+- the next approved `jayess:fs` slice is explicit recursive file-tree helpers: `walk`, `copyRecursive`, and `removeRecursive`, plus matching `Sync` variants
+- the next approved `jayess:path` slice is path-structure helpers: `parse`, `format`, `separator`, and `delimiter`
+- the next approved `jayess:process` slice is read-only environment inspection: `hasEnv`, `envKeys`, and `envEntries`
+- the next active host-module implementation slice is `jayess:timers`
+- `jayess:stream` currently exports `openRead`, `openWrite`, `openReadSync`, `openWriteSync`, `readChunk`, `writeChunk`, `close`, `pipe`, `pipeAll`, `pipeWithCancellation`, `copy`, `tee`, `chunks`, `readText`, `readAllBytes`, `readAllText`, `toBytes`, `toText`, `collectBytes`, `collectText`, `readLines`, `writeText`, `writeLine`, and `pipeText`
 - `jayess:assert` currently exports `ok`, `equal`, `notEqual`, `fail`, and `throws`
 - `jayess:console` currently exports `log`, `error`, `write`, and `writeLine`
-- `jayess:bytes` currently exports `fromUtf8`, `fromArray`, `toArray`, `toUtf8`, `length`, `get`, `set`, `fill`, `slice`, `concat`, `equals`, `compare`, `startsWith`, `endsWith`, and `isBytes`
+- `jayess:bytes` currently exports `fromUtf8`, `fromArray`, `toArray`, `toUtf8`, `length`, `get`, `set`, `fill`, `slice`, `concat`, `equals`, `secureEquals`, `compare`, `startsWith`, `endsWith`, and `isBytes`
 - `jayess:buffer` currently exports `create`, `fromBytes`, `toBytes`, `length`, `read`, `write`, and `concat`
 - `jayess:encoding` currently exports `base64Encode`, `base64Decode`, `hexEncode`, `hexDecode`, `asciiEncode`, `asciiDecode`, `utf16Encode`, `utf16Decode`, `uriEncode`, and `uriDecode`
 - `jayess:events` currently exports `create`, `on`, `once`, `off`, `emit`, and `listenerCount`
-- `jayess:crypto` currently exports `sha256`, `sha1`, `hmacSha256`, `hmacSha1`, `createHash`, `updateHash`, `digestHash`, and `randomBytes`
+- `jayess:crypto` currently exports `sha256`, `sha512`, `sha1`, `hmacSha256`, `hmacSha512`, `hmacSha1`, `hkdfSha256`, `certificateFromPem`, `privateKeyFromPem`, `trustAnchorsFromPem`, `createHash`, `updateHash`, `digestHash`, and `randomBytes`; SHA-1 remains legacy-only for compatibility, while the shipped PEM certificate/key/trust-anchor containers are the first TLS-supporting groundwork for later `jayess:http` transport work
 - `jayess:url` currently exports `parse`, `format`, `joinPath`, `getQuery`, and `setQuery`
 - `jayess:time` currently exports `millis`, `seconds`, `minutes`, `elapsed`, and `formatDuration`
 - `jayess:iter` currently exports `next`, `toArray`, `take`, `map`, `filter`, `forEach`, `reduce`, `some`, `every`, `find`, `chain`, and `range` for Jayess generator handles
@@ -295,12 +305,12 @@ Current system-module note:
 - `jayess:json` currently exports `parse`, `stringify`, `stringifyPretty`, `validate`, and `isJsonText`
 - `jayess:date` currently exports `now`, `fromUnixMillis`, `toUnixMillis`, `toIsoString`, UTC component readers, millisecond arithmetic, `parseIso`, and `isDate`
 - `jayess:regex` currently exports `create`, `test`, `exec`, `split`, `matchAll`, `replaceFirst`, `replaceAll`, and `isRegex`
-- `jayess:subprocess` currently exports `run`, `spawn`, `join`, and `kill`
+- `jayess:subprocess` currently exports `run`, `runText`, `runBytes`, `runJson`, `runWithCancellation`, `runWithTimeout`, `runWithTimeoutAndCancellation`, `spawn`, `spawnPipeline`, `join`, `kill`, `stdout`, `stderr`, `ok`, and `requireSuccess`
 - these modules resolve through the built-in module graph and lower through explicit native adapter primitives
 - ambient `node:*` imports remain explicitly unsupported
 - env mutation remains outside the current system-module surface
 - subprocess execution is provided by the concrete [`jayess:subprocess`](./jayess-subprocess-module.md) module slice
-- cross-platform native rendering is planned through `jayess:color`, `jayess:image`, and `jayess:canvas`; see [jayess-native-gui.md](./jayess-native-gui.md)
+- Jayess ships a real native-rendering family surface through `jayess:color`, `jayess:image`, `jayess:canvas`, `jayess:window`, and `jayess:gpu`; `jayess:image` owns raster/image manipulation while `jayess:canvas` owns higher-level drawing over that buffer; see [jayess-native-gui.md](./jayess-native-gui.md)
 
 Current module/export hardening note:
 
@@ -316,8 +326,8 @@ Current module/export hardening note:
 Current regex note:
 
 - a narrow helper-only `jayess:regex` slice is now shipped
-- the shipped exports are `create`, `test`, `exec`, `replaceFirst`, `replaceAll`, and `isRegex`
-- regex literals and ambient/global `RegExp` remain unsupported
+- the shipped exports are `create`, `test`, `exec`, `split`, `matchAll`, `replaceFirst`, `replaceAll`, and `isRegex`
+- regex literals and ambient/global `RegExp` are unsupported by Jayess language direction; regex stays module-owned through `jayess:regex`
 
 Current standard-library expansion note:
 

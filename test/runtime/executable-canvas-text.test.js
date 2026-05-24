@@ -1,4 +1,5 @@
 import test from "node:test";
+import path from "node:path";
 import { findAvailableCompiler } from "../support/compiler.js";
 import { transpileAndRunFixture } from "../support/generated-executable.js";
 
@@ -24,15 +25,25 @@ std::string readFile(const std::string& path) {
 }
 
 int main() {
-  const std::string ppmPath = "${targetDir}/canvas-text.ppm";
-  ${namespace}::jayess_module_init();
-  auto rendered = ${namespace}::renderTextBox(std::vector<jayess::value>{ppmPath});
-  require(std::get<bool>(rendered) == true, "canvas text render");
-  auto ppm = readFile(ppmPath);
-  require(ppm.find("P3\\n48 24\\n255\\n") == 0, "canvas text ppm header");
-  require(ppm.find("255 255 255") != std::string::npos, "canvas text has white pixels");
-  std::cout << "ok\\n";
-  return 0;
+  try {
+    const std::string ppmPath = ${JSON.stringify(`${targetDir.replace(/\\/g, "/")}/canvas-text.ppm`)};
+    const std::string expectedPath = ${JSON.stringify(path.resolve("test/fixtures/runtime/canvas-golden-text.ppm").replace(/\\/g, "/"))};
+    ${namespace}::jayess_module_init();
+    auto rendered = ${namespace}::renderTextBox(std::vector<jayess::value>{ppmPath});
+    require(std::get<bool>(rendered) == true, "canvas text render");
+    require(readFile(ppmPath) == readFile(expectedPath), "canvas text golden ppm content");
+    std::cout << "ok\\n";
+    return 0;
+  } catch (const jayess::thrown_value& error) {
+    auto payload = jayess::exception_to_value(error);
+    if (std::holds_alternative<std::string>(payload)) {
+      std::cerr << std::get<std::string>(payload) << "\\n";
+    }
+    return 2;
+  } catch (const std::exception& error) {
+    std::cerr << error.what() << "\\n";
+    return 3;
+  }
 }
 `;
 }

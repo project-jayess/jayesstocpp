@@ -2,6 +2,8 @@
 
 Jayess standard-library modules live under the repository-owned `jayess:*` namespace. They are explicit imports, not ambient JavaScript or Node.js globals.
 
+This document is the authoritative export index for shipped `jayess:*` modules. Use [standard-library-matrix.md](./standard-library-matrix.md) for the quick per-module summary table.
+
 `node:*` imports remain unsupported in Jayess source. Use the matching `jayess:*` module when Jayess owns a portable surface for that behavior.
 
 Generated project metadata records imported standard-library modules in `jayess_dependency_plan.json`, `jayess_module_manifest.json`, and `jayess_build_hints.json`. Native-backed modules also expose platform adapter and library requirements there, while pure Jayess modules remain ordinary generated stdlib sources under `generated-stdlib/jayess/`.
@@ -37,6 +39,7 @@ Some modules are mostly Jayess wrappers over a small native primitive layer:
 - `jayess:crypto`
 - `jayess:csv`
 - `jayess:date`
+- `jayess:dialog`
 - `jayess:encoding`
 - `jayess:events`
 - `jayess:font`
@@ -80,7 +83,7 @@ Some modules are mostly Jayess wrappers over a small native primitive layer:
 
 Native primitives stay narrow and explicit. Higher-level behavior should stay in Jayess modules where practical.
 
-## Planned Native Rendering Modules
+## Native Rendering Modules
 
 Jayess should provide a cross-platform native rendering family through focused `jayess:*` modules:
 
@@ -89,8 +92,9 @@ Jayess should provide a cross-platform native rendering family through focused `
 - `jayess:canvas` for higher-level off-screen 2D drawing operations over image buffers.
 - `jayess:window` for live native windows, frame presentation, and input events.
 - `jayess:gpu` for optional accelerated resources, pipelines, and draw commands.
+- `jayess:gui` for the default Jayess-owned widget toolkit over layout, canvas, and normalized window events.
 
-The current canvas implementation renders off-screen, can save deterministic PPM files, and can be presented through `jayess:window` where a host adapter is available. The Linux/X11 window adapter uploads validated software canvas pixels through dynamically loaded X11 image functions. The planned layering is `jayess:color` under `jayess:image` under `jayess:canvas`, with `jayess:window` presenting canvas buffers to real native windows. `jayess:gpu` should be a separate optional acceleration layer rather than a requirement for `jayess:canvas`. The portable implementation should favor software rendering and deterministic image output. Live window and GPU rendering should stay behind narrow runtime adapters and platform-isolated native code.
+The current canvas implementation renders off-screen, can save deterministic image files, and can be presented through `jayess:window` where a host adapter is available. The Linux/X11 window adapter uploads validated software canvas pixels through dynamically loaded X11 image functions. The shipped layering is `jayess:color` under `jayess:image` under `jayess:canvas`, with `jayess:window` presenting canvas buffers to real native windows. `jayess:gui` now sits above `jayess:layout`, `jayess:canvas`, and `jayess:window` as the first default Jayess-owned widget-toolkit slice. `jayess:image` owns the raster buffer and image-manipulation layer; `jayess:canvas` owns higher-level drawing commands over that buffer. `jayess:gui` owns widget layout, paint, and action dispatch. `jayess:gpu` remains a separate optional acceleration layer rather than a requirement for `jayess:canvas` or `jayess:gui`. The portable implementation favors software rendering and deterministic image output. Live window and GPU rendering stay behind narrow runtime adapters and platform-isolated native code.
 
 ## Module Index
 
@@ -112,7 +116,7 @@ Exports: `resolved`, `rejected`, `all`, `allSettled`, `any`, `race`, `sleep`, `t
 
 ### `jayess:bytes`
 
-Exports: `fromUtf8`, `fromArray`, `toArray`, `toUtf8`, `length`, `get`, `set`, `fill`, `slice`, `concat`, `equals`, `compare`, `startsWith`, `endsWith`, `isBytes`.
+Exports: `fromUtf8`, `fromArray`, `toArray`, `toUtf8`, `length`, `get`, `set`, `fill`, `slice`, `concat`, `equals`, `secureEquals`, `compare`, `startsWith`, `endsWith`, `isBytes`.
 
 ### `jayess:buffer`
 
@@ -132,7 +136,10 @@ Exports: `deflate`, `inflate`, `gzip`, `gunzip`. See [jayess-compress-module.md]
 
 ### `jayess:canvas`
 
-Exports: `create`, `clear`, `width`, `height`, `getPixel`, `copy`, `fillRect`, `clipRect`, `fillRectClipped`, `fillRectAlpha`, `strokeRect`, `drawImage`, `drawImageClipped`, `drawCanvas`, `fillCircle`, `strokeCircle`, `fillEllipse`, `strokeEllipse`, `line`, `polyline`, `quadraticCurve`, `bezierCurve`, `fillPolygon`, `strokePolygon`, `measureText`, `text`, `drawTextBox`, `savePpm`, `saveImage`. See [jayess-canvas-module.md](./jayess-canvas-module.md).
+Exports: `create`, `clear`, `width`, `height`, `getPixel`, `copy`, `fillRect`, `clipRect`, `currentClip`, `pushClip`, `popClip`, `fillRectClipped`, `fillRectAlpha`, `strokeRect`, `drawImage`, `drawImageClipped`, `drawCanvas`, `fillCircle`, `strokeCircle`, `fillEllipse`, `strokeEllipse`, `line`, `polyline`, `quadraticCurve`, `bezierCurve`, `fillPolygon`, `strokePolygon`, `measureText`, `text`, `drawTextBox`, `savePpm`, `saveImage`. See [jayess-canvas-module.md](./jayess-canvas-module.md).
+
+The shipped state slice is a focused clip stack. Transform stacks and broader draw-state save/restore stay separate later slices.
+The shipped stroke-style slice is `strokeWidth` only; caps and joins stay separate later slices.
 
 ### `jayess:collections/map`
 
@@ -164,7 +171,7 @@ Exports: `load`, `loadSync`, `loadJson`, `loadJsonSync`, `loadToml`, `loadTomlSy
 
 ### `jayess:crypto`
 
-Exports: `sha256`, `sha1`, `hmacSha256`, `hmacSha1`, `createHash`, `updateHash`, `digestHash`, `randomBytes`.
+Exports: `sha256`, `sha512`, `sha1`, `hmacSha256`, `hmacSha512`, `hmacSha1`, `hkdfSha256`, `certificateFromPem`, `privateKeyFromPem`, `trustAnchorsFromPem`, `createHash`, `updateHash`, `digestHash`, `randomBytes`. `sha1`, `hmacSha1`, and `createHash("sha1")` are legacy-only compatibility helpers; prefer the SHA-256 or SHA-512 surface for new code. The PEM helpers return normalized Jayess-owned certificate/private-key/trust-anchor containers and do not yet expose full TLS or ASN.1 inspection APIs. See [jayess-crypto-module.md](./jayess-crypto-module.md).
 
 ### `jayess:csv`
 
@@ -173,6 +180,10 @@ Exports: `parse`, `stringify`. See [jayess-csv-module.md](./jayess-csv-module.md
 ### `jayess:date`
 
 Exports: `now`, `fromUnixMillis`, `toUnixMillis`, `toIsoString`, `getUtcYear`, `getUtcMonth`, `getUtcDay`, `getUtcHour`, `getUtcMinute`, `getUtcSecond`, `getUtcMillisecond`, `addMillis`, `diffMillis`, `parseIso`, `isDate`.
+
+### `jayess:dialog`
+
+Exports: `openFile`, `saveFile`, `openDirectory`, `message`. The current shipped host-backed slices are Win32 and Cocoa. Linux is kept on the explicit `xdg-desktop-portal` adapter family boundary and reports the focused unavailable-host diagnostic when that host path cannot be used. Picker dialogs normalize cancellation to `null`, and `message(...)` normalizes results to `"ok"`, `"cancel"`, `"yes"`, or `"no"`. See [jayess-dialog-module.md](./jayess-dialog-module.md).
 
 ### `jayess:dotenv`
 
@@ -196,9 +207,11 @@ Exports: `parseUrlEncoded`, `stringifyUrlEncoded`, `field`, `setField`. See [jay
 
 ### `jayess:fs`
 
-Default async exports: `exists`, `readText`, `readBytes`, `readJson`, `createReadStream`, `createWriteStream`, `writeText`, `writeBytes`, `writeJson`, `appendText`, `copy`, `copyRecursive`, `createDirectories`, `tempDirectory`, `tempFile`, `remove`, `removeRecursive`, `list`, `walk`, `rename`, `stat`.
+Default async exports: `exists`, `readText`, `readBytes`, `writeText`, `writeBytes`, `appendText`, `copy`, `createDirectories`, `remove`, `list`, `rename`, `stat`.
 
-Synchronous exports: `existsSync`, `readTextSync`, `readBytesSync`, `readJsonSync`, `createReadStreamSync`, `createWriteStreamSync`, `writeTextSync`, `writeBytesSync`, `writeJsonSync`, `appendTextSync`, `copySync`, `copyRecursiveSync`, `createDirectoriesSync`, `tempDirectorySync`, `tempFileSync`, `removeSync`, `removeRecursiveSync`, `listSync`, `walkSync`, `renameSync`, `statSync`.
+Synchronous exports: `existsSync`, `readTextSync`, `readBytesSync`, `writeTextSync`, `writeBytesSync`, `appendTextSync`, `copySync`, `createDirectoriesSync`, `removeSync`, `listSync`, `renameSync`, `statSync`.
+
+Next approved `jayess:fs` slice: `walk`, `walkSync`, `copyRecursive`, `copyRecursiveSync`, `removeRecursive`, `removeRecursiveSync`.
 
 ### `jayess:glob`
 
@@ -207,6 +220,12 @@ Exports: `matches`, `globSync`. See [jayess-glob-module.md](./jayess-glob-module
 ### `jayess:gpu`
 
 Exports: `createDevice`, `createSurface`, `createBuffer`, `createTexture`, `createShader`, `createPipeline`, `beginFrame`, `clear`, `draw`, `endFrame`. Runtime handles record backend capability metadata and validate command/frame lifecycle shapes before real backend adapters are available. See [jayess-gpu-module.md](./jayess-gpu-module.md).
+
+### `jayess:gui`
+
+Exports: `createApplication`, `createWindowState`, `setRoot`, `invalidate`, `needsRedraw`, `drainActions`, `createLabel`, `createButton`, `createPanel`, `createStack`, `createColumn`, `createRow`, `layout`, `update`, `draw`. See [jayess-gui-module.md](./jayess-gui-module.md).
+
+The first shipped slice is a pure Jayess-owned software toolkit layer. It records click actions through an explicit action queue instead of hiding a broad callback/runtime loop, and it stays above `jayess:layout`, `jayess:canvas`, and normalized `jayess:window` events without depending on `jayess:gpu`.
 
 ### `jayess:html`
 
@@ -219,6 +238,9 @@ Exports: `sha256Bytes`, `sha1Bytes`, `sha256Text`, `sha1Text`, `sha256File`, `sh
 ### `jayess:http`
 
 Exports: `request`, `requestWithCancellation`, `requestWithTimeout`, `requestWithTimeoutAndCancellation`, `text`, `bytes`, `json`, `textBody`, `bytesBody`, `jsonBody`, `method`, `path`, `query`, `params`, `headers`, `header`, `body`, `bodyText`, `bodyBytes`, `collectBody`, `createServer`, `close`, `setStatus`, `status`, `setHeader`, `write`, `end`, `sendText`, `sendJson`, `sendBytes`, `sendTextStream`, `sendBytesStream`, `notFound`, `redirect`, `sendFile`, `serveStatic`, `serveFiles`, `route`, `router`, `match`, `handle`, `compose`.
+
+The current shipped scope is plain HTTP only, not HTTPS/TLS. The server/runtime path now has both Unix/POSIX and Windows/Winsock-backed slices for the same focused HTTP/1.1 close-per-connection behavior.
+The current production claim is limited to that explicit plain-HTTP slice and its deliberate diagnostics; transport security and hardened keep-alive/timeout/shutdown behavior remain separate later slices.
 
 See [jayess-http-module.md](./jayess-http-module.md).
 
@@ -282,11 +304,15 @@ Exports: `platform`, `arch`, `homeDir`, `tmpDir`, `hostname`, `newline`.
 
 ### `jayess:path`
 
-Exports: `join`, `dirname`, `basename`, `extname`, `normalize`, `parse`, `format`, `separator`, `delimiter`, `resolve`, `relative`, `isAbsolute`.
+Exports: `join`, `dirname`, `basename`, `extname`, `normalize`, `resolve`, `relative`, `isAbsolute`.
+
+Next approved `jayess:path` slice: `parse`, `format`, `separator`, `delimiter`.
 
 ### `jayess:process`
 
-Exports: `argv`, `cwd`, `getEnv`, `hasEnv`, `envKeys`, `envEntries`, `exit`.
+Exports: `argv`, `cwd`, `getEnv`, `exit`.
+
+Next approved `jayess:process` slice: `hasEnv`, `envKeys`, `envEntries`.
 
 ### `jayess:querystring`
 
@@ -330,7 +356,9 @@ Exports: `spawn`, `join`, `sleep`, `hardwareConcurrency`, `currentId`.
 
 ### `jayess:timers`
 
-Exports: `sleep`, `setTimeout`, `clearTimeout`.
+Exports: `sleep`, `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`.
+
+Next active host-module slice: `jayess:timers`.
 
 ### `jayess:toml`
 

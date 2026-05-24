@@ -9,6 +9,7 @@ import { getCompressRuntimeCppFragment, getCompressRuntimeHeaderFragment } from 
 import { getConsoleRuntimeCppFragment, getConsoleRuntimeHeaderFragment } from "./runtime-console-source.js";
 import { getCryptoRuntimeCppFragment, getCryptoRuntimeHeaderFragment } from "./runtime-crypto-source.js";
 import { getDateRuntimeCppFragment, getDateRuntimeHeaderFragment } from "./runtime-date-source.js";
+import { getDialogRuntimeCppFragment, getDialogRuntimeHeaderFragment } from "./runtime-dialog-source.js";
 import { getEncodingRuntimeCppFragment, getEncodingRuntimeHeaderFragment } from "./runtime-encoding-source.js";
 import { getEventsRuntimeCppFragment, getEventsRuntimeHeaderFragment } from "./runtime-events-source.js";
 import { getFsRuntimeCppFragment, getFsRuntimeHeaderFragment } from "./runtime-fs-source.js";
@@ -34,6 +35,7 @@ import { getSubprocessRuntimeCppFragment, getSubprocessRuntimeHeaderFragment } f
 import { getSystemRuntimeCppFragment, getSystemRuntimeHeaderFragment } from "./runtime-system-source.js";
 import { getTerminalRuntimeCppFragment, getTerminalRuntimeHeaderFragment } from "./runtime-terminal-source.js";
 import { getTimeRuntimeCppFragment, getTimeRuntimeHeaderFragment } from "./runtime-time-source.js";
+import { getTimersRuntimeCppFragment, getTimersRuntimeHeaderFragment } from "./runtime-timers-source.js";
 import { getThreadRuntimeCppFragment, getThreadRuntimeHeaderFragment } from "./runtime-thread-source.js";
 import { getUrlRuntimeCppFragment, getUrlRuntimeHeaderFragment } from "./runtime-url-source.js";
 import { getValidateRuntimeCppFragment, getValidateRuntimeHeaderFragment } from "./runtime-validate-source.js";
@@ -54,6 +56,7 @@ export const RUNTIME_FRAGMENT_DEFINITIONS = [
   { key: "console", header: getConsoleRuntimeHeaderFragment, cpp: getConsoleRuntimeCppFragment },
   { key: "crypto", header: getCryptoRuntimeHeaderFragment, cpp: getCryptoRuntimeCppFragment },
   { key: "date", header: getDateRuntimeHeaderFragment, cpp: getDateRuntimeCppFragment },
+  { key: "dialog", header: getDialogRuntimeHeaderFragment, cpp: getDialogRuntimeCppFragment, requires: ["async-core"] },
   { key: "encoding", header: getEncodingRuntimeHeaderFragment, cpp: getEncodingRuntimeCppFragment },
   { key: "events", header: getEventsRuntimeHeaderFragment, cpp: getEventsRuntimeCppFragment },
   { key: "fs", header: getFsRuntimeHeaderFragment, cpp: getFsRuntimeCppFragment },
@@ -78,6 +81,7 @@ export const RUNTIME_FRAGMENT_DEFINITIONS = [
   { key: "system", header: getSystemRuntimeHeaderFragment, cpp: getSystemRuntimeCppFragment, requires: ["path"] },
   { key: "terminal", header: getTerminalRuntimeHeaderFragment, cpp: getTerminalRuntimeCppFragment },
   { key: "time", header: getTimeRuntimeHeaderFragment, cpp: getTimeRuntimeCppFragment },
+  { key: "timers", header: getTimersRuntimeHeaderFragment, cpp: getTimersRuntimeCppFragment, requires: ["async-core"] },
   { key: "thread", header: getThreadRuntimeHeaderFragment, cpp: getThreadRuntimeCppFragment },
   { key: "url", header: getUrlRuntimeHeaderFragment, cpp: getUrlRuntimeCppFragment },
   { key: "validate", header: getValidateRuntimeHeaderFragment, cpp: getValidateRuntimeCppFragment },

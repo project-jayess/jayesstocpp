@@ -60,6 +60,48 @@ test("transpile rejects built-in Jayess iterator modules in string mode without 
   );
 });
 
+test("transpile rejects built-in Jayess object modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { keys } from "jayess:object"; function run(value) { return keys(value); }', { moduleName: "builtin_object_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess number modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { parseInt } from "jayess:number"; function run(text) { return parseInt(text); }', { moduleName: "builtin_number_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess url modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { parse } from "jayess:url"; function run(text) { return parse(text); }', { moduleName: "builtin_url_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess bytes modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { fromUtf8 } from "jayess:bytes"; function run(text) { return fromUtf8(text); }', { moduleName: "builtin_bytes_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess buffer modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { create } from "jayess:buffer"; function run() { return create(4); }', { moduleName: "builtin_buffer_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
+test("transpile rejects built-in Jayess time modules in string mode without explicit resolution support", () => {
+  assert.throws(
+    () => transpile('import { millis } from "jayess:time"; function run() { return millis(); }', { moduleName: "builtin_time_case" }),
+    (error) => error instanceof JayessError && /transpile\(\) string mode does not resolve them by default/.test(error.diagnostics[0].message)
+  );
+});
+
 test("transpile rejects built-in Jayess path modules in string mode without explicit resolution support", () => {
   assert.throws(
     () => transpile('import { join } from "jayess:path"; function run(root) { return join(root, "main.js"); }', { moduleName: "builtin_path_case" }),

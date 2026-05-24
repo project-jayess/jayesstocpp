@@ -33,7 +33,8 @@ value window_set_title(const value& window, const value& title);`;
 
 export function getWindowRuntimeCppFragment() {
   return `namespace {
-[[noreturn]] void throw_window_unavailable();
+[[noreturn]] void throw_window_unavailable(const char* detail = nullptr);
+[[noreturn]] void throw_window_adapter_unavailable(const char* adapter, const char* detail = nullptr);
 
 struct window_canvas_pixels {
   image_ptr image;
@@ -42,12 +43,57 @@ struct window_canvas_pixels {
   const std::vector<unsigned char>* pixels = nullptr;
 };
 
+void window_push_close_event(const window_ptr& window);
+void window_push_resize_event(const window_ptr& window, int width, int height);
+void window_push_key_event(const window_ptr& window, const std::string& type, const std::string& key);
+void window_push_mouse_move_event(const window_ptr& window, int x, int y);
+void window_push_mouse_button_event(const window_ptr& window, const std::string& type, int button, int x, int y);
+
 ${getWindowWindowsAdapterCppFragment()}
 ${getWindowMacosAdapterCppFragment()}
 ${getWindowLinuxAdapterCppFragment()}
 
-[[noreturn]] void throw_window_unavailable() {
-  throw std::runtime_error("Jayess window host adapter is not available on this platform");
+const char* window_default_unavailable_detail() {
+#if defined(_WIN32)
+  return "Windows Win32 adapter is not available on this host";
+#elif defined(__APPLE__)
+  return "macOS Cocoa adapter is not available on this host";
+#elif defined(__linux__)
+  return "Linux window support requires a usable X11 or Wayland adapter on this host";
+#else
+  return "no supported window adapter is compiled for this host";
+#endif
+}
+
+[[noreturn]] void throw_window_unavailable(const char* detail) {
+  std::string message = "Jayess window host adapter is not available on this platform";
+  const char* resolvedDetail = detail == nullptr ? window_default_unavailable_detail() : detail;
+  if (resolvedDetail != nullptr && resolvedDetail[0] != '\\0') {
+    message += " (";
+    message += resolvedDetail;
+    message += ")";
+  }
+  throw std::runtime_error(message);
+}
+
+[[noreturn]] void throw_window_adapter_unavailable(const char* adapter, const char* detail) {
+  std::string detailMessage;
+#if defined(_WIN32)
+  detailMessage = "Windows ";
+#elif defined(__APPLE__)
+  detailMessage = "macOS ";
+#elif defined(__linux__)
+  detailMessage = "Linux ";
+#else
+  detailMessage = "";
+#endif
+  detailMessage += adapter;
+  detailMessage += " adapter is not available on this host";
+  if (detail != nullptr && detail[0] != '\\0') {
+    detailMessage += ": ";
+    detailMessage += detail;
+  }
+  throw_window_unavailable(detailMessage.c_str());
 }
 
 window_ptr require_window_value(const value& input, bool allowClosed = false) {
@@ -70,7 +116,7 @@ int window_option_integer(const object_ptr& options, const std::string& key, int
     throw std::runtime_error(message);
   }
   const auto numeric = std::get<double>(found->second);
-  if (!std::isfinite(numeric) || std::floor(numeric) != numeric || numeric <= 0.0 || numeric > static_cast<double>(std::numeric_limits<int>::max())) {
+  if (!std::isfinite(numeric) || std::floor(numeric) != numeric || numeric <= 0.0 || numeric > static_cast<double>((std::numeric_limits<int>::max)())) {
     throw std::runtime_error(message);
   }
   return static_cast<int>(numeric);
@@ -146,6 +192,21 @@ std::string window_event_code_for_key(const std::string& key) {
 
 value window_event(std::vector<std::pair<std::string, value>> fields) {
   return make_object(std::move(fields));
+}
+
+void window_mark_shown(const window_ptr& window) {
+  window->shown = true;
+}
+
+void window_mark_closed(const window_ptr& window) {
+  window->closed = true;
+  window->close_requested = true;
+  window->shown = false;
+}
+
+void window_record_presented_size(const window_ptr& window, int width, int height) {
+  window->presented_width = width;
+  window->presented_height = height;
 }
 
 void window_push_close_event(const window_ptr& window) {
@@ -225,19 +286,24 @@ value window_create(const value& optionsValue) {
 
 value window_show(const value& windowValue) {
   auto window = require_window_value(windowValue);
+  if (window->shown) {
+    return windowValue;
+  }
   if (!window_platform_available()) {
     throw_window_unavailable();
   }
   window_platform_show(window);
+  window_mark_shown(window);
   return windowValue;
 }
 
 value window_close(const value& windowValue) {
   auto window = require_window_value(windowValue);
   window_platform_close(window);
-  window->closed = true;
-  window->close_requested = true;
-  window_push_close_event(window);
+  if (!window->close_requested) {
+    window_push_close_event(window);
+  }
+  window_mark_closed(window);
   return value(std::monostate{});
 }
 
@@ -267,8 +333,7 @@ value window_poll_events(const value& windowValue) {
 value window_present(const value& windowValue, const value& canvasValue) {
   auto window = require_window_value(windowValue);
   const auto pixels = require_window_canvas_pixels(canvasValue);
-  window->presented_width = pixels.width;
-  window->presented_height = pixels.height;
+  window_record_presented_size(window, pixels.width, pixels.height);
   if (!window_platform_available()) {
     throw_window_unavailable();
   }

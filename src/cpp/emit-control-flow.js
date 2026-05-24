@@ -1,3 +1,5 @@
+import { withStatementBindings } from "./emit-local-bindings.js";
+
 export function emitReturnStatement(node, context, lines, indent, callbacks) {
   if (context.finallyControl === true) {
     const payload = node.argument == null
@@ -45,7 +47,8 @@ export function emitContinueStatement(context, lines, indent) {
 }
 
 export function emitBlockStatement(node, context, lines, depth, callbacks) {
+  const blockContext = withStatementBindings(context, node.body);
   for (const statement of node.body) {
-    callbacks.emitStatement(statement, { ...context, topLevel: false }, lines, depth);
+    callbacks.emitStatement(statement, { ...blockContext, topLevel: false }, lines, depth);
   }
 }

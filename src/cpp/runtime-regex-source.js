@@ -19,6 +19,7 @@ constexpr const char* kJayessRegexFlagsKey = "__jayess_regex_flags";
 struct regex_flags {
   std::string text;
   std::regex_constants::syntax_option_type options = std::regex_constants::ECMAScript;
+  bool multiline = false;
   bool dotAll = false;
 };
 
@@ -72,7 +73,7 @@ regex_flags parse_regex_flags(const value& input) {
           throw std::runtime_error("Duplicate Jayess regex flag: m");
         }
         sawMultiline = true;
-        flags.options |= std::regex_constants::multiline;
+        flags.multiline = true;
         break;
       case 's':
         if (sawDotAll) {
@@ -131,6 +132,53 @@ std::string apply_dot_all_pattern_transform(const std::string& pattern) {
   return transformed;
 }
 
+std::string apply_multiline_pattern_transform(const std::string& pattern) {
+  std::string transformed;
+  transformed.reserve(pattern.size() * 2);
+  bool escaped = false;
+  bool inCharacterClass = false;
+
+  for (const char character : pattern) {
+    if (escaped) {
+      transformed.push_back(character);
+      escaped = false;
+      continue;
+    }
+
+    if (character == '\\\\') {
+      transformed.push_back(character);
+      escaped = true;
+      continue;
+    }
+
+    if (character == '[') {
+      inCharacterClass = true;
+      transformed.push_back(character);
+      continue;
+    }
+
+    if (character == ']' && inCharacterClass) {
+      inCharacterClass = false;
+      transformed.push_back(character);
+      continue;
+    }
+
+    if (!inCharacterClass && character == '^') {
+      transformed += "(?:^|(?<=\\\\n))";
+      continue;
+    }
+
+    if (!inCharacterClass && character == '$') {
+      transformed += "(?:$|(?=\\\\n))";
+      continue;
+    }
+
+    transformed.push_back(character);
+  }
+
+  return transformed;
+}
+
 std::string require_regex_text_argument(const value& input) {
   if (!std::holds_alternative<std::string>(input)) {
     throw std::runtime_error("Jayess regex operations expect a string text input");
@@ -160,6 +208,9 @@ std::regex require_compiled_regex(const value& input) {
     }
 
     auto patternText = std::get<std::string>(pattern->second);
+    if (flags.multiline) {
+      patternText = apply_multiline_pattern_transform(patternText);
+    }
     if (flags.dotAll) {
       patternText = apply_dot_all_pattern_transform(patternText);
     }

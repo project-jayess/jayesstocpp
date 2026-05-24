@@ -5,12 +5,16 @@ import {
   jayessImageBlit,
   jayessImageCrop,
   jayessImageFill,
+  jayessImageFillRect,
+  jayessImageFillRectAlpha,
   jayessImageGetPixel,
   jayessImageHeight,
   jayessImageIsImage,
   jayessImageFlipHorizontal,
   jayessImageFlipVertical,
+  jayessImageDecodePgm,
   jayessImageDecodePpm,
+  jayessImageEncodePgm,
   jayessImageEncodePpm,
   jayessImageLoadBmp,
   jayessImageLoadPgm,
@@ -63,6 +67,14 @@ export function fill(image, color) {
   return jayessImageFill(image, normalizeColor(color));
 }
 
+export function fillRect(image, x, y, width, height, color) {
+  return jayessImageFillRect(image, x, y, width, height, normalizeColor(color));
+}
+
+export function fillRectAlpha(image, x, y, width, height, color) {
+  return jayessImageFillRectAlpha(image, x, y, width, height, normalizeColor(color));
+}
+
 export function copy(image) {
   return jayessImageCopy(image);
 }
@@ -111,7 +123,19 @@ export function decodePpm(bytes) {
   return jayessImageDecodePpm(bytes);
 }
 
+export function encodePgm(image) {
+  return jayessImageEncodePgm(image);
+}
+
+export function decodePgm(bytes) {
+  return jayessImageDecodePgm(bytes);
+}
+
 export function crop(image, x, y, width, height) {
+  return jayessImageCrop(image, x, y, width, height);
+}
+
+export function subimage(image, x, y, width, height) {
   return jayessImageCrop(image, x, y, width, height);
 }
 

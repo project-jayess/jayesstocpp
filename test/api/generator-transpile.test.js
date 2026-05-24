@@ -203,3 +203,20 @@ test("transpile emits generator-local destructuring from yield-star completion",
   assert.match(cpp, /jayess::destructure_property\(jayess_destructure_\d+, "value"\);/);
   assert.match(cpp, /jayess::generator_complete\(jayess_generator, value\);/);
 });
+
+test("transpile emits generator locals in stable identifier order", () => {
+  const cpp = transpile(
+    "function* run(flag) { var zebra = 1; if (flag) { var alpha = 2; } var middle = 3; yield middle; return zebra; }",
+    { moduleName: "generator_local_order_case" }
+  );
+
+  const alphaIndex = cpp.indexOf("jayess::value alpha = 0.0;");
+  const middleIndex = cpp.indexOf("jayess::value middle = 0.0;");
+  const zebraIndex = cpp.indexOf("jayess::value zebra = 0.0;");
+
+  assert.notEqual(alphaIndex, -1);
+  assert.notEqual(middleIndex, -1);
+  assert.notEqual(zebraIndex, -1);
+  assert.ok(alphaIndex < middleIndex);
+  assert.ok(middleIndex < zebraIndex);
+});

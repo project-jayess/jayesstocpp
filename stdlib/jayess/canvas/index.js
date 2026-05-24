@@ -1,24 +1,32 @@
 import { abs, round } from "jayess:math";
 import { rgb, rgba } from "jayess:color";
+import { slice as sliceString } from "jayess:string";
 import {
   copy as copyImage,
   create as createImage,
   fill as fillImage,
+  fillRect as fillImageRect,
+  fillRectAlpha as fillImageRectAlpha,
   getPixel as getImagePixel,
   height as imageHeight,
   savePpm as saveImagePpm,
   setPixel,
   width as imageWidth
 } from "jayess:image";
+import {
+  pointInsidePolygon,
+  polygonBounds
+} from "./polygon-helpers.js";
 
 function fail(message) {
   throw message;
 }
 
-function makeCanvas(image, title) {
+function makeCanvas(image, title, clipStack) {
   return {
     image: image,
-    title: title
+    title: title,
+    clipStack: clipStack
   };
 }
 
@@ -69,6 +77,22 @@ function defaultTextColor() {
   return rgb(255, 255, 255);
 }
 
+function defaultStrokeWidth() {
+  return 1;
+}
+
+function defaultClipStack() {
+  return [];
+}
+
+function copyClipStack(stack) {
+  var copied = [];
+  for (var index = 0; index < stack.length; index = index + 1) {
+    copied.push(stack[index]);
+  }
+  return copied;
+}
+
 function sign(value) {
   if (value < 0) {
     return -1;
@@ -79,12 +103,40 @@ function sign(value) {
   return 0;
 }
 
+function blendColor(destination, source) {
+  var alpha = source.alpha;
+  var inverse = 1 - alpha;
+  return rgba(
+    round(source.red * alpha + destination.red * inverse),
+    round(source.green * alpha + destination.green * inverse),
+    round(source.blue * alpha + destination.blue * inverse),
+    1
+  );
+}
+
 function drawPixel(canvas, x, y, color) {
   var image = requireCanvas(canvas).image;
   if (x < 0 || y < 0 || x >= imageWidth(image) || y >= imageHeight(image)) {
     return canvas;
   }
-  setPixel(image, x, y, color);
+  if (color.alpha <= 0) {
+    return canvas;
+  }
+  if (color.alpha >= 1) {
+    setPixel(image, x, y, color);
+    return canvas;
+  }
+  setPixel(image, x, y, blendColor(getImagePixel(image, x, y), color));
+  return canvas;
+}
+
+function drawStrokePixel(canvas, x, y, color, strokeWidth) {
+  var radius = round((strokeWidth - 1) / 2);
+  for (var row = y - radius; row <= y + radius; row = row + 1) {
+    for (var column = x - radius; column <= x + radius; column = column + 1) {
+      drawPixel(canvas, column, row, color);
+    }
+  }
   return canvas;
 }
 
@@ -129,6 +181,33 @@ function normalizeClip(canvas, clip) {
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
+function intersectClip(left, right) {
+  var x = maxValue(left.x, right.x);
+  var y = maxValue(left.y, right.y);
+  var rightEdge = minValue(left.x + left.width, right.x + right.width);
+  var bottomEdge = minValue(left.y + left.height, right.y + right.height);
+  if (rightEdge <= x || bottomEdge <= y) {
+    return { x: x, y: y, width: 0, height: 0 };
+  }
+  return { x: x, y: y, width: rightEdge - x, height: bottomEdge - y };
+}
+
+function currentClipRegion(canvas) {
+  var checkedCanvas = requireCanvas(canvas);
+  if (checkedCanvas.clipStack.length === 0) {
+    return normalizeClip(checkedCanvas, null);
+  }
+  return checkedCanvas.clipStack[checkedCanvas.clipStack.length - 1];
+}
+
+function resolveClipRegion(canvas, clip) {
+  var stackClip = currentClipRegion(canvas);
+  if (clip === null) {
+    return stackClip;
+  }
+  return intersectClip(stackClip, normalizeClip(canvas, clip));
+}
+
 function drawPixelClipped(canvas, x, y, color, clip) {
   var region = normalizeClip(canvas, clip);
   if (x < region.x || y < region.y || x >= region.x + region.width || y >= region.y + region.height) {
@@ -137,21 +216,18 @@ function drawPixelClipped(canvas, x, y, color, clip) {
   return drawPixel(canvas, x, y, color);
 }
 
-function blendColor(destination, source) {
-  var alpha = source.alpha;
-  var inverse = 1 - alpha;
-  return rgba(
-    round(source.red * alpha + destination.red * inverse),
-    round(source.green * alpha + destination.green * inverse),
-    round(source.blue * alpha + destination.blue * inverse),
-    1
-  );
+function strokeWidthValue(options) {
+  var width = optionValue(options, "strokeWidth", defaultStrokeWidth());
+  if (width < 1) {
+    fail("jayess:canvas strokeWidth must be at least 1");
+  }
+  return round(width);
 }
 
 export function create(width, height, options) {
   var background = optionValue(options, "background", defaultBackground());
   var title = optionValue(options, "title", "");
-  return makeCanvas(createImage(width, height, background), title);
+  return makeCanvas(createImage(width, height, background), title, defaultClipStack());
 }
 
 export function clear(canvas, color) {
@@ -173,24 +249,43 @@ export function getPixel(canvas, x, y) {
 
 export function copy(canvas) {
   var source = requireCanvas(canvas);
-  return makeCanvas(copyImage(source.image), source.title);
+  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack));
 }
 
 export function fillRect(canvas, x, y, width, height, color) {
-  for (var row = y; row < y + height; row = row + 1) {
-    for (var column = x; column < x + width; column = column + 1) {
-      drawPixel(canvas, column, row, color);
-    }
+  if (color.alpha >= 1) {
+    fillImageRect(requireCanvas(canvas).image, x, y, width, height, color);
+    return canvas;
   }
+  fillImageRectAlpha(requireCanvas(canvas).image, x, y, width, height, color);
   return canvas;
 }
 
 export function clipRect(canvas, x, y, width, height) {
-  return normalizeClip(canvas, { x: x, y: y, width: width, height: height });
+  return resolveClipRegion(canvas, { x: x, y: y, width: width, height: height });
+}
+
+export function currentClip(canvas) {
+  return currentClipRegion(canvas);
+}
+
+export function pushClip(canvas, x, y, width, height) {
+  var checkedCanvas = requireCanvas(canvas);
+  checkedCanvas.clipStack.push(resolveClipRegion(checkedCanvas, { x: x, y: y, width: width, height: height }));
+  return canvas;
+}
+
+export function popClip(canvas) {
+  var checkedCanvas = requireCanvas(canvas);
+  if (checkedCanvas.clipStack.length === 0) {
+    fail("jayess:canvas popClip requires an active clip");
+  }
+  checkedCanvas.clipStack.pop();
+  return canvas;
 }
 
 export function fillRectClipped(canvas, x, y, width, height, color, clip) {
-  var region = normalizeClip(canvas, clip);
+  var region = resolveClipRegion(canvas, clip);
   for (var row = y; row < y + height; row = row + 1) {
     for (var column = x; column < x + width; column = column + 1) {
       if (column >= region.x && row >= region.y && column < region.x + region.width && row < region.y + region.height) {
@@ -202,28 +297,23 @@ export function fillRectClipped(canvas, x, y, width, height, color, clip) {
 }
 
 export function fillRectAlpha(canvas, x, y, rectWidth, rectHeight, color) {
-  for (var row = y; row < y + rectHeight; row = row + 1) {
-    for (var column = x; column < x + rectWidth; column = column + 1) {
-      if (column >= 0 && row >= 0 && column < width(canvas) && row < height(canvas)) {
-        drawPixel(canvas, column, row, blendColor(getPixel(canvas, column, row), color));
-      }
-    }
-  }
+  fillImageRectAlpha(requireCanvas(canvas).image, x, y, rectWidth, rectHeight, color);
   return canvas;
 }
 
-export function strokeRect(canvas, x, y, width, height, color) {
+export function strokeRect(canvas, x, y, width, height, color, options) {
   if (width <= 0 || height <= 0) {
     return canvas;
   }
+  var strokeWidth = strokeWidthValue(options);
 
   for (var column = x; column < x + width; column = column + 1) {
-    drawPixel(canvas, column, y, color);
-    drawPixel(canvas, column, y + height - 1, color);
+    drawStrokePixel(canvas, column, y, color, strokeWidth);
+    drawStrokePixel(canvas, column, y + height - 1, color, strokeWidth);
   }
   for (var row = y + 1; row < y + height - 1; row = row + 1) {
-    drawPixel(canvas, x, row, color);
-    drawPixel(canvas, x + width - 1, row, color);
+    drawStrokePixel(canvas, x, row, color, strokeWidth);
+    drawStrokePixel(canvas, x + width - 1, row, color, strokeWidth);
   }
   return canvas;
 }
@@ -238,9 +328,10 @@ export function drawImage(canvas, image, x, y) {
 }
 
 export function drawImageClipped(canvas, image, x, y, clip) {
+  var region = resolveClipRegion(canvas, clip);
   for (var row = 0; row < imageHeight(image); row = row + 1) {
     for (var column = 0; column < imageWidth(image); column = column + 1) {
-      drawPixelClipped(canvas, x + column, y + row, getImagePixel(image, column, row), clip);
+      drawPixelClipped(canvas, x + column, y + row, getImagePixel(image, column, row), region);
     }
   }
   return canvas;
@@ -267,10 +358,11 @@ export function fillCircle(canvas, centerX, centerY, radius, color) {
   return canvas;
 }
 
-export function strokeCircle(canvas, centerX, centerY, radius, color) {
+export function strokeCircle(canvas, centerX, centerY, radius, color, options) {
   var checkedRadius = requireRadius(radius);
+  var strokeWidth = strokeWidthValue(options);
   if (checkedRadius === 0) {
-    drawPixel(canvas, centerX, centerY, color);
+    drawStrokePixel(canvas, centerX, centerY, color, strokeWidth);
     return canvas;
   }
 
@@ -284,7 +376,7 @@ export function strokeCircle(canvas, centerX, centerY, radius, color) {
       var dy = row - centerY;
       var distance = dx * dx + dy * dy;
       if (distance <= outer && distance > inner) {
-        drawPixel(canvas, column, row, color);
+        drawStrokePixel(canvas, column, row, color, strokeWidth);
       }
     }
   }
@@ -315,11 +407,40 @@ export function fillEllipse(canvas, centerX, centerY, radiusX, radiusY, color) {
   return canvas;
 }
 
-export function strokeEllipse(canvas, centerX, centerY, radiusX, radiusY, color) {
+function drawLine(canvas, x1, y1, x2, y2, color, options) {
+  var dx = abs(x2 - x1);
+  var dy = abs(y2 - y1);
+  var sx = sign(x2 - x1);
+  var sy = sign(y2 - y1);
+  var error = dx - dy;
+  var x = x1;
+  var y = y1;
+  var strokeWidth = strokeWidthValue(options);
+
+  while (true) {
+    drawStrokePixel(canvas, x, y, color, strokeWidth);
+    if (x === x2 && y === y2) {
+      return canvas;
+    }
+
+    var doubled = error * 2;
+    if (doubled > 0 - dy) {
+      error = error - dy;
+      x = x + sx;
+    }
+    if (doubled < dx) {
+      error = error + dx;
+      y = y + sy;
+    }
+  }
+}
+
+export function strokeEllipse(canvas, centerX, centerY, radiusX, radiusY, color, options) {
   var checkedX = requireEllipseRadius(radiusX);
   var checkedY = requireEllipseRadius(radiusY);
+  var strokeWidth = strokeWidthValue(options);
   if (checkedX === 0 || checkedY === 0) {
-    return line(canvas, centerX - checkedX, centerY - checkedY, centerX + checkedX, centerY + checkedY, color);
+    return drawLine(canvas, centerX - checkedX, centerY - checkedY, centerX + checkedX, centerY + checkedY, color, options);
   }
 
   var xSquare = checkedX * checkedX;
@@ -337,41 +458,18 @@ export function strokeEllipse(canvas, centerX, centerY, radiusX, radiusY, color)
       var outerValue = dx * dx * ySquare + dy * dy * xSquare;
       var innerValue = dx * dx * innerYSquare + dy * dy * innerXSquare;
       if (outerValue <= outer && (inner === 0 || innerValue > inner)) {
-        drawPixel(canvas, column, row, color);
+        drawStrokePixel(canvas, column, row, color, strokeWidth);
       }
     }
   }
   return canvas;
 }
 
-export function line(canvas, x1, y1, x2, y2, color) {
-  var dx = abs(x2 - x1);
-  var dy = abs(y2 - y1);
-  var sx = sign(x2 - x1);
-  var sy = sign(y2 - y1);
-  var error = dx - dy;
-  var x = x1;
-  var y = y1;
-
-  while (true) {
-    drawPixel(canvas, x, y, color);
-    if (x === x2 && y === y2) {
-      return canvas;
-    }
-
-    var doubled = error * 2;
-    if (doubled > 0 - dy) {
-      error = error - dy;
-      x = x + sx;
-    }
-    if (doubled < dx) {
-      error = error + dx;
-      y = y + sy;
-    }
-  }
+export function line(canvas, x1, y1, x2, y2, color, options) {
+  return drawLine(canvas, x1, y1, x2, y2, color, options);
 }
 
-export function polyline(canvas, points, color) {
+export function polyline(canvas, points, color, options) {
   if (points.length === 0) {
     return canvas;
   }
@@ -379,7 +477,7 @@ export function polyline(canvas, points, color) {
   for (var index = 0; index < points.length - 1; index = index + 1) {
     var start = requirePoint(points[index]);
     var end = requirePoint(points[index + 1]);
-    line(canvas, start.x, start.y, end.x, end.y, color);
+    line(canvas, start.x, start.y, end.x, end.y, color, options);
   }
 
   return canvas;
@@ -402,7 +500,7 @@ export function quadraticCurve(canvas, x1, y1, controlX, controlY, x2, y2, color
     var inverse = 1 - t;
     var currentX = round(inverse * inverse * x1 + 2 * inverse * t * controlX + t * t * x2);
     var currentY = round(inverse * inverse * y1 + 2 * inverse * t * controlY + t * t * y2);
-    line(canvas, round(previousX), round(previousY), currentX, currentY, color);
+    line(canvas, round(previousX), round(previousY), currentX, currentY, color, options);
     previousX = currentX;
     previousY = currentY;
   }
@@ -428,7 +526,7 @@ export function bezierCurve(canvas, x1, y1, c1x, c1y, c2x, c2y, x2, y2, color, o
       + 3 * inverse * t * t * c2y
       + t * t * t * y2
     );
-    line(canvas, round(previousX), round(previousY), currentX, currentY, color);
+    line(canvas, round(previousX), round(previousY), currentX, currentY, color, options);
     previousX = currentX;
     previousY = currentY;
   }
@@ -507,24 +605,27 @@ function requireRect(rect) {
 
 function wrappedTextLines(textValue, maxColumns) {
   var lines = [];
-  var current = "";
+  var lineStart = 0;
+  var currentLength = 0;
   if (maxColumns < 1) {
     maxColumns = 1;
   }
   for (var index = 0; index < textValue.length; index = index + 1) {
     var char = textValue[index];
     if (char === "\n") {
-      lines.push(current);
-      current = "";
+      lines.push(sliceString(textValue, lineStart, index));
+      lineStart = index + 1;
+      currentLength = 0;
     } else {
-      if (current.length >= maxColumns) {
-        lines.push(current);
-        current = "";
+      if (currentLength >= maxColumns) {
+        lines.push(sliceString(textValue, lineStart, index));
+        lineStart = index;
+        currentLength = 0;
       }
-      current = current + char;
+      currentLength = currentLength + 1;
     }
   }
-  lines.push(current);
+  lines.push(sliceString(textValue, lineStart, textValue.length));
   return lines;
 }
 
@@ -571,43 +672,6 @@ export function drawTextBox(canvas, textValue, rectValue, options) {
   return target;
 }
 
-function polygonBounds(points) {
-  if (points.length === 0) {
-    return { minX: 0, minY: 0, maxX: -1, maxY: -1 };
-  }
-  var first = requirePoint(points[0]);
-  var minX = first.x;
-  var maxX = first.x;
-  var minY = first.y;
-  var maxY = first.y;
-  for (var index = 1; index < points.length; index = index + 1) {
-    var point = requirePoint(points[index]);
-    minX = minValue(minX, point.x);
-    maxX = maxValue(maxX, point.x);
-    minY = minValue(minY, point.y);
-    maxY = maxValue(maxY, point.y);
-  }
-  return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
-}
-
-function pointInsidePolygon(x, y, points) {
-  var inside = false;
-  var previous = points.length - 1;
-  for (var index = 0; index < points.length; index = index + 1) {
-    var currentPoint = requirePoint(points[index]);
-    var previousPoint = requirePoint(points[previous]);
-    var crosses = (currentPoint.y > y) !== (previousPoint.y > y);
-    if (crosses) {
-      var atX = (previousPoint.x - currentPoint.x) * (y - currentPoint.y) / (previousPoint.y - currentPoint.y) + currentPoint.x;
-      if (x < atX) {
-        inside = !inside;
-      }
-    }
-    previous = index;
-  }
-  return inside;
-}
-
 export function fillPolygon(canvas, points, color) {
   if (points.length < 3) {
     return canvas;
@@ -623,15 +687,15 @@ export function fillPolygon(canvas, points, color) {
   return canvas;
 }
 
-export function strokePolygon(canvas, points, color) {
+export function strokePolygon(canvas, points, color, options) {
   if (points.length === 0) {
     return canvas;
   }
-  polyline(canvas, points, color);
+  polyline(canvas, points, color, options);
   if (points.length > 2) {
     var first = requirePoint(points[0]);
     var last = requirePoint(points[points.length - 1]);
-    line(canvas, last.x, last.y, first.x, first.y, color);
+    line(canvas, last.x, last.y, first.x, first.y, color, options);
   }
   return canvas;
 }

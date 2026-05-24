@@ -22,6 +22,8 @@ var bytes = toBytes(buffer);
 - `write(buffer, offset, bytes)` writes bytes at `offset` and returns the same buffer handle.
 - `concat(buffers)` returns a new buffer containing each buffer's bytes in order.
 
+`fromBytes(bytes)` and `toBytes(buffer)` do not copy the underlying storage. Writing through a buffer mutates the same backing `jayess:bytes` value. `read(buffer, offset, size)` returns a new `jayess:bytes` slice rather than a live view into the buffer.
+
 ## Diagnostics
 
 The module throws Jayess runtime errors for:

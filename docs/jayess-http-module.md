@@ -28,8 +28,8 @@
 - `sendText(response, text, options)` sends a complete text response.
 - `sendJson(response, value, options)` sends a complete JSON response.
 - `sendBytes(response, bytes, options)` sends a complete byte response.
-- `sendTextStream(response, stream, options, chunkSize)` consumes a Jayess stream and sends the text content.
-- `sendBytesStream(response, stream, options, chunkSize)` consumes a Jayess stream and sends the byte content.
+- `sendTextStream(response, stream, options, chunkSize)` consumes a Jayess read stream and sends a real chunked text response incrementally.
+- `sendBytesStream(response, stream, options, chunkSize)` consumes a Jayess read stream and sends a real chunked byte response incrementally.
 - `notFound(response, message)` sends a 404 text response.
 - `redirect(response, location, status)` sends a redirect response.
 - `sendFile(response, filename, options)` sends a file as a byte response with MIME lookup.
@@ -41,9 +41,9 @@
 - `handle(router, request, response)` dispatches to a matched route handler or sends a 404 response.
 - `compose(handlers)` creates a compact sequential handler composition helper.
 
-## First Slice
+## Current Shipped Scope
 
-The implemented first slice supports plain HTTP over the Jayess-owned native runtime adapter:
+The current shipped scope supports plain HTTP over the Jayess-owned native runtime adapter:
 
 - `request(options)` for `http://host:port/path` URLs
 - `createServer(handler, options)` for a focused multi-request server adapter
@@ -57,7 +57,129 @@ The implemented first slice supports plain HTTP over the Jayess-owned native run
 - Jayess async handles for client requests
 - Jayess async timeout/cancellation wrappers for client requests
 
-This is not Node.js `http` compatibility and does not expose Node streams. The server first slice is intentionally handle-based and explicit so the runtime can grow without changing the import surface.
+The current shipped scope is deliberately plain HTTP only:
+
+- client URLs must be `http://...`
+- there is no HTTPS or TLS transport in the current slice
+- there is no certificate loading, trust-store integration, or ALPN/HTTP2 surface in the current slice
+
+TLS remains out of scope until `jayess:crypto` grows the first approved certificate/key/trust-anchor container primitives needed to support it honestly. Even then, `jayess:http` will continue to own transport sockets and handshake behavior rather than pushing those responsibilities into raw crypto helpers.
+
+This is not Node.js `http` compatibility and does not expose Node streams. The server surface is intentionally handle-based and explicit so the runtime can grow without changing the import surface.
+
+## Current Host Boundary
+
+The current runtime boundary is now a plain-HTTP socket path on both major host families already used elsewhere in the repo:
+
+- client request helpers use the focused native HTTP runtime path
+- server creation, request handling, response sending, and `close(server)` now have both Unix/POSIX and Windows/Winsock-backed implementations
+- the current Windows slice is still the same bounded HTTP/1.1 close-per-connection server path as the Unix slice; it does not yet widen into TLS, HTTP/2, or broader transport features
+
+This means `jayess:http` now has a first real Windows server/runtime path, but later hardening work such as graceful shutdown and transport security still remains separate.
+
+## Current Production-Level Boundary
+
+For the current shipped slice, "production level" means the module has deliberate contracts and diagnostics for the plain-HTTP surface it already claims:
+
+- explicit request, response, route, and static-file helper APIs rather than ambient Node.js behavior
+- explicit invalid-input diagnostics instead of silent coercion
+- deterministic body helper limits through `maxBytes` where those helpers already expose it
+- explicit platform-bounded behavior instead of pretending missing transport features exist
+
+It does not yet mean that the module has fully hardened transport behavior. The following remain outside the current production claim until later slices land:
+
+- HTTPS or TLS
+- certificate, key, or trust-store handling
+- HTTP/2, HTTP/3, or WebSocket behavior
+- fully incremental streaming across every request and response helper shape
+- server hardening items such as graceful shutdown guarantees
+
+## Current Request-Parsing Limits
+
+The shipped server runtime now enforces explicit request-head limits before user handlers run:
+
+- request line: 4096 bytes
+- total request-head bytes before the blank line: 16384 bytes
+- header count: 100 headers
+
+Malformed request lines, malformed headers, invalid `Content-Length` values, and incomplete request heads are rejected by the runtime before the handler is invoked.
+
+The current rejection behavior is:
+
+- malformed request line or malformed headers: `400`
+- oversized header count or header block: `431`
+
+These are runtime guardrails for the server parser. They do not yet imply the later graceful-shutdown slice is complete.
+
+## Current Timeout Policy
+
+The shipped server runtime now applies one explicit read-timeout policy to accepted client sockets:
+
+- idle accepted socket before a full request head arrives: `5000ms`
+- partially received request head: `5000ms` per blocking read while the head is still incomplete
+- partially received request body after `Content-Length` is known: `5000ms` per blocking read while the body is still incomplete
+
+The current timeout response is:
+
+- read timeout during request head: `408`
+- read timeout during request body: `408`
+
+This policy is currently runtime-owned and fixed. It is not yet configurable through `createServer(options)`, and it does not yet imply the later graceful-shutdown slice is complete.
+
+## Current Graceful Shutdown Policy
+
+The shipped server runtime now applies one explicit shutdown policy for `close(server)`:
+
+- stop accepting new connections immediately
+- wait for active requests to finish for up to `1000ms`
+- if active requests are still running after that grace window, force-close their client sockets
+- once active requests drain or the forced close completes, return from `close(server)`
+
+This means short in-flight requests can still complete during shutdown, while long-running requests do not block shutdown indefinitely.
+
+The current graceful-shutdown policy is runtime-owned and fixed. It does not yet imply broader lifecycle features such as persistent keep-alive draining or richer server-state inspection APIs.
+
+## Current Connection Policy
+
+The shipped server runtime now has one explicit connection policy:
+
+- the server is close-per-connection
+- every normal response writes `Connection: close`
+- the runtime closes the client socket immediately after the response is sent
+- if a handler returns without calling `end(...)`, the runtime still completes the response with the current buffered body and closes the connection
+
+Persistent keep-alive connections are not supported in the current slice.
+
+The current pipelining behavior is also explicit:
+
+- multiple requests queued on one connection are rejected
+- the runtime returns `400` with `Jayess http pipelined requests are not supported`
+
+This keeps the current HTTP/1.1 server path honest while later graceful-shutdown work remains separate.
+
+## Current Body-Size Guardrails
+
+The shipped server runtime now applies buffered body-size guardrails on both sides of the handler boundary:
+
+- default max request body size: `1048576` bytes
+- default max buffered response body size: `1048576` bytes
+
+These can be overridden per server through `createServer(handler, options)`:
+
+- `maxRequestBodyBytes`
+- `maxResponseBodyBytes`
+
+The current rejection behavior is:
+
+- request body larger than `maxRequestBodyBytes`: `413`
+- buffered response body larger than `maxResponseBodyBytes`: `500`
+
+The request-body limit is enforced by the runtime before the handler sees the full request object. The response-body limit is enforced on both shipped response paths:
+
+- the buffered `write(...)` / `end(...)` path used by `sendText`, `sendJson`, and `sendBytes`
+- the chunked streaming path used by `sendTextStream(...)` and `sendBytesStream(...)`, which counts total streamed bytes before each emitted chunk
+
+These guardrails do not yet imply the later streaming slice is complete.
 
 ## Request Options
 
@@ -72,6 +194,8 @@ This is not Node.js `http` compatibility and does not expose Node streams. The s
 - `host`
 - `port`
 - `backlog`
+- `maxRequestBodyBytes`
+- `maxResponseBodyBytes`
 
 The response object returned by `request(options)` should include:
 
@@ -112,7 +236,7 @@ Options are plain Jayess objects:
 
 `sendFile` reads the file synchronously through `jayess:fs` and uses `jayess:mime` when `contentType` is not provided.
 
-`sendTextStream` and `sendBytesStream` are async Jayess helper functions layered over `jayess:stream`. They consume an existing stream handle before completing the response.
+`sendTextStream` and `sendBytesStream` are async Jayess helper functions layered over `jayess:stream.readChunk(...)`. They begin a chunked HTTP response, read one stream chunk at a time, write each chunk incrementally, and end the response explicitly when the stream reaches EOF.
 
 ## Static Files
 
@@ -124,6 +248,14 @@ Supported options:
 - `cacheControl`: optional `Cache-Control` header value for served files. `null` or absence omits the header.
 
 The helper normalizes request pathnames before filesystem access, rejects `..` and backslash path segments, serves files with MIME lookup, applies optional deterministic cache headers, returns `404` for missing paths, and returns `400` for unsafe paths.
+
+The current static-file hardening rules are explicit:
+
+- path traversal through `..` path segments is rejected
+- percent-encoded traversal markers such as `%2e`, `%2f`, and `%5c` are rejected before filesystem access
+- unknown file extensions fall back to `application/octet-stream`
+- if a file disappears between path validation and the actual read, the helper returns `404` instead of surfacing the raw host exception
+- if a file still exists but the read itself fails, the helper returns `500` with a focused `file read failed` response
 
 ## Routing Helpers
 
@@ -170,6 +302,10 @@ The module should throw Jayess runtime errors for:
 - invalid file paths used by `sendFile`
 - unsafe static file request paths
 
+Current host-boundary diagnostics also include:
+
+- `Jayess http request supports only http:// URLs` for unsupported schemes such as HTTPS in the current slice
+
 ## Implementation
 
 - Jayess wrappers live in `stdlib/jayess/http/index.js`.
@@ -180,3 +316,18 @@ The module should throw Jayess runtime errors for:
 - Stream response helpers reuse `jayess:stream` instead of adding Node.js stream compatibility.
 - Query parsing uses `jayess:querystring`.
 - Static file content type lookup uses `jayess:mime`.
+
+## Current Non-Goals
+
+The current shipped module does not yet claim:
+
+- HTTPS or TLS
+- certificate or private-key management
+- HTTP/2 or HTTP/3
+- WebSocket support
+- fully incremental body streaming semantics in every helper
+
+Executable runtime verification currently splits host coverage deliberately:
+
+- Windows and Unix/POSIX both run the core request/response, malformed-request, oversized-header, timeout, body-limit, streaming, connection-policy, and static-file probes.
+- Focused graceful-shutdown and concurrent-request lifecycle probes currently run on Unix-like hosts, while the broader Windows/Winsock lifecycle parity is covered by the other executable HTTP probes listed above.

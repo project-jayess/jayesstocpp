@@ -1,6 +1,6 @@
 # `jayess:async` Module
 
-This document records the shipped first module-level async-composition surface for Jayess.
+This document records the current shipped module-level async-composition surface for Jayess.
 
 The goal is to make async support a Jayess-owned language/runtime feature, not a thin wrapper over ambient JavaScript `Promise`.
 
@@ -59,7 +59,7 @@ These functions operate on Jayess async handles, not on ambient JavaScript Promi
 
 ## Chaining Shape
 
-The first shipped slice does not use handle methods or JavaScript-style method chaining.
+The current shipped surface does not use handle methods or JavaScript-style method chaining.
 
 The approved shape is:
 
@@ -70,7 +70,7 @@ This keeps the first composition layer simple and avoids growing an implicit Pro
 
 ## Rejection Propagation
 
-The first shipped slice uses explicit Jayess async-handle failure propagation rules:
+The current shipped surface uses explicit Jayess async-handle failure propagation rules:
 
 - `resolved(value)` creates an already-resolved Jayess async handle
 - `rejected(error)` creates an already-failed Jayess async handle
@@ -104,7 +104,7 @@ These rules are Jayess-owned async-handle semantics, not JavaScript Promise comp
 
 ## Surface Rationale
 
-This first shipped shape supports:
+This current shipped shape supports:
 
 - construction of already-completed async values
 - construction of already-failed async values
@@ -144,7 +144,7 @@ That keeps the language design clear:
 
 ## Current Boundary
 
-The current async-module plan assumes:
+The current shipped async-module boundary assumes:
 
 - async function expressions and async arrow functions are part of the current supported async syntax slice and reuse the same async-handle runtime model as async function declarations
 - async class methods reuse the same async-handle runtime model as async function declarations
@@ -156,7 +156,7 @@ The current scheduler is cooperative and runs queued async work when `await` nee
 
 ## Implementation Split
 
-The shipped first slice is split across:
+The current shipped surface is split across:
 
 - `stdlib/jayess/async/index.js`
 - `stdlib/jayess/async/async-primitives.hpp`

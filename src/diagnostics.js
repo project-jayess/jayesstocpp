@@ -45,6 +45,9 @@ export function inferDiagnosticCode(phase, message) {
     if (/dynamic import\(\)/.test(message)) {
       return "JY_PARSE_DYNAMIC_IMPORT";
     }
+    if (/regex literal syntax/.test(message)) {
+      return "JY_PARSE_REGEX_LITERAL_UNSUPPORTED";
+    }
     if (/does not support 'let'/.test(message)) {
       return "JY_PARSE_LET_UNSUPPORTED";
     }

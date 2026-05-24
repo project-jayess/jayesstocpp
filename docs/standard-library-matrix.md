@@ -1,6 +1,6 @@
 # Standard Library Matrix
 
-Jayess standard-library modules are imported with `jayess:*` specifiers and are transpiled with user code when imported.
+This is the authoritative quick standard-library/module matrix for shipped `jayess:*` modules. These modules are imported with `jayess:*` specifiers and are transpiled with user code when imported.
 
 | Module | Primary Surface | Runtime Primitive Family |
 | --- | --- | --- |
@@ -19,9 +19,10 @@ Jayess standard-library modules are imported with `jayess:*` specifiers and are 
 | `jayess:console` | output helpers | console |
 | `jayess:cookie` | HTTP cookie parsing and Set-Cookie formatting | http, string |
 | `jayess:config` | config file loading and shallow overlay helpers | fs, json, ini, toml, dotenv, path |
-| `jayess:crypto` | hashes and HMAC helpers | crypto, bytes |
+| `jayess:crypto` | hashes, HMAC, HKDF, and PEM container helpers | crypto, bytes |
 | `jayess:csv` | CSV parse/stringify helpers | array, string |
 | `jayess:date` | date/time values | date |
+| `jayess:dialog` | native open/save/directory/message dialogs | dialog |
 | `jayess:dotenv` | dotenv parsing and formatting | object, string |
 | `jayess:encoding` | base64, hex, URI, ASCII, UTF-16 helpers | encoding, bytes |
 | `jayess:events` | event emitter handles | events |
@@ -30,10 +31,11 @@ Jayess standard-library modules are imported with `jayess:*` specifiers and are 
 | `jayess:fs` | async-by-default filesystem helpers and `Sync` variants | fs, async, bytes |
 | `jayess:glob` | simple filesystem glob matching | fs, path, string |
 | `jayess:gpu` | optional accelerated rendering handles and draw commands | gpu, window |
+| `jayess:gui` | first Jayess-owned widget toolkit slice | layout, canvas, font |
 | `jayess:hash` | higher-level hash helpers | crypto, encoding, fs, bytes |
 | `jayess:html` | HTML escaping and string construction helpers | array, object, string |
-| `jayess:http` | HTTP client/server and response helpers | http, async, bytes, json, querystring, mime, fs |
-| `jayess:image` | software pixel buffers, metadata, and PPM image output | image, color |
+| `jayess:http` | HTTP client/server, routing, and response helpers | http, async, bytes, json, querystring, mime, fs |
+| `jayess:image` | software pixel buffers, metadata, and deterministic image I/O | image, color |
 | `jayess:ini` | sectioned INI parse/stringify helpers | object, string |
 | `jayess:iter` | generator consumption helpers | generator, iter |
 | `jayess:json` | parse/stringify/validate | json |

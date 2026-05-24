@@ -18,6 +18,10 @@ inline jayess::value jayessGpuCreateTexture(const std::vector<jayess::value>& ja
   return jayess::gpu_create_texture(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }
 
+inline jayess::value jayessGpuUploadImage(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::gpu_upload_image(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
 inline jayess::value jayessGpuCreateShader(const std::vector<jayess::value>& jayessArgs) {
   return jayess::gpu_create_shader(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }

@@ -8,9 +8,9 @@
 import { run, runText, runBytes, runJson, runWithCancellation, runWithTimeout, runWithTimeoutAndCancellation, spawn, spawnPipeline, join, kill, stdout, stderr, ok, requireSuccess } from "jayess:subprocess";
 ```
 
-## First Slice
+## Surface
 
-The first slice exposes four focused helpers:
+The current shipped surface includes:
 
 - `run(command, args, options)` starts a command and returns a Jayess async handle for completion data.
 - `runWithCancellation(command, args, options, token)` composes `run` with a cancellation token.
@@ -28,6 +28,8 @@ The first slice exposes four focused helpers:
 - `ok(result)` returns true when completion data has exit code `0` and was not killed.
 - `requireSuccess(result)` returns successful completion data and throws stderr text otherwise.
 
+`run*` helpers return Jayess async handles and should be consumed with `await`. `spawn(command, args, options)` returns an explicit process handle immediately, and `join(handle)` resolves that handle into completion data later.
+
 Output streams must be opened before `join(handle)`. When an output stream is opened, `join(handle)` still returns captured completion text and leaves that output file available for the stream reader.
 
 Convenience helpers are layered over `run`, `requireSuccess`, `jayess:bytes`, and `jayess:json`. They do not add shell-by-default behavior.
@@ -44,7 +46,7 @@ The module does not run commands through a shell by default. Ordinary argument h
 
 ## Options
 
-The first slice keeps options object-shaped and explicit:
+The current shipped options remain object-shaped and explicit:
 
 - `cwd` selects a child working directory.
 - `env` passes per-child environment values.

@@ -8,7 +8,7 @@
 - `writeText(text)`
 - `clear()`
 
-The current slice exposes the module, native bridge, and normalized unavailable diagnostic:
+The current shipped surface exposes the module, native bridge, and normalized unavailable diagnostic:
 
 ```text
 Jayess clipboard host adapter is not available on this platform

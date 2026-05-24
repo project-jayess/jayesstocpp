@@ -55,7 +55,7 @@ parsed_url_parts parse_url_parts(const std::string& input) {
 
   const auto fragmentStart = input.find('#', restStart);
   const auto queryStart = input.find('?', restStart);
-  const auto pathEnd = std::min(
+  const auto pathEnd = (std::min)(
     queryStart == std::string::npos ? input.size() : queryStart,
     fragmentStart == std::string::npos ? input.size() : fragmentStart
   );

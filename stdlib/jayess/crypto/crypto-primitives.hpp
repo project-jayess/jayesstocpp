@@ -6,6 +6,10 @@ inline jayess::value jayessCryptoSha256(const std::vector<jayess::value>& jayess
   return jayess::crypto_sha256(jayess::argument_at(jayessArgs, 0));
 }
 
+inline jayess::value jayessCryptoSha512(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::crypto_sha512(jayess::argument_at(jayessArgs, 0));
+}
+
 inline jayess::value jayessCryptoSha1(const std::vector<jayess::value>& jayessArgs) {
   return jayess::crypto_sha1(jayess::argument_at(jayessArgs, 0));
 }

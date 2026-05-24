@@ -1,4 +1,5 @@
 import { collectParameterBindingNames } from "../ast/parameters.js";
+import { toCppIdentifier } from "./cpp-identifiers.js";
 import { collectGeneratorLocalNames, GeneratorLoweringContext } from "./emit-generator-core.js";
 import { emitGeneratorStatement } from "./emit-generator-statement.js";
 
@@ -17,7 +18,10 @@ function buildGeneratorBodyLines(node, context, renderExpression, loweringContex
 
 function collectLocalNames(node) {
   const parameterNames = collectParameterBindingNames(node.params);
-  return [...collectGeneratorLocalNames(node.body)].filter((name) => !parameterNames.includes(name));
+  return [...collectGeneratorLocalNames(node.body)]
+    .filter((name) => !parameterNames.includes(name))
+    .map((name) => toCppIdentifier(name))
+    .sort((left, right) => left.localeCompare(right));
 }
 
 function emitGeneratorCallableBody(node, context, lines, emitParameterInitialization, bodyLines, loweringContext, localNames, options = {}) {
@@ -41,7 +45,7 @@ function emitGeneratorCallableBody(node, context, lines, emitParameterInitializa
   const captureNames = [
     "jayess_generator",
     ...(options.outerCaptureNames ?? []),
-    ...collectParameterBindingNames(node.params),
+    ...collectParameterBindingNames(node.params).map((name) => toCppIdentifier(name)),
     ...localNames,
     ...loweringContext.declaredDestructureTemps,
     ...loweringContext.declaredExpressionTemps,
@@ -59,7 +63,7 @@ export function emitGeneratorFunction(node, context, lines, renderExpression, em
   const loweringContext = new GeneratorLoweringContext();
   const bodyLines = buildGeneratorBodyLines(node, context, renderExpression, loweringContext);
 
-  lines.push(`jayess::value ${node.id.name}(const std::vector<jayess::value>& jayess_args) {`);
+  lines.push(`jayess::value ${toCppIdentifier(node.id.name)}(const std::vector<jayess::value>& jayess_args) {`);
   emitGeneratorCallableBody(node, context, lines, emitParameterInitialization, bodyLines, loweringContext, localNames);
   lines.push("}");
 }

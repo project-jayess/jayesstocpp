@@ -103,7 +103,7 @@ Computed class member names and static initialization blocks now have a narrow f
 
 Large runtime built-ins such as `Date`, `Map`, `Set`, and `JSON` are treated as explicit Jayess library/runtime features rather than ambient JavaScript globals. Narrow module-owned slices are now shipped through `jayess:date`, `jayess:json`, `jayess:collections/map`, and `jayess:collections/set`.
 
-Regular-expression support now has a narrow shipped first slice through `jayess:regex`, with helper exports `create`, `test`, `exec`, `replaceFirst`, `replaceAll`, and `isRegex`.
+Regular-expression support now has a narrow shipped first slice through `jayess:regex`, with helper exports `create`, `test`, `exec`, `split`, `matchAll`, `replaceFirst`, `replaceAll`, and `isRegex`.
 
 The standard-library expansion work is intentionally bounded: array `includes(value)`, the string `includes` / `indexOf` / `endsWith` slice, the first `jayess:object` helper surface, and the first `jayess:number` parsing surface are now shipped.
 
@@ -114,6 +114,8 @@ Jayess also does not currently claim broad JavaScript runtime compatibility. Com
 - `undefined` as a first-class JavaScript value model
 - JavaScript `Date` global compatibility beyond the shipped `jayess:date` module surface
 - broader regex support beyond the shipped `jayess:regex` helper-only slice
+- regex literal syntax such as `/abc/`
+- ambient/global `RegExp`
 - ambient/global `Map` and `Set` compatibility, plus `WeakMap` and `WeakSet`
 - broad `Array.prototype` method coverage beyond `.push(...)`, `.pop()`, `.join(...)`, and `.includes(...)`
 - broad `String.prototype` method coverage beyond `.length`, `.slice(...)`, `.substring(...)`, `.startsWith(...)`, `.includes(...)`, `.indexOf(...)`, `.endsWith(...)`, and primitive `.toString()`

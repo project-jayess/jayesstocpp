@@ -1,6 +1,6 @@
 # Jayess `jayess:number` Module
 
-The first shipped numeric helper surface in Jayess is a small Jayess-owned module:
+The current shipped numeric helper surface in Jayess is a small Jayess-owned module:
 
 - `jayess:number`
 
@@ -17,12 +17,11 @@ The shipped exports are:
 
 ## Current Semantics
 
-The current slice is intentionally narrow.
-
+The current shipped surface is intentionally narrow.
 - `isInteger(value)` returns `true` only for finite Jayess numeric values with no fractional part.
 - `isFinite(value)` returns `true` only for finite Jayess numeric values.
 - non-number values return `false` from numeric predicate helpers.
-- Both helpers require a string input.
+- Only the parse helpers require string input.
 - Leading and trailing ASCII whitespace is ignored.
 - `parseInt(text)` accepts only full decimal integer text with an optional sign.
 - `parseFloat(text)` accepts only full floating-point text with an optional sign and optional exponent.
@@ -52,7 +51,7 @@ That keeps the language direction aligned with:
 
 ## Ownership Split
 
-The shipped first slice is split across:
+The current shipped surface is split across:
 
 - `stdlib/jayess/number/index.js`
 - `stdlib/jayess/number/number-primitives.hpp`
@@ -62,7 +61,7 @@ The C++ runtime owns the primitive parsing machinery. The public module surface 
 
 ## Non-Goals For This Slice
 
-This first slice does not attempt to provide:
+This current shipped surface does not attempt to provide:
 
 - ambient global `parseInt`
 - ambient global `parseFloat`

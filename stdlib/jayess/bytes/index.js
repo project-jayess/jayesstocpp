@@ -3,6 +3,7 @@ import {
   jayessBytesConcat,
   jayessBytesEndsWith,
   jayessBytesEquals,
+  jayessBytesSecureEquals,
   jayessBytesFill,
   jayessBytesFromArray,
   jayessBytesFromUtf8,
@@ -58,6 +59,10 @@ export function concat(left, right) {
 
 export function equals(left, right) {
   return jayessBytesEquals(left, right);
+}
+
+export function secureEquals(left, right) {
+  return jayessBytesSecureEquals(left, right);
 }
 
 export function compare(left, right) {

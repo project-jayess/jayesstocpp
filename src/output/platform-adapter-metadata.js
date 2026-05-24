@@ -1,6 +1,8 @@
 const sourceRuntimeFeatures = new Map([
   ["jayess:clipboard", ["clipboard"]],
+  ["jayess:dialog", ["dialog"]],
   ["jayess:gpu", ["gpu"]],
+  ["jayess:http", ["http"]],
   ["jayess:net", ["net"]],
   ["jayess:subprocess", ["subprocess"]],
   ["jayess:watch", ["watch"]],
@@ -14,11 +16,40 @@ const featureAdapters = new Map([
     platformLibraries: [],
     optionalBackendRequirements: []
   }],
+  ["dialog", {
+    feature: "dialog",
+    adapters: ["win32-dialog", "cocoa-dialog", "linux-portal-dialog"],
+    platformLibraries: [],
+    optionalBackendRequirements: ["Linux dialog runtime uses the focused xdg-desktop-portal adapter family and reports a normalized unavailable diagnostic when that host path cannot be used"],
+    compiledAdaptersByPlatform: {
+      windows: ["win32-dialog"],
+      macos: ["cocoa-dialog"],
+      linux: ["linux-portal-dialog"]
+    }
+  }],
   ["gpu", {
     feature: "gpu",
-    adapters: ["direct3d", "metal", "opengl", "vulkan"],
+    adapters: ["validation", "direct3d", "metal", "opengl", "vulkan"],
     platformLibraries: ["d3d11", "metal", "opengl", "vulkan"],
-    optionalBackendRequirements: ["host GPU driver", "selected GPU SDK headers"]
+    optionalBackendRequirements: ["validation backend is always available for deterministic command execution", "host GPU driver", "selected GPU SDK headers"],
+    compiledAdaptersByPlatform: {
+      windows: ["validation", "direct3d"],
+      macos: ["validation", "metal"],
+      linux: ["validation", "opengl", "vulkan"]
+    },
+    adapterSelection: {
+      windowSurface: {
+        windows: "Prefer direct3d for createSurface(window) when the Win32 window adapter is available; otherwise fall back to validation.",
+        macos: "Prefer metal for createSurface(window) when the Cocoa window adapter is available; otherwise fall back to validation.",
+        linux: "Current createSurface(window) still falls back to validation until the Linux host-backed backend slice lands."
+      }
+    }
+  }],
+  ["http", {
+    feature: "http",
+    adapters: ["posix-http", "winsock-http"],
+    platformLibraries: ["ws2_32"],
+    optionalBackendRequirements: []
   }],
   ["net", {
     feature: "net",
@@ -40,9 +71,20 @@ const featureAdapters = new Map([
   }],
   ["window", {
     feature: "window",
-    adapters: ["win32", "cocoa", "x11"],
-    platformLibraries: ["gdi32", "user32", "x11"],
-    optionalBackendRequirements: []
+    adapters: ["win32", "cocoa", "x11", "wayland"],
+    platformLibraries: ["gdi32", "user32", "wayland-client", "x11"],
+    optionalBackendRequirements: ["Wayland runtime depends on a host compositor that exposes the xdg-shell client protocol"],
+    compiledAdaptersByPlatform: {
+      windows: ["win32"],
+      macos: ["cocoa"],
+      linux: ["x11", "wayland"]
+    },
+    adapterSelection: {
+      linux: {
+        preferredOrder: ["wayland", "x11"],
+        defaultBehavior: "Prefer Wayland when WAYLAND_DISPLAY is set and the Wayland client path is available; otherwise fall back to X11 when available."
+      }
+    }
   }]
 ]);
 
@@ -67,6 +109,12 @@ export function runtimeRequirementsForFeatures(runtimeFeatures) {
       platformLibraries: adapter.platformLibraries,
       optionalBackendRequirements: adapter.optionalBackendRequirements
     };
+    if (adapter.compiledAdaptersByPlatform != null) {
+      requirement.compiledAdaptersByPlatform = adapter.compiledAdaptersByPlatform;
+    }
+    if (adapter.adapterSelection != null) {
+      requirement.adapterSelection = adapter.adapterSelection;
+    }
     if (adapter.feature === "gpu") {
       requirement.backends = adapter.adapters;
       requirement.defaultBackend = "host";

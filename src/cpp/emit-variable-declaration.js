@@ -1,10 +1,11 @@
 import { isBindingPattern } from "../ast/binding-patterns.js";
+import { toCppIdentifier } from "./cpp-identifiers.js";
 
 export function renderVariableDeclaration(node, context, helpers) {
   return node.declarations
     .map((declaration) => {
       const init = declaration.init == null ? helpers.renderNullValue() : helpers.renderExpression(declaration.init, context);
-      return `jayess::value ${declaration.id.name} = ${init}`;
+      return `jayess::value ${toCppIdentifier(declaration.id.name)} = ${init}`;
     })
     .join(", ");
 }

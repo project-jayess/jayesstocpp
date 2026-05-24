@@ -4,6 +4,22 @@ import os from "node:os";
 import path from "node:path";
 import { getRuntimeCppSource, getRuntimeHeaderSource } from "../../src/cpp/runtime-source.js";
 
+function platformLibrariesForTarget(targetDir) {
+  const hintsPath = path.join(targetDir, "jayess_build_hints.json");
+  if (!fs.existsSync(hintsPath)) {
+    return [];
+  }
+  const hints = JSON.parse(fs.readFileSync(hintsPath, "utf8"));
+  const libraries = new Set();
+  for (const hint of hints.platformLibraryHints ?? []) {
+    for (const library of hint.libraries ?? []) {
+      libraries.add(library);
+    }
+  }
+  const requiredAtLinkTime = new Set(["gdi32", "user32", "ws2_32"]);
+  return [...libraries].filter((library) => requiredAtLinkTime.has(library)).sort();
+}
+
 export function findAvailableCompiler() {
   for (const command of ["clang++", "c++", "g++"]) {
     try {
@@ -57,7 +73,8 @@ export function compileAndRunCppExecutable(files, includeDir, mainSource, execut
   }
 
   const mainPath = path.join(includeDir, `${executableName}.cpp`);
-  const executablePath = path.join(includeDir, executableName);
+  const executablePath = path.join(includeDir, process.platform === "win32" ? `${executableName}.exe` : executableName);
+  const platformLibraries = platformLibrariesForTarget(includeDir).map((library) => `-l${library}`);
   fs.writeFileSync(mainPath, mainSource, "utf8");
 
   execFileSync(compiler, [
@@ -68,7 +85,8 @@ export function compileAndRunCppExecutable(files, includeDir, mainSource, execut
     "-I",
     includeDir,
     "-o",
-    executablePath
+    executablePath,
+    ...platformLibraries
   ], {
     stdio: "pipe",
     encoding: "utf8",

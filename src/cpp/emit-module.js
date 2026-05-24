@@ -3,6 +3,7 @@ import { renderAssignmentExpression } from "./emit-assignment.js";
 import { renderArrayExpression } from "./emit-array.js";
 import { emitAsyncFunction, renderAsyncCallableExpression, renderAwaitExpression } from "./emit-async.js";
 import { isBuiltinLengthMember, renderBuiltinCallExpression } from "./emit-builtins.js";
+import { renderSyncCallableClosure } from "./emit-callable-closure.js";
 import {
   hasSpreadArgument,
   pushRenderedCallArguments,
@@ -21,6 +22,11 @@ import { emitDestructuringAssignments as emitSharedDestructuringAssignments } fr
 import { collectExportAliasLines } from "./emit-export-aliases.js";
 import { emitGeneratorFunction, renderGeneratorCallableExpression } from "./emit-generator.js";
 import { renderLiteral } from "./emit-literals.js";
+import {
+  hasLocalBinding,
+  withLoopInitializerBindings,
+  withParameterBindings
+} from "./emit-local-bindings.js";
 import { emitExternValueDeclaration, emitFunctionDeclaration, emitGlobalValueDeclaration } from "./emit-module-declarations.js";
 import { renderObjectExpression } from "./emit-object.js";
 import { renderBinary, renderUnary } from "./emit-operators.js";
@@ -39,6 +45,7 @@ import {
 import { collectHeaderIncludes, collectImportBindings } from "./module-imports.js";
 import { emitModuleInit, emitModuleInitAsync } from "./module-init.js";
 import { toModuleNamespace } from "./module-names.js";
+import { toCppIdentifier } from "./cpp-identifiers.js";
 import {
   isPrivateMemberExpression,
   renderPrivateMemberExpression
@@ -73,19 +80,19 @@ function renderIdentifier(node, context) {
   if (context.classSelfName != null && context.classSelfAlias != null && node.name === context.classSelfName) {
     return context.classSelfAlias;
   }
-  const imported = context.importBindings.get(node.name);
+  const imported = hasLocalBinding(context, node.name) ? null : context.importBindings.get(node.name);
   if (imported != null) {
     const dependency = context.dependencies.get(imported.importSource);
-    const importedName = imported.importedName === "default" ? "__default_export__" : imported.importedName;
+    const importedName = imported.importedName === "default" ? "__default_export__" : toCppIdentifier(imported.importedName);
     if (imported.importKind === "namespace") {
-      return node.name;
+      return toCppIdentifier(node.name);
     }
     if (dependency != null) {
       return `${dependency.namespace}::${importedName}`;
     }
     return importedName;
   }
-  return node.name;
+  return toCppIdentifier(node.name);
 }
 
 function renderThisExpression(context) {
@@ -194,20 +201,23 @@ function renderClosureExpression(node, context) {
   if (node.async) {
     return renderAsyncCallableExpression(node, context, (node.captures ?? []).join(", "), emitParameterInitialization, emitStatement, renderExpression);
   }
-  const captureList = (node.captures ?? []).join(", ");
-  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
-  lines.push("  jayess::scope_cleanup_frame jayess_scope;");
-
-  for (const [index, param] of node.params.entries()) {
-    emitParameterInitialization(param, index, context, lines);
-  }
-
-  const bodyLines = [];
-  emitStatement(node.body, context, bodyLines, 1);
-  lines.push(...bodyLines);
-  lines.push(`  return ${renderNullValue()};`);
-  lines.push("})");
-  return lines.join("\n");
+  const nestedContext = {
+    ...context,
+    asyncResultName: null,
+    inAsyncFunction: false
+  };
+  const closureContext = withParameterBindings(nestedContext, node.params, node.id != null ? [node.id.name] : []);
+  return renderSyncCallableClosure({
+    captureList: (node.captures ?? []).join(", "),
+    params: node.params,
+    parameterContext: closureContext,
+    bodyContext: closureContext,
+    emitParameter: emitParameterInitialization,
+    emitBody(activeContext, bodyLines) {
+      emitStatement(node.body, activeContext, bodyLines, 1);
+    },
+    nullReturnExpression: renderNullValue()
+  });
 }
 
 function renderArrowFunctionExpression(node, context) {
@@ -217,31 +227,45 @@ function renderArrowFunctionExpression(node, context) {
   if (node.async) {
     return renderAsyncCallableExpression(node, context, captureList, emitParameterInitialization, emitStatement, renderExpression);
   }
-  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
-  lines.push("  jayess::scope_cleanup_frame jayess_scope;");
-
-  for (const [index, param] of node.params.entries()) {
-    emitParameterInitialization(param, index, context, lines);
-  }
-
+  const nestedContext = {
+    ...context,
+    asyncResultName: null,
+    inAsyncFunction: false
+  };
+  const closureContext = withParameterBindings(nestedContext, node.params);
   if (node.expressionBody) {
-    lines.push(`  return ${renderExpression(node.body, context)};`);
-    lines.push("})");
-    return lines.join("\n");
+    return renderSyncCallableClosure({
+      captureList,
+      params: node.params,
+      parameterContext: closureContext,
+      bodyContext: closureContext,
+      emitParameter: emitParameterInitialization,
+      emitBody() {
+      },
+      nullReturnExpression: renderNullValue(),
+      renderExpressionReturn(activeContext) {
+        return renderExpression(node.body, activeContext);
+      }
+    });
   }
 
-  const bodyLines = [];
-  emitStatement(node.body, context, bodyLines, 1);
-  lines.push(...bodyLines);
-  lines.push(`  return ${renderNullValue()};`);
-  lines.push("})");
-  return lines.join("\n");
+  return renderSyncCallableClosure({
+    captureList,
+    params: node.params,
+    parameterContext: closureContext,
+    bodyContext: closureContext,
+    emitParameter: emitParameterInitialization,
+    emitBody(activeContext, bodyLines) {
+      emitStatement(node.body, activeContext, bodyLines, 1);
+    },
+    nullReturnExpression: renderNullValue()
+  });
 }
 
 function renderFunctionExportValue(node, context) {
   const lines = ["jayess::make_callable([](const std::vector<jayess::value>& jayess_args) -> jayess::value {"];
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
-  lines.push(`  return ::${context.namespace}::${node.id.name}(jayess_args);`);
+  lines.push(`  return ::${context.namespace}::${toCppIdentifier(node.id.name)}(jayess_args);`);
   lines.push("})");
   return lines.join("\n");
 }
@@ -334,21 +358,22 @@ function emitStatement(node, context, lines, depth = 0) {
       lines.push(`${indent}} while (jayess::truthy(${renderExpression(node.test, context)}));`);
       return;
     case "ForStatement": {
+      const loopContext = withLoopInitializerBindings(context, node.init);
       const forPrefixLines = [];
-      const init = renderForInitializer(node.init, context, forPrefixLines, `${indent}  `);
-      const test = node.test == null ? "true" : `jayess::truthy(${renderExpression(node.test, context)})`;
-      const update = node.update == null ? "" : renderExpression(node.update, context);
+      const init = renderForInitializer(node.init, loopContext, forPrefixLines, `${indent}  `);
+      const test = node.test == null ? "true" : `jayess::truthy(${renderExpression(node.test, loopContext)})`;
+      const update = node.update == null ? "" : renderExpression(node.update, loopContext);
       if (forPrefixLines.length > 0) {
         lines.push(`${indent}{`);
         lines.push(...forPrefixLines);
         lines.push(`${indent}  for (${init}; ${test}; ${update}) {`);
-        emitStatement(node.body, { ...context, topLevel: false, breakTarget: null, continueTarget: null }, lines, depth + 2);
+        emitStatement(node.body, { ...loopContext, topLevel: false, breakTarget: null, continueTarget: null }, lines, depth + 2);
         lines.push(`${indent}  }`);
         lines.push(`${indent}}`);
         return;
       }
       lines.push(`${indent}for (${init}; ${test}; ${update}) {`);
-      emitStatement(node.body, { ...context, topLevel: false, breakTarget: null, continueTarget: null }, lines, depth + 1);
+      emitStatement(node.body, { ...loopContext, topLevel: false, breakTarget: null, continueTarget: null }, lines, depth + 1);
       lines.push(`${indent}}`);
       return;
     }
@@ -387,7 +412,7 @@ function emitStatement(node, context, lines, depth = 0) {
       return;
     case "ClassDeclaration":
       if (node.id != null) {
-        lines.push(`${indent}jayess::value ${node.id.name} = ${renderClassValue(node, context, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushCallArguments)};`);
+        lines.push(`${indent}jayess::value ${toCppIdentifier(node.id.name)} = ${renderClassValue(node, context, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushCallArguments)};`);
       }
       return;
     case "BlockStatement":
@@ -399,20 +424,21 @@ function emitStatement(node, context, lines, depth = 0) {
 }
 
 function emitFunction(node, context, lines) {
+  const functionContext = withParameterBindings(context, node.params);
   if (node.async) {
-    emitAsyncFunction(node, context, lines, emitParameterInitialization, emitStatement);
+    emitAsyncFunction(node, functionContext, lines, emitParameterInitialization, emitStatement);
     return;
   }
   if (node.generator) {
-    emitGeneratorFunction(node, context, lines, renderExpression, emitParameterInitialization);
+    emitGeneratorFunction(node, functionContext, lines, renderExpression, emitParameterInitialization);
     return;
   }
-  lines.push(`jayess::value ${node.id.name}(const std::vector<jayess::value>& jayess_args) {`);
+  lines.push(`jayess::value ${toCppIdentifier(node.id.name)}(const std::vector<jayess::value>& jayess_args) {`);
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
   for (const [index, param] of node.params.entries()) {
-    emitParameterInitialization(param, index, context, lines);
+    emitParameterInitialization(param, index, functionContext, lines);
   }
-  emitStatement(node.body, context, lines, 1);
+  emitStatement(node.body, functionContext, lines, 1);
   lines.push(`  return ${renderNullValue()};`);
   lines.push("}");
 }
@@ -424,7 +450,13 @@ export function emitModule({ ast, analysis, moduleStem, dependencies = new Map()
     .map((dependency) => `#include ${JSON.stringify(dependency.header)}`)
     .sort();
 
-  const context = { dependencies, importBindings, namespace, tempState: { nextDestructureIndex: 0, nextSwitchIndex: 0 } };
+  const context = {
+    dependencies,
+    importBindings,
+    namespace,
+    localBindingSets: [],
+    tempState: { nextDestructureIndex: 0, nextSwitchIndex: 0 }
+  };
   const headerLines = standalone
     ? []
     : [
@@ -534,7 +566,7 @@ export function emitModule({ ast, analysis, moduleStem, dependencies = new Map()
             renderClassValue(statement.declaration, context, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushCallArguments),
             declarationTarget
           );
-          globalLines.push("jayess::value __default_export__ = " + statement.declaration.id.name + ";");
+          globalLines.push("jayess::value __default_export__ = " + toCppIdentifier(statement.declaration.id.name) + ";");
           continue;
         }
         globalLines.push(`jayess::value __default_export__ = ${renderClassValue(statement.declaration, context, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushCallArguments)};`);

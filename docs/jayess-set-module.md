@@ -130,7 +130,7 @@ The primitive layer provides one dedicated set carrier in the Jayess runtime rat
 
 ### Why Plain Arrays Are Not Enough
 
-An array wrapper can hold values, but it is a poor fit for the first shipped `Set` slice because:
+An array wrapper can hold values, but it is a poor fit for the current shipped `Set` surface because:
 
 - every membership check would become linear-time library code over ordinary array elements
 - duplicate suppression would need to be reimplemented at the Jayess library layer

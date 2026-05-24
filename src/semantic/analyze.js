@@ -213,6 +213,9 @@ export function analyzeModule(ast, sourceText, options = {}) {
           walk(declaration.init, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         }
         return;
+      case "ExportNamedDeclaration":
+        walk(node.declaration, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
+        return;
       case "ExportDefaultDeclaration":
         walk(node.declaration, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, currentMethod);
         return;

@@ -16,3 +16,13 @@ compileTest("transpileFile window stdlib output compiles with guarded platform a
   compileCppFiles(cppFiles, targetDir);
   assert.ok(cppFiles.some((file) => file.includes("stdlib_jayess_window_index_js.cpp")));
 });
+
+compileTest("transpileFile window frame helper project compiles with guarded platform adapters", (t) => {
+  const targetDir = createManagedTempDir(t, "window-frame-compile");
+  const fixture = path.resolve("test/fixtures/modules/window-frame-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(cppFiles.some((file) => file.includes("window_frame_main_js.cpp")));
+});

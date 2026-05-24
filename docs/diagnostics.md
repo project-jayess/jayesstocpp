@@ -29,6 +29,7 @@ Current focused parser diagnostic families include:
 - unsupported-by-design declarations such as `let`
 - unsupported-by-design dynamic `import()`
 - unsupported-by-design `with`
+- unsupported-by-design regex literal syntax such as `/abc/`
 - malformed control-flow clauses such as detached `catch` or `finally`
 - invalid expression starts such as empty initializers, repeated commas, standalone spread, or bare `=>`
 - unsupported spread/rest placement outside accepted literal, call, parameter, or binding positions
@@ -40,7 +41,7 @@ Semantic diagnostics cover syntax that parsed successfully but cannot be lowered
 
 Current focused semantic diagnostic families include:
 
-- undefined identifiers and unsupported ambient built-ins
+- undefined identifiers and unsupported ambient built-ins, including direct `jayess:*` replacement guidance for ambient JavaScript globals such as `parseInt`, `Object`, `Date`, `JSON`, `Map`, `Set`, `Promise`, and `RegExp`
 - unsupported-by-design runtime source evaluation through `eval` or `Function`
 - invalid assignment/update targets
 - const reassignment or update
@@ -63,6 +64,7 @@ Current focused module diagnostic families include:
 - package export/import mappings with unsupported target shapes
 - imports or re-exports of missing exported names
 - missing native header, native source, shared library, or static library artifacts copied during project generation
+- invalid native import binding shapes such as binding imports from native source or library artifacts instead of the matching header import
 
 ## Runtime Diagnostics
 
@@ -75,6 +77,7 @@ Current focused runtime diagnostic families include:
 - invalid stream handles and closed stream handles
 - invalid subprocess handles
 - invalid thread handles
+- unavailable host adapters for runtime-backed modules such as clipboard and window
 - unsupported array, map, set, string, spread, and destructuring sources
 - unsupported operands for explicit non-coercive operators
 - unsupported net, HTTP, and subprocess option keys
@@ -97,5 +100,10 @@ Generated runtime validation diagnostics use these additional message shapes:
 - unsupported operands: `Jayess <operation> operands are unsupported`
 - unsupported destructuring source: `Jayess <pattern> destructuring requires <source-kind>`
 - unsupported spread source: `Jayess <spread-kind> spread requires <source-kind>`
+
+Host-adapter runtime diagnostics use these additional message shapes:
+
+- generic unavailable host path: `Jayess <module> host adapter is not available on this platform (...)`
+- focused adapter path: `Jayess <module> host adapter is not available on this platform (<platform> <adapter> adapter is not available on this host ...)`
 
 Diagnostics should preserve filename, line, and column information when source text includes a filename. New diagnostics should be added with focused tests under `test/` and should not add GitHub workflow files.

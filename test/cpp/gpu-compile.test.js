@@ -16,3 +16,13 @@ compileTest("transpileFile built-in GPU module project compiles with guarded bac
   compileCppFiles(cppFiles, targetDir);
   assert.ok(true);
 });
+
+compileTest("transpileFile built-in GPU upload project compiles with the validation backend upload path", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-gpu-upload-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/gpu-upload-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});

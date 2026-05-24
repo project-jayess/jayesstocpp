@@ -39,6 +39,28 @@ inline jayess::value jayessImageFill(const std::vector<jayess::value>& jayessArg
   return jayess::image_fill(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }
 
+inline jayess::value jayessImageFillRect(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_fill_rect(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3),
+    jayess::argument_at(jayessArgs, 4),
+    jayess::argument_at(jayessArgs, 5)
+  );
+}
+
+inline jayess::value jayessImageFillRectAlpha(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_fill_rect_alpha(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3),
+    jayess::argument_at(jayessArgs, 4),
+    jayess::argument_at(jayessArgs, 5)
+  );
+}
+
 inline jayess::value jayessImageCopy(const std::vector<jayess::value>& jayessArgs) {
   return jayess::image_copy(jayess::argument_at(jayessArgs, 0));
 }
@@ -85,6 +107,14 @@ inline jayess::value jayessImageEncodePpm(const std::vector<jayess::value>& jaye
 
 inline jayess::value jayessImageDecodePpm(const std::vector<jayess::value>& jayessArgs) {
   return jayess::image_decode_ppm(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageEncodePgm(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_encode_pgm(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageDecodePgm(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_decode_pgm(jayess::argument_at(jayessArgs, 0));
 }
 
 inline jayess::value jayessImageCrop(const std::vector<jayess::value>& jayessArgs) {

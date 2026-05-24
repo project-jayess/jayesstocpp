@@ -94,7 +94,7 @@ int main() {
   const auto& missingFields = std::get<jayess::object_ptr>(missingResponse)->fields;
   require(std::get<double>(missingFields.at("statusCode")) == 404.0, "http missing status");
 
-  const std::string streamPath = "${targetDir}/http-stream.txt";
+  const std::string streamPath = ${JSON.stringify(`${targetDir}/http-stream.txt`)};
   {
     std::ofstream output(streamPath, std::ios::binary);
     output << "streamed response";
@@ -161,7 +161,7 @@ int main() {
     });
     throw std::runtime_error("expected body size diagnostic");
   } catch (const jayess::thrown_value& error) {
-    require(std::get<std::string>(error.value).find("exceeded maxBytes") != std::string::npos, "http body maxBytes diagnostic");
+    require(std::get<std::string>(jayess::exception_to_value(error)).find("exceeded maxBytes") != std::string::npos, "http body maxBytes diagnostic");
   }
   std::cout << "ok\\n";
   return 0;

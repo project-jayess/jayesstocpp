@@ -10,6 +10,7 @@ import {
   jayessWindowShow,
   jayessWindowWidth
 } from "./window-primitives.hpp";
+import { clearTimeout, setTimeout } from "jayess:timers";
 
 export function create(options) {
   return jayessWindowCreate(options);
@@ -33,6 +34,19 @@ export function requestClose(window) {
 
 export function pollEvents(window) {
   return jayessWindowPollEvents(window);
+}
+
+export function requestFrame(window, callback, args) {
+  return setTimeout(function (currentWindow, currentCallback, currentArgs) {
+    if (shouldClose(currentWindow)) {
+      return null;
+    }
+    return currentCallback(currentWindow, ...currentArgs);
+  }, 0, [window, callback, args == null ? [] : args]);
+}
+
+export function cancelFrame(handle) {
+  return clearTimeout(handle);
 }
 
 export function present(window, canvas) {

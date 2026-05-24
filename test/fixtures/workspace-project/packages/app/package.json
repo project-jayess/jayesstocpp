@@ -1,0 +1,7 @@
+{
+  "name": "workspace-app",
+  "exports": {
+    ".": "./src/index.js",
+    "./self": "./src/self.js"
+  }
+}

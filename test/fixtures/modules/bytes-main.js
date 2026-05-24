@@ -10,6 +10,7 @@ import {
   isBytes,
   length,
   set,
+  secureEquals,
   slice,
   startsWith,
   toArray,
@@ -35,6 +36,9 @@ export function run() {
     beforeFill,
     get(raw, 0),
     compare(fromUtf8("a"), fromUtf8("b")),
+    secureEquals(fromUtf8("token"), fromUtf8("token")),
+    secureEquals(fromUtf8("token"), fromUtf8("taken")),
+    secureEquals(fromUtf8("short"), fromUtf8("shorter")),
     startsWith(combined, left),
     endsWith(combined, right)
   ];

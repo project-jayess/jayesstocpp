@@ -59,3 +59,4 @@ The shared-library manifest currently records:
 - the exported native entry function name
 
 See [generated-project-shape.md](./generated-project-shape.md) for the broader generated layout contract.
+See [native-adapter-patterns.md](./native-adapter-patterns.md) for the recommended small header/source adapter shape when direct native APIs are awkward.

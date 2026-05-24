@@ -1,6 +1,8 @@
 import {
   jayessFsCreateDirectories,
+  jayessFsCreateDirectoriesSync,
   jayessFsAppendText,
+  jayessFsAppendTextSync,
   jayessFsCopy,
   jayessFsCopyRecursive,
   jayessFsCopyRecursiveSync,

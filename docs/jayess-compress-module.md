@@ -13,7 +13,7 @@ All helpers accept and return `jayess:bytes`.
 
 ## Format Support
 
-The first slice writes stored DEFLATE blocks. This gives deterministic round trips and gzip-compatible framing without requiring generated projects to link against zlib.
+The current shipped surface writes stored DEFLATE blocks. This gives deterministic round trips and gzip-compatible framing without requiring generated projects to link against zlib.
 
 `gzip(bytes)` writes a minimal gzip stream with:
 

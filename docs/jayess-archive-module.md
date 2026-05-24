@@ -20,4 +20,4 @@ Entries are plain objects:
 { path: "bin/data.bin", bytes: someBytes, mode: 384 }
 ```
 
-The first slice supports regular file entries only. Entry paths must be relative, must not contain `..`, and must not contain backslashes. Compression is intentionally not part of this module surface.
+The current shipped surface supports regular file entries only. Entry paths must be relative, must not contain `..`, and must not contain backslashes. Compression is intentionally not part of this module surface.

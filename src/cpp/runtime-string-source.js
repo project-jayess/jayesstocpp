@@ -113,7 +113,7 @@ value string_substring(const value& input, const std::vector<value>& args) {
 
 value string_starts_with(const value& input, const std::vector<value>& args) {
   const auto text = require_string_value(input, "Jayess string startsWith requires a string receiver");
-  const auto prefix = stringify_value(args[0]);
+  const auto prefix = require_string_value(args[0], "Jayess string startsWith expects a string prefix");
   if (prefix.size() > text.size()) {
     return false;
   }
@@ -122,12 +122,14 @@ value string_starts_with(const value& input, const std::vector<value>& args) {
 
 value string_includes(const value& input, const std::vector<value>& args) {
   const auto text = require_string_value(input, "Jayess string includes requires a string receiver");
-  return text.find(stringify_value(args[0])) != std::string::npos;
+  const auto needle = require_string_value(args[0], "Jayess string includes expects a string needle");
+  return text.find(needle) != std::string::npos;
 }
 
 value string_index_of(const value& input, const std::vector<value>& args) {
   const auto text = require_string_value(input, "Jayess string indexOf requires a string receiver");
-  const auto found = text.find(stringify_value(args[0]));
+  const auto needle = require_string_value(args[0], "Jayess string indexOf expects a string needle");
+  const auto found = text.find(needle);
   if (found == std::string::npos) {
     return static_cast<double>(-1);
   }
@@ -136,7 +138,7 @@ value string_index_of(const value& input, const std::vector<value>& args) {
 
 value string_ends_with(const value& input, const std::vector<value>& args) {
   const auto text = require_string_value(input, "Jayess string endsWith requires a string receiver");
-  const auto suffix = stringify_value(args[0]);
+  const auto suffix = require_string_value(args[0], "Jayess string endsWith expects a string suffix");
   if (suffix.size() > text.size()) {
     return false;
   }

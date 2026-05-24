@@ -13,6 +13,8 @@ value image_height(const value& image);
 value image_get_pixel(const value& image, const value& x, const value& y);
 value image_set_pixel(const value& image, const value& x, const value& y, const value& color);
 value image_fill(const value& image, const value& color);
+value image_fill_rect(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color);
+value image_fill_rect_alpha(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color);
 value image_copy(const value& image);
 value image_save_ppm(const value& image, const value& path);
 value image_save_bmp(const value& image, const value& path);
@@ -25,6 +27,8 @@ value image_load_tga(const value& path);
 value image_metadata_from_file(const value& path);
 value image_encode_ppm(const value& image);
 value image_decode_ppm(const value& bytes);
+value image_encode_pgm(const value& image);
+value image_decode_pgm(const value& bytes);
 value image_crop(const value& image, const value& x, const value& y, const value& width, const value& height);
 value image_resize_nearest(const value& image, const value& width, const value& height);
 value image_blit(const value& target, const value& source, const value& x, const value& y);
@@ -64,7 +68,15 @@ double require_image_number(const value& input, const std::string& message) {
 
 int require_image_dimension(const value& input, const std::string& message) {
   const auto numeric = require_image_number(input, message);
-  if (numeric <= 0.0 || numeric > static_cast<double>(std::numeric_limits<int>::max())) {
+  if (numeric <= 0.0 || numeric > static_cast<double>((std::numeric_limits<int>::max)())) {
+    throw std::runtime_error(message);
+  }
+  return static_cast<int>(numeric);
+}
+
+int require_image_span(const value& input, const std::string& message) {
+  const auto numeric = require_image_number(input, message);
+  if (numeric < 0.0 || numeric > static_cast<double>((std::numeric_limits<int>::max)())) {
     throw std::runtime_error(message);
   }
   return static_cast<int>(numeric);
@@ -73,6 +85,17 @@ int require_image_dimension(const value& input, const std::string& message) {
 int require_image_coordinate(const value& input, int limit, const std::string& message) {
   const auto numeric = require_image_number(input, message);
   if (numeric < 0.0 || numeric >= static_cast<double>(limit)) {
+    throw std::runtime_error(message);
+  }
+  return static_cast<int>(numeric);
+}
+
+int require_image_offset(const value& input, const std::string& message) {
+  const auto numeric = require_image_number(input, message);
+  if (
+    numeric < static_cast<double>((std::numeric_limits<int>::min)()) ||
+    numeric > static_cast<double>((std::numeric_limits<int>::max)())
+  ) {
     throw std::runtime_error(message);
   }
   return static_cast<int>(numeric);
@@ -129,7 +152,21 @@ std::size_t image_pixel_offset(const image_ptr& image, int x, int y) {
   return (static_cast<std::size_t>(y) * static_cast<std::size_t>(image->width) + static_cast<std::size_t>(x)) * 4U;
 }
 
+void image_require_storage_dimensions(int width, int height, const std::string& message) {
+  if (width <= 0 || height <= 0) {
+    throw std::runtime_error(message);
+  }
+  constexpr std::size_t imageStorageByteLimit = 256U * 1024U * 1024U;
+  const auto maxPixels = imageStorageByteLimit / 4U;
+  const auto widthValue = static_cast<std::size_t>(width);
+  const auto heightValue = static_cast<std::size_t>(height);
+  if (widthValue > maxPixels / heightValue) {
+    throw std::runtime_error(message);
+  }
+}
+
 image_ptr image_allocate(int width, int height) {
+  image_require_storage_dimensions(width, height, "Jayess image dimensions exceed supported size");
   auto image = std::make_shared<image_state>();
   image->width = width;
   image->height = height;
@@ -171,6 +208,17 @@ value image_make_bytes(std::vector<unsigned char> items) {
 std::array<unsigned char, 4> image_read_pixel(const image_ptr& image, int x, int y) {
   const auto offset = image_pixel_offset(image, x, y);
   return {image->pixels[offset], image->pixels[offset + 1], image->pixels[offset + 2], image->pixels[offset + 3]};
+}
+
+std::array<unsigned char, 4> image_alpha_blend(const std::array<unsigned char, 4>& destination, const std::array<unsigned char, 4>& source) {
+  const auto alpha = static_cast<int>(source[3]);
+  const auto inverse = 255 - alpha;
+  return {
+    static_cast<unsigned char>((static_cast<int>(source[0]) * alpha + static_cast<int>(destination[0]) * inverse) / 255),
+    static_cast<unsigned char>((static_cast<int>(source[1]) * alpha + static_cast<int>(destination[1]) * inverse) / 255),
+    static_cast<unsigned char>((static_cast<int>(source[2]) * alpha + static_cast<int>(destination[2]) * inverse) / 255),
+    255
+  };
 }
 
 void image_write_u16(std::ostream& output, std::uint16_t value) {
@@ -255,6 +303,7 @@ std::array<int, 2> image_read_ppm_dimensions(std::istream& input, const std::str
   if (width <= 0 || height <= 0 || maxValue != 255) {
     throw std::runtime_error("Jayess image " + operation + " found unsupported content");
   }
+  image_require_storage_dimensions(width, height, "Jayess image " + operation + " found unsupported image dimensions");
   return {width, height};
 }
 
@@ -275,12 +324,15 @@ std::array<int, 2> image_read_bmp_dimensions(std::istream& input, const std::str
   if (
     rawWidth == 0U ||
     rawHeight == 0U ||
-    rawWidth > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
-    rawHeight > static_cast<std::uint32_t>(std::numeric_limits<int>::max())
+    rawWidth > static_cast<std::uint32_t>((std::numeric_limits<int>::max)()) ||
+    rawHeight > static_cast<std::uint32_t>((std::numeric_limits<int>::max)())
   ) {
     throw std::runtime_error("Jayess image " + operation + " found unsupported BMP dimensions");
   }
-  return {static_cast<int>(rawWidth), static_cast<int>(rawHeight)};
+  const auto width = static_cast<int>(rawWidth);
+  const auto height = static_cast<int>(rawHeight);
+  image_require_storage_dimensions(width, height, "Jayess image " + operation + " found unsupported BMP dimensions");
+  return {width, height};
 }
 
 std::array<int, 2> image_read_tga_dimensions(std::istream& input, const std::string& operation) {
@@ -310,7 +362,10 @@ std::array<int, 2> image_read_tga_dimensions(std::istream& input, const std::str
   ) {
     throw std::runtime_error("Jayess image " + operation + " only supports uncompressed 24-bit TGA files");
   }
-  return {static_cast<int>(width), static_cast<int>(height)};
+  const auto widthValue = static_cast<int>(width);
+  const auto heightValue = static_cast<int>(height);
+  image_require_storage_dimensions(widthValue, heightValue, "Jayess image " + operation + " found unsupported TGA dimensions");
+  return {widthValue, heightValue};
 }
 } // namespace
 
@@ -367,6 +422,66 @@ value image_fill(const value& input, const value& colorValue) {
   return input;
 }
 
+value image_fill_rect(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue, const value& colorValue) {
+  const auto image = require_image_value(input);
+  const auto x = require_image_offset(xValue, "Jayess image fillRect x must be an integer within supported range");
+  const auto y = require_image_offset(yValue, "Jayess image fillRect y must be an integer within supported range");
+  const auto width = require_image_span(widthValue, "Jayess image fillRect width must be a non-negative integer");
+  const auto height = require_image_span(heightValue, "Jayess image fillRect height must be a non-negative integer");
+  const auto color = require_image_color(colorValue);
+  if (width == 0 || height == 0) {
+    return input;
+  }
+
+  for (int row = 0; row < height; ++row) {
+    const auto targetY = static_cast<long long>(y) + static_cast<long long>(row);
+    if (targetY < 0 || targetY >= image->height) {
+      continue;
+    }
+    for (int column = 0; column < width; ++column) {
+      const auto targetX = static_cast<long long>(x) + static_cast<long long>(column);
+      if (targetX < 0 || targetX >= image->width) {
+        continue;
+      }
+      image_write_pixel(image, static_cast<int>(targetX), static_cast<int>(targetY), color);
+    }
+  }
+  return input;
+}
+
+value image_fill_rect_alpha(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue, const value& colorValue) {
+  const auto image = require_image_value(input);
+  const auto x = require_image_offset(xValue, "Jayess image fillRectAlpha x must be an integer within supported range");
+  const auto y = require_image_offset(yValue, "Jayess image fillRectAlpha y must be an integer within supported range");
+  const auto width = require_image_span(widthValue, "Jayess image fillRectAlpha width must be a non-negative integer");
+  const auto height = require_image_span(heightValue, "Jayess image fillRectAlpha height must be a non-negative integer");
+  const auto color = require_image_color(colorValue);
+  if (width == 0 || height == 0) {
+    return input;
+  }
+
+  for (int row = 0; row < height; ++row) {
+    const auto targetY = static_cast<long long>(y) + static_cast<long long>(row);
+    if (targetY < 0 || targetY >= image->height) {
+      continue;
+    }
+    for (int column = 0; column < width; ++column) {
+      const auto targetX = static_cast<long long>(x) + static_cast<long long>(column);
+      if (targetX < 0 || targetX >= image->width) {
+        continue;
+      }
+      const auto destination = image_read_pixel(image, static_cast<int>(targetX), static_cast<int>(targetY));
+      image_write_pixel(
+        image,
+        static_cast<int>(targetX),
+        static_cast<int>(targetY),
+        image_alpha_blend(destination, color)
+      );
+    }
+  }
+  return input;
+}
+
 value image_copy(const value& input) {
   const auto source = require_image_value(input);
   auto copied = std::make_shared<image_state>();
@@ -384,7 +499,7 @@ value image_crop(const value& input, const value& xValue, const value& yValue, c
   const auto y = require_image_coordinate(yValue, source->height, "Jayess image crop y coordinate is out of range");
   const auto width = require_image_dimension(widthValue, "Jayess image crop width must be a positive integer");
   const auto height = require_image_dimension(heightValue, "Jayess image crop height must be a positive integer");
-  if (x + width > source->width || y + height > source->height) {
+  if (width > source->width - x || height > source->height - y) {
     throw std::runtime_error("Jayess image crop rectangle is out of range");
   }
 
@@ -416,20 +531,20 @@ value image_resize_nearest(const value& input, const value& widthValue, const va
 value image_blit(const value& targetValue, const value& sourceValue, const value& xValue, const value& yValue) {
   const auto target = require_image_value(targetValue);
   const auto source = require_image_value(sourceValue);
-  const auto x = static_cast<int>(require_image_number(xValue, "Jayess image blit x must be an integer"));
-  const auto y = static_cast<int>(require_image_number(yValue, "Jayess image blit y must be an integer"));
+  const auto x = require_image_offset(xValue, "Jayess image blit x must be an integer within supported range");
+  const auto y = require_image_offset(yValue, "Jayess image blit y must be an integer within supported range");
 
   for (int row = 0; row < source->height; ++row) {
-    const auto targetY = y + row;
+    const auto targetY = static_cast<long long>(y) + static_cast<long long>(row);
     if (targetY < 0 || targetY >= target->height) {
       continue;
     }
     for (int column = 0; column < source->width; ++column) {
-      const auto targetX = x + column;
+      const auto targetX = static_cast<long long>(x) + static_cast<long long>(column);
       if (targetX < 0 || targetX >= target->width) {
         continue;
       }
-      image_write_pixel(target, targetX, targetY, image_read_pixel(source, column, row));
+      image_write_pixel(target, static_cast<int>(targetX), static_cast<int>(targetY), image_read_pixel(source, column, row));
     }
   }
   return targetValue;
@@ -471,29 +586,22 @@ value image_rotate_90(const value& input) {
 value image_transparent_blit(const value& targetValue, const value& sourceValue, const value& xValue, const value& yValue) {
   const auto target = require_image_value(targetValue);
   const auto source = require_image_value(sourceValue);
-  const auto x = static_cast<int>(require_image_number(xValue, "Jayess image transparentBlit x must be an integer"));
-  const auto y = static_cast<int>(require_image_number(yValue, "Jayess image transparentBlit y must be an integer"));
+  const auto x = require_image_offset(xValue, "Jayess image transparentBlit x must be an integer within supported range");
+  const auto y = require_image_offset(yValue, "Jayess image transparentBlit y must be an integer within supported range");
 
   for (int row = 0; row < source->height; ++row) {
-    const auto targetY = y + row;
+    const auto targetY = static_cast<long long>(y) + static_cast<long long>(row);
     if (targetY < 0 || targetY >= target->height) {
       continue;
     }
     for (int column = 0; column < source->width; ++column) {
-      const auto targetX = x + column;
+      const auto targetX = static_cast<long long>(x) + static_cast<long long>(column);
       if (targetX < 0 || targetX >= target->width) {
         continue;
       }
       const auto sourceColor = image_read_pixel(source, column, row);
-      const auto targetColor = image_read_pixel(target, targetX, targetY);
-      const auto alpha = static_cast<int>(sourceColor[3]);
-      const auto inverse = 255 - alpha;
-      image_write_pixel(target, targetX, targetY, {
-        static_cast<unsigned char>((static_cast<int>(sourceColor[0]) * alpha + static_cast<int>(targetColor[0]) * inverse) / 255),
-        static_cast<unsigned char>((static_cast<int>(sourceColor[1]) * alpha + static_cast<int>(targetColor[1]) * inverse) / 255),
-        static_cast<unsigned char>((static_cast<int>(sourceColor[2]) * alpha + static_cast<int>(targetColor[2]) * inverse) / 255),
-        255
-      });
+      const auto targetColor = image_read_pixel(target, static_cast<int>(targetX), static_cast<int>(targetY));
+      image_write_pixel(target, static_cast<int>(targetX), static_cast<int>(targetY), image_alpha_blend(targetColor, sourceColor));
     }
   }
   return targetValue;

@@ -7,6 +7,7 @@ import {
   jayessGpuCreateShader,
   jayessGpuCreateSurface,
   jayessGpuCreateTexture,
+  jayessGpuUploadImage,
   jayessGpuDraw,
   jayessGpuEndFrame
 } from "./gpu-primitives.hpp";
@@ -30,6 +31,10 @@ export function createBuffer(device, options) {
 
 export function createTexture(device, options) {
   return jayessGpuCreateTexture(device, options);
+}
+
+export function uploadImage(texture, image) {
+  return jayessGpuUploadImage(texture, image);
 }
 
 export function createShader(device, source) {

@@ -138,6 +138,19 @@ test("parser reports unsupported-by-design with statements clearly", () => {
   );
 });
 
+test("parser reports unsupported-by-design regex literals clearly", () => {
+  const sourceText = createSourceText("var pattern = /abc/;", "bad-regex-literal.js");
+  assert.throws(
+    () => parse(sourceText),
+    (error) => error instanceof JayessError
+      && /unsupported by design/.test(error.diagnostics[0].message)
+      && /regex literal syntax/.test(error.diagnostics[0].message)
+      && /jayess:regex/.test(error.diagnostics[0].message)
+      && error.diagnostics[0].code === "JY_PARSE_REGEX_LITERAL_UNSUPPORTED"
+      && error.diagnostics[0].filename === "bad-regex-literal.js"
+  );
+});
+
 test("semantic diagnostics include stable unsupported-by-design codes", () => {
   const evalSource = createSourceText("eval(\"value\");", "bad-eval.js");
   const functionSource = createSourceText("Function(\"return 1\");", "bad-function.js");
@@ -207,9 +220,10 @@ test("generated runtime diagnostics include invalid standard-library handle cate
   transpileFile(fixture, targetDir, { runtimeFragments: "all" });
 
   const runtimeSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
-  assert.match(runtimeSource, /Expected Jayess http response handle/);
-  assert.match(runtimeSource, /Expected Jayess net socket handle/);
-  assert.match(runtimeSource, /Expected Jayess stream handle/);
-  assert.match(runtimeSource, /Expected Jayess subprocess handle/);
-  assert.match(runtimeSource, /Expected Jayess thread handle/);
+  assert.match(runtimeSource, /Jayess " \+ moduleName \+ " expected a " \+ handleName \+ " handle/);
+  assert.match(runtimeSource, /throw_invalid_handle\("http", "response"\);/);
+  assert.match(runtimeSource, /throw_invalid_handle\("net", "socket"\);/);
+  assert.match(runtimeSource, /throw_invalid_handle\("stream", "stream"\);/);
+  assert.match(runtimeSource, /throw_invalid_handle\("subprocess", "subprocess"\);/);
+  assert.match(runtimeSource, /throw_invalid_handle\("thread", "thread"\);/);
 });

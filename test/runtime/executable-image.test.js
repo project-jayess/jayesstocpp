@@ -5,6 +5,11 @@ import { transpileAndRunFixture } from "../support/generated-executable.js";
 const runtimeTest = findAvailableCompiler() == null ? test.skip : test;
 
 function imageMain(targetDir, { header, namespace }) {
+  const ppmPath = JSON.stringify(`${targetDir.replace(/\\/g, "/")}/image-output.ppm`);
+  const bmpPath = JSON.stringify(`${targetDir.replace(/\\/g, "/")}/image-output.bmp`);
+  const pgmPath = JSON.stringify(`${targetDir.replace(/\\/g, "/")}/image-output.pgm`);
+  const tgaPath = JSON.stringify(`${targetDir.replace(/\\/g, "/")}/image-output.tga`);
+  const unsupportedPath = JSON.stringify(`${targetDir.replace(/\\/g, "/")}/image-output.txt`);
   return `#include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -27,8 +32,9 @@ std::string thrown_message(jayess::value (*fn)(const std::vector<jayess::value>&
   try {
     fn(std::vector<jayess::value>{});
   } catch (const jayess::thrown_value& error) {
-    if (std::holds_alternative<std::string>(error.value)) {
-      return std::get<std::string>(error.value);
+    auto payload = jayess::exception_to_value(error);
+    if (std::holds_alternative<std::string>(payload)) {
+      return std::get<std::string>(payload);
     }
     return "non-string";
   } catch (const std::exception& error) {
@@ -41,8 +47,9 @@ std::string thrown_message_with_string(jayess::value (*fn)(const std::vector<jay
   try {
     fn(std::vector<jayess::value>{arg});
   } catch (const jayess::thrown_value& error) {
-    if (std::holds_alternative<std::string>(error.value)) {
-      return std::get<std::string>(error.value);
+    auto payload = jayess::exception_to_value(error);
+    if (std::holds_alternative<std::string>(payload)) {
+      return std::get<std::string>(payload);
     }
     return "non-string";
   } catch (const std::exception& error) {
@@ -52,11 +59,11 @@ std::string thrown_message_with_string(jayess::value (*fn)(const std::vector<jay
 }
 
 int main() {
-  const std::string ppmPath = "${targetDir}/image-output.ppm";
-  const std::string bmpPath = "${targetDir}/image-output.bmp";
-  const std::string pgmPath = "${targetDir}/image-output.pgm";
-  const std::string tgaPath = "${targetDir}/image-output.tga";
-  const std::string unsupportedPath = "${targetDir}/image-output.txt";
+  const std::string ppmPath = ${ppmPath};
+  const std::string bmpPath = ${bmpPath};
+  const std::string pgmPath = ${pgmPath};
+  const std::string tgaPath = ${tgaPath};
+  const std::string unsupportedPath = ${unsupportedPath};
   {
     std::ofstream output(unsupportedPath, std::ios::binary);
     output << "not an image";

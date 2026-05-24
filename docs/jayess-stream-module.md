@@ -1,6 +1,6 @@
 # Jayess Stream Module
 
-`jayess:stream` provides a narrow byte-oriented file stream surface. It is a Jayess-owned module, not a Node.js stream compatibility layer.
+`jayess:stream` provides a focused byte-oriented stream surface for file-backed and runtime-provided read/write handles. It is a Jayess-owned module, not a Node.js stream compatibility layer.
 
 ## Surface
 
@@ -30,6 +30,8 @@
 - `tee(readStream, leftWriteStream, rightWriteStream, chunkSize)`
 
 Default stream functions return Jayess async handles. Use `await` to consume their results. `openReadSync` and `openWriteSync` return direct stream handles for synchronous setup code.
+
+High-level helpers such as `pipe`, `copy`, `readAllBytes`, `collectText`, `pipeText`, and `tee` are ordinary Jayess wrappers layered over the same explicit stream handles and chunk primitives.
 
 ## Behavior
 
@@ -80,6 +82,13 @@ Default stream functions return Jayess async handles. Use `await` to consume the
 `tee(readStream, leftWriteStream, rightWriteStream, chunkSize)` copies input chunks to two output streams.
 
 Invalid stream handles, closed stream handles, and wrong-direction operations fail with focused Jayess runtime diagnostics.
+
+The module intentionally stays narrow:
+
+- no Node.js stream event API
+- no implicit text-mode line buffering
+- no seek/truncate surface
+- no ambient global stream handles
 
 ## Implementation Shape
 

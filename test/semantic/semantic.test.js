@@ -374,6 +374,16 @@ test("semantic analysis records captured bindings for function expressions", () 
   assert.deepEqual(functionExpression.captures, ["x"]);
 });
 
+test("semantic analysis records captures inside exported function declarations", () => {
+  const sourceText = createSourceText("export function outer(x) { var value = x; return function() { return value; }; }");
+  const ast = parse(sourceText);
+  const result = analyzeModule(ast, sourceText, { throwOnError: false });
+  const functionExpression = ast.body[0].declaration.body.body[1].argument;
+
+  assert.equal(result.diagnostics.length, 0);
+  assert.deepEqual(functionExpression.captures, ["value"]);
+});
+
 test("semantic analysis records captures for arrow functions with lexical this", () => {
   const sourceText = createSourceText("class Counter { value = 1; make(step) { return (delta = step) => this.value + delta; } }");
   const ast = parse(sourceText);

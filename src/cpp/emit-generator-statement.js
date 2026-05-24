@@ -1,4 +1,5 @@
 import { isBindingPattern } from "../ast/binding-patterns.js";
+import { toCppIdentifier } from "./cpp-identifiers.js";
 import { emitDestructuringAssignments } from "./emit-destructuring.js";
 import {
   containsYieldExpression,
@@ -33,7 +34,7 @@ function generatorDestructureOptions(loweringContext, renderExpression) {
 function emitGeneratorVariableDeclaration(node, context, lines, renderExpression, loweringContext) {
   for (const declaration of node.declarations) {
     const isPattern = isBindingPattern(declaration.id);
-    const name = isPattern ? nextGeneratorDestructureTempName(context, loweringContext) : declaration.id.name;
+    const name = isPattern ? nextGeneratorDestructureTempName(context, loweringContext) : toCppIdentifier(declaration.id.name);
     if (declaration.init == null) {
       if (isPattern) {
         lines.push(`      ${name} = jayess::value(std::monostate{});`);
@@ -86,13 +87,13 @@ function emitGeneratorVariableDeclaration(node, context, lines, renderExpression
 
 function emitCatchBinding(node, lines, errorName) {
   if (node.handler.param != null) {
-    lines.push(`        ${node.handler.param.name} = jayess::exception_to_value(${errorName});`);
+    lines.push(`        ${toCppIdentifier(node.handler.param.name)} = jayess::exception_to_value(${errorName});`);
   }
 }
 
 function emitCatchBodyPrefix(node, context, lines, renderExpression, loweringContext, yieldIndex) {
   if (node.handler.param != null) {
-    lines.push(`        ${node.handler.param.name} = jayess::exception_to_value(jayess_error);`);
+    lines.push(`        ${toCppIdentifier(node.handler.param.name)} = jayess::exception_to_value(jayess_error);`);
   }
   for (const statement of node.handler.body.body.slice(0, yieldIndex)) {
     emitGeneratorStatement(statement, context, lines, renderExpression, loweringContext);

@@ -152,13 +152,13 @@ function resolvePackageTargetValue(packageDirectory, value, patternMatch = null,
   if (typeof value === "string") {
     const expanded = expandExportPatternTarget(value, patternMatch);
     if (expanded == null) {
-      return { resolved: null, unsupported: true };
+      return { resolved: null, unsupported: true, unsupportedReason: "invalid-pattern-target" };
     }
     return { resolved: path.resolve(packageDirectory, expanded), unsupported: false };
   }
   if (Array.isArray(value)) {
     if (!allowArray) {
-      return { resolved: null, unsupported: true };
+      return { resolved: null, unsupported: true, unsupportedReason: "nested-array-not-supported" };
     }
     return resolvePackageTargetArray(packageDirectory, value, patternMatch);
   }
@@ -168,10 +168,10 @@ function resolvePackageTargetValue(packageDirectory, value, patternMatch = null,
     if (expanded != null) {
       return { resolved: path.resolve(packageDirectory, expanded), unsupported: false, condition, conditionTrace, rejectedConditions };
     }
-    return { resolved: null, unsupported: true, conditionTrace, rejectedConditions };
+    return { resolved: null, unsupported: true, conditionTrace, rejectedConditions, unsupportedReason: "unsupported-conditions" };
   }
   if (value != null) {
-    return { resolved: null, unsupported: true };
+    return { resolved: null, unsupported: true, unsupportedReason: `invalid-target-value-type:${typeof value}` };
   }
   return { resolved: null, unsupported: false };
 }

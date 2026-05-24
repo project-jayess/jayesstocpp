@@ -36,6 +36,10 @@ This module is Jayess-owned. It is not JavaScript iterator-protocol emulation.
 - `find(generator, callback)` returns the first yielded value with a truthy callback result or Jayess null.
 - `chain(left, right)` returns a generator handle that yields all values from `left`, then all values from `right`.
 - `range(start, end, step)` returns a generator handle for a numeric half-open range. Positive steps stop before `end`; negative steps stop after passing `end`.
+- helpers that fully consume a generator leave it completed; they do not reset or clone generator state.
+- `take(generator, 0)` returns an empty array without consuming yielded values.
+- `every(generator, callback)` returns `true` for an empty generator.
+- `find(generator, callback)` returns Jayess `null` for an empty generator or when no yielded value matches.
 - `count` must be a non-negative integer Jayess number.
 - `range` arguments must be numeric and `step` must be non-zero.
 - callbacks must be callable Jayess values.

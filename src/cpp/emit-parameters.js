@@ -1,4 +1,5 @@
 import { isBindingPattern } from "../ast/binding-patterns.js";
+import { toCppIdentifier } from "./cpp-identifiers.js";
 import { emitDestructuringAssignments } from "./emit-destructuring.js";
 
 function renderArgumentSource(param, index, argsName) {
@@ -17,10 +18,11 @@ export function emitParameterInitialization(param, index, context, lines, option
   } = options;
 
   if (!isBindingPattern(param.id)) {
-    lines.push(`${indent}jayess::value ${param.name} = ${renderArgumentSource(param, index, argsName)};`);
+    const paramName = toCppIdentifier(param.name);
+    lines.push(`${indent}jayess::value ${paramName} = ${renderArgumentSource(param, index, argsName)};`);
     if (param.defaultValue != null) {
       lines.push(`${indent}if (!jayess::has_argument(${argsName}, ${index})) {`);
-      lines.push(`${indent}  ${param.name} = ${renderExpression(param.defaultValue, context)};`);
+      lines.push(`${indent}  ${paramName} = ${renderExpression(param.defaultValue, context)};`);
       lines.push(`${indent}}`);
     }
     return;

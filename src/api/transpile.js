@@ -26,7 +26,7 @@ export function transpile(source, options = {}) {
         createModuleDiagnostic(
           sourceText,
           statement,
-          `Built-in Jayess module imports such as '${statement.source}' require transpileFile() or explicit resolver support; transpile() string mode does not resolve them by default`,
+          `Built-in Jayess module imports such as '${statement.source}' require transpileFile() or explicit resolver support; use transpileFile() when the closed module graph needs repository stdlib modules, because transpile() string mode does not resolve them by default`,
           statement.source
         )
       )

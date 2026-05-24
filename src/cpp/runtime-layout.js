@@ -28,6 +28,7 @@ export function renderRuntimeCppIncludes() {
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstring>
 #include <ctime>
 #include <deque>
 #include <filesystem>
@@ -52,6 +53,7 @@ export function renderRuntimeCppIncludes() {
 #include <csignal>
 #include <fcntl.h>
 #include <netdb.h>
+#include <sys/mman.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/wait.h>

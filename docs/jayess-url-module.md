@@ -32,18 +32,24 @@ Missing fields are returned as empty strings.
 
 `format(parts)` expects the same plain object shape. Each present field must be a string. Missing or `null` fields are treated as empty strings.
 
+- formatting a host without a path currently emits a trailing `/`
+- formatting does not percent-encode or normalize fields beyond this simple string assembly
+
 ## Query Helpers
 
 - `getQuery(url, key)` returns the first matching query value or Jayess `null`.
 - `setQuery(url, key, value)` returns a new URL string with the query key added or updated.
+- repeated keys are preserved; `setQuery` updates the first matching key and leaves later duplicates unchanged.
 
-The first slice keeps query handling deliberately small. It works on plain `key=value` pairs separated by `&`; percent-decoding belongs in `jayess:encoding`.
+The current shipped surface keeps query handling deliberately small. It works on plain `key=value` pairs separated by `&`; percent-decoding belongs in `jayess:encoding`.
 
 ## Path Helper
 
 `joinPath(base, path)` returns a new URL string with the path joined against the base URL path.
 
 If `path` starts with `/`, it replaces the URL path. Otherwise it is appended relative to the base URL path's directory.
+
+The current shipped surface also preserves the existing query string and fragment while joining the path.
 
 ## Generated Output
 

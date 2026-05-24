@@ -1,3 +1,5 @@
+import { withLocalBindings } from "./emit-local-bindings.js";
+
 function collectFinallyControlFlow(node, flags = { hasAny: false, hasReturn: false, hasBreak: false, hasContinue: false }) {
   if (node == null || typeof node !== "object") {
     return flags;
@@ -78,18 +80,21 @@ export function emitTryStatement(node, context, lines, depth, emitStatement) {
     lines.push(`${indent}  });`);
   }
   if (node.handler != null) {
+    const catchContext = node.handler.param == null
+      ? context
+      : withLocalBindings(context, [node.handler.param.name]);
     lines.push(`${indent}  try {`);
     emitStatement(node.block, { ...context, topLevel: false }, lines, depth + 2);
     lines.push(`${indent}  } catch (const jayess::thrown_value& jayess_error) {`);
     if (node.handler.param != null) {
-      lines.push(`${indent}    jayess::value ${node.handler.param.name} = jayess::exception_to_value(jayess_error);`);
+      lines.push(`${indent}    jayess::value ${toCppIdentifier(node.handler.param.name)} = jayess::exception_to_value(jayess_error);`);
     }
-    emitStatement(node.handler.body, { ...context, topLevel: false }, lines, depth + 2);
+    emitStatement(node.handler.body, { ...catchContext, topLevel: false }, lines, depth + 2);
     lines.push(`${indent}  } catch (const std::exception& jayess_error) {`);
     if (node.handler.param != null) {
-      lines.push(`${indent}    jayess::value ${node.handler.param.name} = jayess::exception_to_value(jayess_error);`);
+      lines.push(`${indent}    jayess::value ${toCppIdentifier(node.handler.param.name)} = jayess::exception_to_value(jayess_error);`);
     }
-    emitStatement(node.handler.body, { ...context, topLevel: false }, lines, depth + 2);
+    emitStatement(node.handler.body, { ...catchContext, topLevel: false }, lines, depth + 2);
     lines.push(`${indent}  }`);
   } else {
     emitStatement(node.block, { ...context, topLevel: false }, lines, depth + 1);
@@ -100,3 +105,4 @@ export function emitTryStatement(node, context, lines, depth, emitStatement) {
     emitFinallySignalHandlers(context, lines, depth, finallyControl);
   }
 }
+import { toCppIdentifier } from "./cpp-identifiers.js";

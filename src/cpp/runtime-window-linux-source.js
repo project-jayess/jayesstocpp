@@ -1,3 +1,5 @@
+import { getWindowWaylandAdapterCppFragment } from "./runtime-window-wayland-source.js";
+
 export function getWindowLinuxAdapterCppFragment() {
   return `#if !defined(_WIN32) && !defined(__APPLE__)
 using jayess_xopen_display_fn = void* (*)(const char*);
@@ -186,7 +188,7 @@ jayess_linux_window_api& window_linux_api() {
   return api;
 }
 
-bool window_platform_available() {
+bool window_x11_platform_available() {
   auto& api = window_linux_api();
   return api.open_display != nullptr
     && api.default_screen != nullptr
@@ -254,11 +256,11 @@ std::string window_linux_key_name(unsigned long keysym) {
   return "unknown";
 }
 
-void window_platform_create(const window_ptr& window) {
+void window_x11_platform_create(const window_ptr& window) {
   auto& api = window_linux_api();
   void* display = api.open_display(nullptr);
   if (display == nullptr) {
-    throw_window_unavailable();
+    throw_window_adapter_unavailable("X11", "XOpenDisplay failed");
   }
   const auto screen = api.default_screen(display);
   const auto root = api.root_window(display, screen);
@@ -275,7 +277,7 @@ void window_platform_create(const window_ptr& window) {
   );
   if (hostWindow == 0) {
     api.close_display(display);
-    throw_window_unavailable();
+    throw_window_adapter_unavailable("X11", "XCreateSimpleWindow failed");
   }
   window->adapter = "linux-x11";
   window->host_display = display;
@@ -291,14 +293,14 @@ void window_platform_create(const window_ptr& window) {
   api.flush(display);
 }
 
-void window_platform_show(const window_ptr& window) {
+void window_x11_platform_show(const window_ptr& window) {
   auto& api = window_linux_api();
   api.map_window(window->host_display, window->host_window);
   api.flush(window->host_display);
   window->shown = true;
 }
 
-void window_platform_close(const window_ptr& window) {
+void window_x11_platform_close(const window_ptr& window) {
   if (window->host_display == nullptr || window->host_window == 0) {
     return;
   }
@@ -309,13 +311,13 @@ void window_platform_close(const window_ptr& window) {
   window->host_window = 0;
 }
 
-void window_platform_set_title(const window_ptr& window) {
+void window_x11_platform_set_title(const window_ptr& window) {
   auto& api = window_linux_api();
   api.store_name(window->host_display, window->host_window, window->title.c_str());
   api.flush(window->host_display);
 }
 
-void window_platform_present(const window_ptr& window, const window_canvas_pixels& canvas) {
+void window_x11_platform_present(const window_ptr& window, const window_canvas_pixels& canvas) {
   auto& api = window_linux_api();
   if (window->host_display == nullptr || window->host_window == 0) {
     throw_window_unavailable();
@@ -332,7 +334,7 @@ void window_platform_present(const window_ptr& window, const window_canvas_pixel
   const auto depth = api.default_depth(window->host_display, screen);
   const auto gc = api.default_gc(window->host_display, screen);
   if (visual == nullptr || gc == nullptr || depth <= 0) {
-    throw_window_unavailable();
+    throw_window_adapter_unavailable("X11", "default visual, depth, or graphics context is unavailable");
   }
   const auto byteCount = expectedSize;
   auto* data = static_cast<char*>(std::malloc(byteCount));
@@ -360,7 +362,7 @@ void window_platform_present(const window_ptr& window, const window_canvas_pixel
   );
   if (image == nullptr) {
     std::free(data);
-    throw_window_unavailable();
+    throw_window_adapter_unavailable("X11", "XCreateImage failed");
   }
   api.put_image(
     window->host_display,
@@ -380,7 +382,7 @@ void window_platform_present(const window_ptr& window, const window_canvas_pixel
   api.flush(window->host_display);
 }
 
-void window_platform_poll_events(const window_ptr& window) {
+void window_x11_platform_poll_events(const window_ptr& window) {
   if (window->host_display == nullptr || window->host_window == 0) {
     return;
   }
@@ -418,6 +420,75 @@ void window_platform_poll_events(const window_ptr& window) {
       }
     }
   }
+}
+${getWindowWaylandAdapterCppFragment()}
+
+bool window_linux_prefers_wayland() {
+  return window_wayland_requested();
+}
+
+bool window_platform_available() {
+  return window_x11_platform_available() || window_wayland_platform_available();
+}
+
+bool window_linux_uses_wayland(const window_ptr& window) {
+  return window->adapter == "linux-wayland";
+}
+
+void window_platform_create(const window_ptr& window) {
+  if (window_linux_prefers_wayland() && window_wayland_platform_available()) {
+    window_wayland_platform_create(window);
+    return;
+  }
+  if (window_x11_platform_available()) {
+    window_x11_platform_create(window);
+    return;
+  }
+  if (window_wayland_platform_available()) {
+    window_wayland_platform_create(window);
+    return;
+  }
+  throw_window_unavailable("Linux window support requires a usable X11 or Wayland adapter on this host");
+}
+
+void window_platform_show(const window_ptr& window) {
+  if (window_linux_uses_wayland(window)) {
+    window_wayland_platform_show(window);
+    return;
+  }
+  window_x11_platform_show(window);
+}
+
+void window_platform_close(const window_ptr& window) {
+  if (window_linux_uses_wayland(window)) {
+    window_wayland_platform_close(window);
+    return;
+  }
+  window_x11_platform_close(window);
+}
+
+void window_platform_set_title(const window_ptr& window) {
+  if (window_linux_uses_wayland(window)) {
+    window_wayland_platform_set_title(window);
+    return;
+  }
+  window_x11_platform_set_title(window);
+}
+
+void window_platform_present(const window_ptr& window, const window_canvas_pixels& canvas) {
+  if (window_linux_uses_wayland(window)) {
+    window_wayland_platform_present(window, canvas);
+    return;
+  }
+  window_x11_platform_present(window, canvas);
+}
+
+void window_platform_poll_events(const window_ptr& window) {
+  if (window_linux_uses_wayland(window)) {
+    window_wayland_platform_poll_events(window);
+    return;
+  }
+  window_x11_platform_poll_events(window);
 }
 #endif`;
 }

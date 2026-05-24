@@ -21,8 +21,9 @@ std::string thrown_message(jayess::value (*fn)(const std::vector<jayess::value>&
   try {
     fn(std::vector<jayess::value>{});
   } catch (const jayess::thrown_value& error) {
-    if (std::holds_alternative<std::string>(error.value)) {
-      return std::get<std::string>(error.value);
+    auto payload = jayess::exception_to_value(error);
+    if (std::holds_alternative<std::string>(payload)) {
+      return std::get<std::string>(payload);
     }
     return "non-string";
   } catch (const std::exception& error) {
@@ -34,7 +35,15 @@ std::string thrown_message(jayess::value (*fn)(const std::vector<jayess::value>&
 int main() {
   ${namespace}::jayess_module_init();
   auto unavailable = thrown_message(${namespace}::openWindow);
-  require(unavailable.find("Jayess window host adapter is not available") != std::string::npos, "window unavailable diagnostic");
+  if (unavailable.find("Jayess window host adapter is not available") == std::string::npos) {
+    auto opened = ${namespace}::openWindow(std::vector<jayess::value>{});
+    const auto& openedItems = std::get<jayess::array_ptr>(opened)->items;
+    require(openedItems.size() == 4, "window open result shape");
+    require(std::get<double>(openedItems[0]) > 0.0, "window open width is positive");
+    require(std::get<double>(openedItems[1]) > 0.0, "window open height is positive");
+    require(std::get<bool>(openedItems[2]) == false, "window open shouldClose initially false");
+    require(std::holds_alternative<jayess::array_ptr>(openedItems[3]), "window open pollEvents result shape");
+  }
   auto invalid = thrown_message(${namespace}::invalidOptions);
   require(invalid.find("options object") != std::string::npos || invalid.find("host adapter") != std::string::npos, "window options diagnostic");
 
@@ -80,6 +89,7 @@ int main() {
   }));
   require(std::get<bool>(jayess::window_should_close(manualWindow)) == false, "window initially not closing");
   jayess::window_request_close(manualWindow);
+  jayess::window_request_close(manualWindow);
   require(std::get<bool>(jayess::window_should_close(manualWindow)) == true, "window request close state");
   auto drained = jayess::window_poll_events(manualWindow);
   const auto& drainedItems = std::get<jayess::array_ptr>(drained)->items;
@@ -102,12 +112,30 @@ int main() {
   auto secondDrain = jayess::window_poll_events(manualWindow);
   require(std::get<jayess::array_ptr>(secondDrain)->items.empty(), "window event queue is empty after drain");
 
+  auto closeOnlyWindow = std::make_shared<jayess::window_state>();
+  closeOnlyWindow->shown = true;
+  closeOnlyWindow->events.push_back(jayess::make_object({
+    {"type", std::string("mouseMove")},
+    {"x", 1.0},
+    {"y", 2.0}
+  }));
+  auto closeResult = jayess::window_close(closeOnlyWindow);
+  require(std::holds_alternative<std::monostate>(closeResult), "window close returns null");
+  require(closeOnlyWindow->closed == true, "window close marks closed");
+  require(closeOnlyWindow->close_requested == true, "window close marks close requested");
+  require(closeOnlyWindow->shown == false, "window close clears shown state");
+  auto closeDrain = jayess::window_poll_events(closeOnlyWindow);
+  const auto& closeItems = std::get<jayess::array_ptr>(closeDrain)->items;
+  require(closeItems.size() == 2, "window close preserves queued events and appends close");
+  const auto closeTail = std::get<jayess::object_ptr>(closeItems[1]);
+  require(std::get<std::string>(closeTail->fields["type"]) == "close", "window close appends close event");
+
   std::cout << "ok\\n";
   return 0;
 }
 `;
 }
 
-runtimeTest("generated C++ reports window adapter availability deterministically", (t) => {
+runtimeTest("generated C++ reports window adapter availability and normalized event/lifecycle behavior deterministically", (t) => {
   transpileAndRunFixture(t, "test/fixtures/modules/window-main.js", "runtime-window", (_targetDir, entry) => windowMain(entry));
 });

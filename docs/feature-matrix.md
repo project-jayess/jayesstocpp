@@ -1,6 +1,6 @@
 # Feature Matrix
 
-This matrix summarizes shipped Jayess syntax support. `Supported` means the parser, semantic analyzer, and C++ emitter have an implemented path. `Limited` means the feature is implemented for the documented Jayess-owned subset.
+This is the authoritative quick syntax-support matrix for shipped Jayess language features. `Supported` means the parser, semantic analyzer, and C++ emitter have an implemented path. `Limited` means the feature is implemented for the documented Jayess-owned subset.
 
 | Feature | Status | Notes |
 | --- | --- | --- |

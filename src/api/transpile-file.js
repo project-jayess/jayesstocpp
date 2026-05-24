@@ -14,6 +14,21 @@ import { writeSharedLibraryLayout } from "../output/write-shared-library-layout.
 import { writeRuntime } from "../output/write-runtime.js";
 import { resolveRuntimeFragmentKeys } from "../cpp/runtime-fragments.js";
 
+function describeNativeArtifact(kind) {
+  switch (kind) {
+    case "native-header":
+      return "native header file";
+    case "native-source":
+      return "native source file";
+    case "shared-library":
+      return "shared library artifact";
+    case "static-library":
+      return "static library artifact";
+    default:
+      return "native artifact";
+  }
+}
+
 function copyIfNativeArtifact(targetDirname, sourceFilename, importRecord) {
   if (
     importRecord.kind !== "native-header" &&
@@ -25,11 +40,21 @@ function copyIfNativeArtifact(targetDirname, sourceFilename, importRecord) {
   }
 
   const fromPath = path.resolve(path.dirname(sourceFilename), importRecord.source);
-  if (!fs.existsSync(fromPath) || !fs.statSync(fromPath).isFile()) {
+  const artifactLabel = describeNativeArtifact(importRecord.kind);
+  if (!fs.existsSync(fromPath)) {
     throwDiagnostics([
       createModuleFileDiagnostic(
         sourceFilename,
-        `Cannot copy ${importRecord.kind} import '${importRecord.source}': file does not exist`,
+        `Cannot copy ${importRecord.kind} import '${importRecord.source}': expected an existing ${artifactLabel} to package into the generated project`,
+        importRecord.source
+      )
+    ]);
+  }
+  if (!fs.statSync(fromPath).isFile()) {
+    throwDiagnostics([
+      createModuleFileDiagnostic(
+        sourceFilename,
+        `Cannot copy ${importRecord.kind} import '${importRecord.source}': expected a file, but found a non-file path while packaging the ${artifactLabel}`,
         importRecord.source
       )
     ]);

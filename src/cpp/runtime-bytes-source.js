@@ -10,6 +10,7 @@ value bytes_fill(const value& input, const value& assigned);
 value bytes_slice(const value& input, const std::vector<value>& args);
 value bytes_concat(const value& left, const value& right);
 value bytes_equals(const value& left, const value& right);
+value bytes_secure_equals(const value& left, const value& right);
 value bytes_compare(const value& left, const value& right);
 value bytes_starts_with(const value& input, const value& prefix);
 value bytes_ends_with(const value& input, const value& suffix);
@@ -168,6 +169,21 @@ value bytes_equals(const value& left, const value& right) {
   const auto leftBytes = require_bytes_value(left, "Jayess bytes equals expects a bytes left input");
   const auto rightBytes = require_bytes_value(right, "Jayess bytes equals expects a bytes right input");
   return leftBytes->items == rightBytes->items;
+}
+
+value bytes_secure_equals(const value& left, const value& right) {
+  const auto leftBytes = require_bytes_value(left, "Jayess bytes secureEquals expects a bytes left input");
+  const auto rightBytes = require_bytes_value(right, "Jayess bytes secureEquals expects a bytes right input");
+
+  const auto leftSize = leftBytes->items.size();
+  const auto rightSize = rightBytes->items.size();
+  const auto sharedSize = (std::min)(leftSize, rightSize);
+
+  unsigned int diff = static_cast<unsigned int>(leftSize ^ rightSize);
+  for (std::size_t index = 0; index < sharedSize; index += 1) {
+    diff |= static_cast<unsigned int>(leftBytes->items[index] ^ rightBytes->items[index]);
+  }
+  return diff == 0U;
 }
 
 value bytes_compare(const value& left, const value& right) {

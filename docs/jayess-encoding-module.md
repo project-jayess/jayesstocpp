@@ -39,7 +39,7 @@ Malformed decode input throws a focused runtime error. Decode helpers do not sil
 
 ## Generated Output
 
-The first encoding slice is split across:
+The current shipped encoding surface is split across:
 
 - `stdlib/jayess/encoding/index.js`
 - `stdlib/jayess/encoding/encoding-primitives.hpp`

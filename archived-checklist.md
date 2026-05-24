@@ -1,12 +1,10 @@
 # Jayess to C++ Transpiler Checklist
 
-This file archives completed milestones that were moved out of the active [checklist.md](./checklist.md) to keep the working roadmap small and focused.
+This file archives completed milestones that were moved out of the active [checklist.md](./checklist.md) to keep the working checklist small and focused.
 
-This checklist turns the architecture and constraints from `Agents.md` into small implementation tasks for building the first usable version of the Jayess transpiler.
+Use the repository-root [checklist.md](./checklist.md) for current implementation work. Use [Jayess.md](./Jayess.md), [Agents.md](./Agents.md), [docs/feature-matrix.md](./docs/feature-matrix.md), and [docs/standard-library-matrix.md](./docs/standard-library-matrix.md) for current language and shipped-surface guidance.
 
-The repository is currently close to empty, so the checklist starts with minimal vertical slices and then expands stage by stage. Keep changes incremental and behavior-preserving.
-
-Completed milestones through section 308 now live here.
+Completed milestones through section 309 now live here.
 
 ## 0. Project Baseline
 
@@ -5509,3 +5507,16 @@ Decision: private static fields, private static methods, static inheritance, com
 - [x] Preserve public APIs during organization-only extractions.
 - [x] Run relevant focused tests after each extraction or feature slice.
 - [x] Update organization docs under `docs/` when source layout changes.
+
+## 309. Feature And Docs Consistency Audit
+
+- [x] Audit `docs/overview.md`, `Jayess.md`, and `docs/limitations.md` against the currently shipped parser, semantic, runtime, and stdlib surface.
+- [x] Audit each shipped `docs/jayess-*.md` module doc against the real exports under `stdlib/jayess/`.
+- [x] Audit built-in module lists in `docs/overview.md`, `docs/standard-library.md`, `docs/standard-library-matrix.md`, and resolver docs for consistency.
+- [x] Audit active tests and fixtures against the feature claims in the docs, and record any shipped-but-undocumented or documented-but-unshipped surfaces.
+- [x] Add or tighten one authoritative feature-matrix document that summarizes current shipped language, stdlib, and system-module support.
+- [x] Add or tighten one authoritative standard-library export matrix that lists each `jayess:*` module and its current exports.
+- [x] Remove or correct stale roadmap/doc claims that describe unshipped features as already supported.
+- [x] Add focused regression tests only where the audit reveals a real shipped feature without coverage.
+- [x] Update `checklist.md` structure so only active implementation slices remain in the working checklist.
+- [x] Update archived-roadmap references if the audit changes where contributors should look for shipped vs planned surfaces.

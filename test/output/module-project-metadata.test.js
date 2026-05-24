@@ -23,6 +23,10 @@ function transpileFileWithFullRuntime(fixture, targetDir) {
   return transpileFile(fixture, targetDir, { runtimeFragments: "all" });
 }
 
+function normalizeSlashes(text) {
+  return text.replace(/\\/g, "/");
+}
+
 test("transpileFile surfaces package resolver diagnostics through the public API", (t) => {
   const targetDir = createManagedTempDir(t, "package-diagnostic-output");
   const fixture = path.resolve("test/fixtures/package-project/src/outside-package.js");
@@ -150,11 +154,16 @@ test("transpileFile writes deterministic dependency metadata", (t) => {
   );
   assert.equal(entry.dependencies[0].kind, "package");
   assert.equal(entry.dependencies[0].packageName, "jayess-lib");
-  assert.match(entry.dependencies[0].packageRoot, /node_modules\/jayess-lib$/);
+  assert.match(normalizeSlashes(entry.dependencies[0].packageRoot), /node_modules\/jayess-lib$/);
   assert.equal(entry.dependencies[0].packageField, "index");
   assert.equal(entry.dependencies[1].packageName, "@scope/math");
-  assert.match(entry.dependencies[1].packageRoot, /node_modules\/@scope\/math$/);
+  assert.match(normalizeSlashes(entry.dependencies[1].packageRoot), /node_modules\/@scope\/math$/);
   assert.equal(entry.dependencies[1].packageField, "exports");
+  assert.equal(plan.modules[0].sourceFilename, path.resolve(fixture));
+  assert.deepEqual(
+    plan.modules.slice(1).map((module) => module.sourceFilename),
+    [...plan.modules.slice(1).map((module) => module.sourceFilename)].sort((left, right) => left.localeCompare(right))
+  );
 });
 
 test("transpileFile writes deterministic project manifests", (t) => {
@@ -233,15 +242,85 @@ test("transpileFile records stdlib runtime reasons and platform adapter metadata
   const windowDependency = entry.dependencies.find((dependency) => dependency.source === "jayess:window");
   assert.equal(gpuDependency.inclusionReason, "stdlib import 'jayess:gpu' includes runtime feature(s): gpu");
   assert.deepEqual(gpuDependency.runtimeFeatures, ["gpu"]);
-  assert.deepEqual(gpuDependency.runtimeRequirements.gpu.adapters, ["direct3d", "metal", "opengl", "vulkan"]);
+  assert.deepEqual(gpuDependency.runtimeRequirements.gpu.adapters, ["validation", "direct3d", "metal", "opengl", "vulkan"]);
+  assert.deepEqual(gpuDependency.runtimeRequirements.gpu.compiledAdaptersByPlatform, {
+    windows: ["validation", "direct3d"],
+    macos: ["validation", "metal"],
+    linux: ["validation", "opengl", "vulkan"]
+  });
   assert.equal(windowDependency.inclusionReason, "stdlib import 'jayess:window' includes runtime feature(s): window");
-  assert.deepEqual(windowDependency.runtimeRequirements.window.platformLibraries, ["gdi32", "user32", "x11"]);
+  assert.deepEqual(windowDependency.runtimeRequirements.window.adapters, ["win32", "cocoa", "x11", "wayland"]);
+  assert.deepEqual(windowDependency.runtimeRequirements.window.platformLibraries, ["gdi32", "user32", "wayland-client", "x11"]);
+  assert.deepEqual(windowDependency.runtimeRequirements.window.optionalBackendRequirements, ["Wayland runtime depends on a host compositor that exposes the xdg-shell client protocol"]);
+  assert.deepEqual(windowDependency.runtimeRequirements.window.compiledAdaptersByPlatform, {
+    windows: ["win32"],
+    macos: ["cocoa"],
+    linux: ["x11", "wayland"]
+  });
+  assert.deepEqual(windowDependency.runtimeRequirements.window.adapterSelection, {
+    linux: {
+      preferredOrder: ["wayland", "x11"],
+      defaultBehavior: "Prefer Wayland when WAYLAND_DISPLAY is set and the Wayland client path is available; otherwise fall back to X11 when available."
+    }
+  });
 
   assert.deepEqual(
     hints.platformAdapters.map((adapter) => adapter.feature),
     ["gpu", "window"]
   );
-  assert.deepEqual(hints.runtimeRequirements.gpu.optionalBackendRequirements, ["host GPU driver", "selected GPU SDK headers"]);
+  const gpuPlatformAdapter = hints.platformAdapters.find((adapter) => adapter.feature === "gpu");
+  assert.deepEqual(gpuPlatformAdapter.compiledAdaptersByPlatform, {
+    windows: ["validation", "direct3d"],
+    macos: ["validation", "metal"],
+    linux: ["validation", "opengl", "vulkan"]
+  });
+  assert.deepEqual(gpuPlatformAdapter.adapterSelection, {
+    windowSurface: {
+      windows: "Prefer direct3d for createSurface(window) when the Win32 window adapter is available; otherwise fall back to validation.",
+      macos: "Prefer metal for createSurface(window) when the Cocoa window adapter is available; otherwise fall back to validation.",
+      linux: "Current createSurface(window) still falls back to validation until the Linux host-backed backend slice lands."
+    }
+  });
+  const windowPlatformAdapter = hints.platformAdapters.find((adapter) => adapter.feature === "window");
+  assert.deepEqual(windowPlatformAdapter.compiledAdaptersByPlatform, {
+    windows: ["win32"],
+    macos: ["cocoa"],
+    linux: ["x11", "wayland"]
+  });
+  assert.deepEqual(windowPlatformAdapter.adapterSelection, {
+    linux: {
+      preferredOrder: ["wayland", "x11"],
+      defaultBehavior: "Prefer Wayland when WAYLAND_DISPLAY is set and the Wayland client path is available; otherwise fall back to X11 when available."
+    }
+  });
+  assert.deepEqual(hints.runtimeRequirements.gpu.optionalBackendRequirements, [
+    "validation backend is always available for deterministic command execution",
+    "host GPU driver",
+    "selected GPU SDK headers"
+  ]);
+  assert.deepEqual(hints.runtimeRequirements.gpu.compiledAdaptersByPlatform, {
+    windows: ["validation", "direct3d"],
+    macos: ["validation", "metal"],
+    linux: ["validation", "opengl", "vulkan"]
+  });
+  assert.deepEqual(hints.runtimeRequirements.gpu.adapterSelection, {
+    windowSurface: {
+      windows: "Prefer direct3d for createSurface(window) when the Win32 window adapter is available; otherwise fall back to validation.",
+      macos: "Prefer metal for createSurface(window) when the Cocoa window adapter is available; otherwise fall back to validation.",
+      linux: "Current createSurface(window) still falls back to validation until the Linux host-backed backend slice lands."
+    }
+  });
+  assert.deepEqual(hints.runtimeRequirements.window.compiledAdaptersByPlatform, {
+    windows: ["win32"],
+    macos: ["cocoa"],
+    linux: ["x11", "wayland"]
+  });
+  assert.deepEqual(hints.runtimeRequirements.window.adapterSelection, {
+    linux: {
+      preferredOrder: ["wayland", "x11"],
+      defaultBehavior: "Prefer Wayland when WAYLAND_DISPLAY is set and the Wayland client path is available; otherwise fall back to X11 when available."
+    }
+  });
   assert.deepEqual(
     hints.platformLibraryHints.map((hint) => hint.feature),
     ["gpu", "window"]
@@ -255,6 +334,23 @@ test("transpileFile records stdlib runtime reasons and platform adapter metadata
 
 test("transpileFile records platform metadata for native system modules", (t) => {
   const cases = [
+    {
+      fixture: "test/fixtures/modules/dialog-main.js",
+      feature: "dialog",
+      adapters: ["win32-dialog", "cocoa-dialog", "linux-portal-dialog"],
+      libraries: [],
+      compiledAdaptersByPlatform: {
+        windows: ["win32-dialog"],
+        macos: ["cocoa-dialog"],
+        linux: ["linux-portal-dialog"]
+      }
+    },
+    {
+      fixture: "test/fixtures/modules/http-main.js",
+      feature: "http",
+      adapters: ["posix-http", "winsock-http"],
+      libraries: ["ws2_32"]
+    },
     {
       fixture: "test/fixtures/modules/net-main.js",
       feature: "net",
@@ -285,6 +381,11 @@ test("transpileFile records platform metadata for native system modules", (t) =>
     assert.deepEqual(requirement.adapters, current.adapters);
     assert.deepEqual(requirement.platformLibraries, current.libraries);
     assert.ok(hints.platformAdapters.some((adapter) => adapter.feature === current.feature));
+    if (current.compiledAdaptersByPlatform != null) {
+      assert.deepEqual(requirement.compiledAdaptersByPlatform, current.compiledAdaptersByPlatform);
+      const platformAdapter = hints.platformAdapters.find((adapter) => adapter.feature === current.feature);
+      assert.deepEqual(platformAdapter.compiledAdaptersByPlatform, current.compiledAdaptersByPlatform);
+    }
 
     if (current.libraries.length > 0) {
       assert.ok(hints.platformLibraryHints.some((hint) => hint.feature === current.feature));
@@ -381,6 +482,41 @@ test("transpileFile records package self-reference resolution metadata", (t) => 
         key: "./condition",
         condition: "import",
         trace: ["jayess", "import"]
+      }
+    ]
+  );
+});
+
+test("transpileFile records hoisted workspace package resolution metadata", (t) => {
+  const targetDir = createManagedTempDir(t, "dependency-plan-workspace-output");
+  const fixture = path.resolve("test/fixtures/workspace-project/packages/app/src/main.js");
+  transpileFile(fixture, targetDir);
+
+  const plan = JSON.parse(fs.readFileSync(path.join(targetDir, "jayess_dependency_plan.json"), "utf8"));
+  const entry = plan.modules.find((module) => module.sourceFilename === path.resolve(fixture));
+  assert.ok(entry);
+  assert.deepEqual(
+    entry.dependencies.map((dependency) => ({
+      source: dependency.source,
+      mode: dependency.packageResolutionMode,
+      key: dependency.packageExportKey,
+      field: dependency.packageField,
+      root: dependency.packageRoot
+    })),
+    [
+      {
+        source: "workspace-lib",
+        mode: "node-modules",
+        key: ".",
+        field: "exports",
+        root: path.resolve("test/fixtures/workspace-project/node_modules/workspace-lib")
+      },
+      {
+        source: "workspace-app/self",
+        mode: "self-reference",
+        key: "./self",
+        field: "exports",
+        root: path.resolve("test/fixtures/workspace-project/packages/app")
       }
     ]
   );

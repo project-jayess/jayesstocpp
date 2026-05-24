@@ -1,54 +1,27 @@
-import { sleep as asyncSleep } from "jayess:async";
-
-function fail(message) {
-  throw message;
-}
-
-function requireDuration(milliseconds) {
-  if (milliseconds < 0) {
-    fail("jayess:timers duration must be non-negative");
-  }
-}
-
-function requireArgs(args) {
-  if (args.length < 0) {
-    fail("jayess:timers args must be an array");
-  }
-}
-
-function requireTimer(handle) {
-  if (handle.cancelled !== true && handle.cancelled !== false) {
-    fail("jayess:timers expected a timer handle");
-  }
-}
-
-async function runTimer(handle, callback, milliseconds, args) {
-  await asyncSleep(milliseconds);
-  if (handle.cancelled) {
-    return null;
-  }
-  return callback(...args);
-}
+import {
+  jayessTimersClearInterval,
+  jayessTimersClearTimeout,
+  jayessTimersSetInterval,
+  jayessTimersSetTimeout,
+  jayessTimersSleep
+} from "./timers-primitives.hpp";
 
 export function sleep(milliseconds) {
-  requireDuration(milliseconds);
-  return asyncSleep(milliseconds);
+  return jayessTimersSleep(milliseconds);
 }
 
 export function setTimeout(callback, milliseconds, args) {
-  requireDuration(milliseconds);
-  requireArgs(args);
-
-  var handle = {
-    cancelled: false,
-    done: null
-  };
-  handle.done = runTimer(handle, callback, milliseconds, args);
-  return handle;
+  return jayessTimersSetTimeout(callback, milliseconds, args);
 }
 
 export function clearTimeout(handle) {
-  requireTimer(handle);
-  handle.cancelled = true;
-  return null;
+  return jayessTimersClearTimeout(handle);
+}
+
+export function setInterval(callback, milliseconds, args) {
+  return jayessTimersSetInterval(callback, milliseconds, args);
+}
+
+export function clearInterval(handle) {
+  return jayessTimersClearInterval(handle);
 }

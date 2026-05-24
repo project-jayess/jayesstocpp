@@ -42,13 +42,13 @@ function makeZeroBytes(size) {
   return fromArray(values);
 }
 
-export function create(size) {
-  return fromBytes(makeZeroBytes(size));
-}
-
 export function fromBytes(bytes) {
   requireBytes(bytes);
   return bytes;
+}
+
+export function create(size) {
+  return fromBytes(makeZeroBytes(size));
 }
 
 export function toBytes(buffer) {

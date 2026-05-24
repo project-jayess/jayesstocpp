@@ -25,11 +25,40 @@ function runtimeRequirementsForGraph(graph) {
   return runtimeRequirementsForFeatures(features);
 }
 
+function compareNullableText(left, right) {
+  if (left == null && right == null) {
+    return 0;
+  }
+  if (left == null) {
+    return 1;
+  }
+  if (right == null) {
+    return -1;
+  }
+  return left.localeCompare(right);
+}
+
+function comparePlanModules(left, right) {
+  const leftEntry = left.sourceFilename === left.entryFilename;
+  const rightEntry = right.sourceFilename === right.entryFilename;
+  if (leftEntry !== rightEntry) {
+    return leftEntry ? -1 : 1;
+  }
+
+  const bySource = compareNullableText(left.sourceFilename, right.sourceFilename);
+  if (bySource !== 0) {
+    return bySource;
+  }
+
+  return compareNullableText(left.moduleStem, right.moduleStem);
+}
+
 export function writeDependencyPlan(targetDirname, graph, metadata) {
   const planPath = path.join(targetDirname, "jayess_dependency_plan.json");
   const modules = graph.modules.map((moduleRecord) => {
     const moduleMetadata = moduleMetadataFor(metadata, moduleRecord.filename);
     return {
+      entryFilename: normalizeFile(graph.entryFilename),
       sourceFilename: normalizeFile(moduleRecord.filename),
       sourceKind: moduleMetadata?.sourceKind ?? "source-module",
       moduleStem: moduleMetadata?.moduleStem ?? null,
@@ -72,7 +101,8 @@ export function writeDependencyPlan(targetDirname, graph, metadata) {
         };
       })
     };
-  });
+  }).sort(comparePlanModules)
+    .map(({ entryFilename, ...modulePlan }) => modulePlan);
 
   fs.writeFileSync(
     planPath,

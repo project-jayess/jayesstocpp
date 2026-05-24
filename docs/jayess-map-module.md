@@ -154,13 +154,13 @@ The shipped map module does not approximate map support through plain object fie
 
 ### Why Pure Jayess Wrappers Are Not Enough
 
-A pure Jayess wrapper over arrays of `[key, value]` pairs would keep the runtime small, but it would make the first shipped slice weaker in the wrong ways:
+A pure Jayess wrapper over arrays of `[key, value]` pairs would keep the runtime small, but it would make the current shipped surface weaker in the wrong ways:
 
 - key lookup would become linear-time library code for every operation
 - key equality rules would be duplicated at the Jayess library layer instead of staying in one runtime path
 - set support uses its own dedicated container substrate
 
-That is acceptable for experiments, but not for the intended repository-owned first shipped `Map` slice.
+That is acceptable for experiments, but not for the intended repository-owned shipped `Map` surface.
 
 ## Intended Ownership Split
 

@@ -14,4 +14,4 @@
 
 Channels are Jayess-owned runtime handles. Invalid channel handles and sending to a closed channel raise focused runtime diagnostics.
 
-The first slice is intentionally small: `receive` is non-blocking and returns `null` for an empty queue. Blocking receives and async receive handles can be layered on top of this handle model.
+The current shipped surface is intentionally small: `receive` is non-blocking and returns `null` for an empty queue. Blocking receives and async receive handles can be layered on top of this handle model.

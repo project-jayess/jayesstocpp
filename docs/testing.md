@@ -52,6 +52,17 @@ Compiler validation is intentionally narrow:
 
 Compiler diagnostics are a debugging signal for the transpiler. They are not treated as a replacement for parser, semantic, or emitter correctness.
 
+## Executable Runtime Validation
+
+Executable runtime validation is a separate test layer under `test/runtime/`.
+
+- it transpiles one focused fixture into `./temp/test-output`
+- compiles the generated project plus one tiny C++ `main`
+- runs the executable and checks the returned `jayess::value` behavior
+- it is intentionally selective and does not try to execute every compile-validated project
+
+Use compile-validation to prove generated C++ shape and buildability. Use executable runtime validation to prove selected shipped runtime behavior after real execution.
+
 ## Snapshot Workflow
 
 - emitted `transpile(source)` output has focused snapshots under `test/snapshots`

@@ -80,3 +80,15 @@ inline jayess::value jayessHttpWrite(const std::vector<jayess::value>& jayessArg
 inline jayess::value jayessHttpEnd(const std::vector<jayess::value>& jayessArgs) {
   return jayess::http_end_response(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }
+
+inline jayess::value jayessHttpBeginStream(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::http_begin_stream_response(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessHttpWriteStream(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::http_write_stream_response(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessHttpEndStream(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::http_end_stream_response(jayess::argument_at(jayessArgs, 0));
+}

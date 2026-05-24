@@ -12,6 +12,7 @@ The shipped Jayess-owned system modules are:
 - `jayess:process`
 - `jayess:subprocess`
 - `jayess:system`
+- `jayess:timers`
 - `jayess:thread`
 
 These modules are repository-owned Jayess modules. They are not ambient Node built-ins, and they are not ordinary npm package imports.
@@ -215,7 +216,7 @@ These behaviors can be Jayess-owned wrappers once the primitive hooks exist:
 - higher-level convenience wrappers over text-file primitives
 - pure path manipulation helpers when practical
 
-For the first slice, `jayess:path` may still use a small native helper path if that keeps separator and normalization behavior portable and reviewable.
+For the current shipped surface, `jayess:path` may still use a small native helper path if that keeps separator and normalization behavior portable and reviewable.
 
 ## Current Module Shape
 
@@ -226,6 +227,7 @@ The shipped Jayess-owned system-module sources live at:
 - `stdlib/jayess/process/index.js`
 - `stdlib/jayess/subprocess/index.js`
 - `stdlib/jayess/system/index.js`
+- `stdlib/jayess/timers/index.js`
 - `stdlib/jayess/thread/index.js`
 
 The native primitive bridges for those modules live at:
@@ -235,6 +237,7 @@ The native primitive bridges for those modules live at:
 - `stdlib/jayess/process/process-primitives.hpp`
 - `stdlib/jayess/subprocess/subprocess-primitives.hpp`
 - `stdlib/jayess/system/system-primitives.hpp`
+- `stdlib/jayess/timers/timers-primitives.hpp`
 - `stdlib/jayess/thread/thread-primitives.hpp`
 
 Each module stays intentionally thin and forwards directly into the primitive layer.
@@ -242,17 +245,21 @@ Each module stays intentionally thin and forwards directly into the primitive la
 ## Current Verification Coverage
 
 - module-graph resolution tests for `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:subprocess`, `jayess:system`, and `jayess:thread`
+- generated-output tests that verify the Jayess timers module writes its thin wrapper plus `timers-primitives.hpp` into `transpileFile()` output
 - generated-output tests that verify the Jayess modules and native bridge headers are written into `transpileFile()` output
 - compile-validation tests that confirm a generated project importing Jayess system modules compiles with the available C++ compiler
+- compile-validation now explicitly includes a focused `jayess:timers` interval fixture
+- executable-runtime verification now explicitly covers `jayess:timers` sleep plus timeout-cancellation behavior
 - string-mode API tests that keep `transpile()` conservative for `jayess:*` imports without explicit resolver support
 
-## Explicit First-Slice Rules
+## Explicit Current-Surface Rules
 
-- the shipped system-module namespace includes `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:subprocess`, `jayess:system`, and `jayess:thread`
+- the shipped system-module namespace includes `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:subprocess`, `jayess:system`, `jayess:timers`, and `jayess:thread`
 - raw `node:*` imports remain unsupported in Jayess source
 - system-module helpers are synchronous and explicit unless documented otherwise
 - system-module helpers should prefer small adapter primitives over broad Node compatibility layers
 - the public module surface should remain Jayess-owned even when native primitives are required underneath
+- `node:child_process` should be replaced with `jayess:subprocess`, `node:path` with `jayess:path`, and `node:timers` with `jayess:timers`
 
 ## Current Scope Limits
 
@@ -261,6 +268,7 @@ The shipped system-module surface is intentionally narrow:
 - narrow helper-only surfaces with async behavior only where module docs define it
 - explicit file, path, process, subprocess, system, and thread helpers only
 - no ambient `node:*` compatibility layer
+- timer scheduling stays explicit under `jayess:timers` instead of adding ambient JavaScript timer globals
 
 ## Current `jayess:subprocess` Notes
 
@@ -268,7 +276,7 @@ The shipped system-module surface is intentionally narrow:
 
 See [`jayess:subprocess` Module](./jayess-subprocess-module.md) for the API shape.
 
-The first slice exposes:
+The current shipped surface exposes:
 
 - `run(command, args, options)` for command completion with captured `stdout`, `stderr`, and `exitCode`
 - `spawn(command, args, options)` for explicit process handles
@@ -301,6 +309,27 @@ The module keeps execution explicit:
 - remove-directory trees
 - streams/watchers
 
+## Next Approved `jayess:fs` Slice
+
+The next approved `jayess:fs` family is explicit directory-tree traversal and recursive file-tree operations.
+
+Approved next exports:
+
+- `walk(path)`
+- `walkSync(path)`
+- `copyRecursive(fromPath, toPath)`
+- `copyRecursiveSync(fromPath, toPath)`
+- `removeRecursive(path)`
+- `removeRecursiveSync(path)`
+
+Approved next rules:
+
+- `walk(...)` returns a deterministic Jayess array of relative descendant paths rooted at the requested directory
+- recursive helpers stay path-explicit and do not add globbing, filtering, or watch behavior in this slice
+- recursive copy/remove operate only on explicit directory trees and should fail clearly on invalid roots
+- temp-file/temp-directory helpers remain outside this slice
+- stream-backed filesystem helpers remain outside this slice
+
 ## Current `jayess:path` Notes
 
 - `resolve(...)` joins path parts and returns one normalized absolute-style path using the host current directory as the base when needed
@@ -312,6 +341,25 @@ The module keeps execution explicit:
 - URL/path bridging
 - separator exposure APIs
 
+## Next Approved `jayess:path` Slice
+
+The next approved `jayess:path` family is path-structure inspection and formatting helpers, kept separate from globbing or URL bridging.
+
+Approved next exports:
+
+- `parse(path)`
+- `format(parts)`
+- `separator()`
+- `delimiter()`
+
+Approved next rules:
+
+- `parse(path)` returns a narrow Jayess object with stable path-component fields only
+- `format(parts)` accepts only the narrow object shape produced by Jayess path parsing helpers
+- `separator()` and `delimiter()` expose host path separators explicitly instead of requiring string literals in user code
+- glob helpers remain outside this slice
+- URL/path bridging remains outside this slice
+
 ## Current `jayess:process` Notes
 
 - `argv()` returns a Jayess array of process argument strings from runtime-owned argv storage
@@ -319,6 +367,32 @@ The module keeps execution explicit:
 
 - env mutation helpers such as `setEnv(...)` or `deleteEnv(...)`
 - exit hooks or signals APIs
+
+## Next Approved `jayess:process` Slice
+
+The next approved `jayess:process` family is read-only environment inspection.
+
+Approved next exports:
+
+- `hasEnv(name)`
+- `envKeys()`
+- `envEntries()`
+
+Approved next rules:
+
+- the slice stays read-only and does not add env mutation helpers
+- subprocess execution remains owned by `jayess:subprocess`
+- exit hooks, signals, and process-control helpers remain outside this slice
+
+## Next Active Host-Module Slice
+
+The next active host-module implementation slice is `jayess:timers`.
+
+This keeps the next host-facing work narrow:
+
+- explicit sleep/timeout scheduling helpers
+- no new process-control surface
+- no broader `jayess:os`, `jayess:url`, `jayess:thread`, or `jayess:subprocess` expansion in the same slice
 
 ## Current `jayess:system` Notes
 

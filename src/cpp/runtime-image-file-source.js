@@ -180,8 +180,8 @@ value image_load_bmp(const value& pathValue) {
   if (
     rawWidth == 0U ||
     rawHeight == 0U ||
-    rawWidth > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
-    rawHeight > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
+    rawWidth > static_cast<std::uint32_t>((std::numeric_limits<int>::max)()) ||
+    rawHeight > static_cast<std::uint32_t>((std::numeric_limits<int>::max)()) ||
     planes != 1U ||
     bitDepth != 24U ||
     compression != 0U
@@ -375,6 +375,41 @@ value image_decode_ppm(const value& input) {
         static_cast<unsigned char>(blue),
         255
       });
+    }
+  }
+  return image;
+}
+
+value image_encode_pgm(const value& input) {
+  const auto image = require_image_value(input);
+  std::ostringstream output;
+  output << "P2\\n" << image->width << " " << image->height << "\\n255\\n";
+  for (int y = 0; y < image->height; ++y) {
+    for (int x = 0; x < image->width; ++x) {
+      const auto color = image_read_pixel(image, x, y);
+      output << ((static_cast<int>(color[0]) + static_cast<int>(color[1]) + static_cast<int>(color[2])) / 3) << "\\n";
+    }
+  }
+  const auto text = output.str();
+  return image_make_bytes(std::vector<unsigned char>(text.begin(), text.end()));
+}
+
+value image_decode_pgm(const value& input) {
+  const auto bytes = require_image_bytes_value(input, "Jayess image decodePgm expects bytes input");
+  const std::string text(bytes->items.begin(), bytes->items.end());
+  std::istringstream stream(text);
+  const auto dimensions = image_read_ppm_dimensions(stream, "decodePgm", "P2");
+  const auto width = dimensions[0];
+  const auto height = dimensions[1];
+  auto image = image_allocate(width, height);
+  for (int y = 0; y < height; ++y) {
+    for (int x = 0; x < width; ++x) {
+      const auto gray = image_read_ppm_integer(stream, "Jayess image decodePgm found unsupported gray channel");
+      if (gray < 0 || gray > 255) {
+        throw std::runtime_error("Jayess image decodePgm found unsupported gray channel");
+      }
+      const auto channel = static_cast<unsigned char>(gray);
+      image_write_pixel(image, x, y, {channel, channel, channel, 255});
     }
   }
   return image;

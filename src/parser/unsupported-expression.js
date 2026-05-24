@@ -1,4 +1,8 @@
 export function unsupportedExpressionMessage(token) {
+  if (token.type === "operator" && token.value === "/") {
+    return "Jayess does not support regex literal syntax like /.../; it is unsupported by design, so use 'jayess:regex' helpers instead";
+  }
+
   if (token.type === "punctuator") {
     if (token.value === "...") {
       return "Spread syntax is only valid inside array literals, object literals, call arguments, or binding patterns";

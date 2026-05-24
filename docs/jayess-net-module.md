@@ -19,9 +19,9 @@
 - `remotePort(socket)` returns the peer port for an open connected socket.
 - `close(socket)` closes a socket or server handle and returns `null`.
 
-## First Slice
+## Current Shipped Scope
 
-The implemented first slice provides a focused TCP adapter:
+The current shipped scope provides a focused TCP adapter:
 
 - client connections through `connect`
 - server sockets through `listen`

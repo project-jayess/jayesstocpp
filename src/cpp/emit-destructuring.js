@@ -1,3 +1,5 @@
+import { toCppIdentifier } from "./cpp-identifiers.js";
+
 function renderPatternKey(node) {
   if (node.type === "Identifier") {
     return JSON.stringify(node.name);
@@ -23,7 +25,7 @@ export function emitDestructuringAssignments(pattern, sourceExpr, context, lines
 
   if (pattern.type === "Identifier") {
     const prefix = declareBindings ? "jayess::value " : "";
-    lines.push(`${indent}${prefix}${pattern.name} = ${sourceExpr};`);
+    lines.push(`${indent}${prefix}${toCppIdentifier(pattern.name)} = ${sourceExpr};`);
     return;
   }
 

@@ -48,6 +48,48 @@ test("transpileFile resolves built-in Jayess canvas module over image and color 
   assert.match(canvasSource, /strokePolygon/);
   assert.match(canvasSource, /fillRectAlpha/);
   assert.match(canvasSource, /getPixel/);
+  assert.match(canvasSource, /jayess_module_stdlib_jayess_image_index_js::fillRect/);
+  assert.match(canvasSource, /jayess_module_stdlib_jayess_image_index_js::fillRectAlpha/);
   assert.match(canvasSource, /jayess_module_stdlib_jayess_image_index_js::setPixel/);
   assert.match(canvasSource, /jayess_module_stdlib_jayess_image_index_js::getPixel/);
+});
+
+test("transpileFile resolves built-in Jayess canvas clip stack helpers", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-canvas-clip-output");
+  const fixture = path.resolve("test/fixtures/modules/canvas-clip-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const canvasPath = generatedStdlibCppPath(targetDir, "canvas");
+  assert.ok(result.files.includes(canvasPath));
+
+  const canvasSource = fs.readFileSync(canvasPath, "utf8");
+  assert.match(canvasSource, /currentClip/);
+  assert.match(canvasSource, /pushClip/);
+  assert.match(canvasSource, /popClip/);
+});
+
+test("transpileFile resolves built-in Jayess canvas stroke width helpers", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-canvas-stroke-output");
+  const fixture = path.resolve("test/fixtures/modules/canvas-stroke-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const canvasPath = generatedStdlibCppPath(targetDir, "canvas");
+  assert.ok(result.files.includes(canvasPath));
+
+  const canvasSource = fs.readFileSync(canvasPath, "utf8");
+  assert.match(canvasSource, /strokeWidthValue/);
+  assert.match(canvasSource, /drawStrokePixel/);
+});
+
+test("transpileFile resolves built-in Jayess canvas alpha compositing helpers", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-canvas-alpha-output");
+  const fixture = path.resolve("test/fixtures/modules/canvas-alpha-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const canvasPath = generatedStdlibCppPath(targetDir, "canvas");
+  assert.ok(result.files.includes(canvasPath));
+
+  const canvasSource = fs.readFileSync(canvasPath, "utf8");
+  assert.match(canvasSource, /blendColor/);
+  assert.match(canvasSource, /fillRectAlpha/);
 });

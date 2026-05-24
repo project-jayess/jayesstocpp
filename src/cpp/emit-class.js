@@ -1,4 +1,5 @@
-import { emitAsyncCallableBody } from "./emit-async.js";
+import { renderAsyncCallableClosure } from "./emit-async.js";
+import { renderSyncCallableClosure } from "./emit-callable-closure.js";
 import { renderGeneratorCallableExpression } from "./emit-generator.js";
 import { isPrivateFieldKey, renderPrivateFieldInitialization, renderPrivateStaticFieldInitialization } from "./emit-private.js";
 
@@ -48,36 +49,49 @@ export function renderSuperConstructorCall(argumentNodes, context, renderExpress
 function renderBoundStaticMethodClosure(node, context, emitParameterInitialization, emitStatement, renderExpression, thisAlias = "class_value") {
   const methodContext = { ...context, staticMethod: true };
   const captureList = context.classSelfAlias != null ? `${thisAlias}` : thisAlias;
-  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
   if (node.async) {
-    emitAsyncMethodClosureBody(node, methodContext, lines, emitParameterInitialization, emitStatement, thisAlias, 0);
-    lines.push("})");
-    return lines.join("\n");
+    return renderAsyncMethodClosure(
+      node,
+      methodContext,
+      captureList,
+      emitParameterInitialization,
+      emitStatement,
+      renderExpression,
+      thisAlias,
+      0
+    );
   }
   if (node.generator) {
     return renderGeneratorMethodClosure(node, methodContext, renderExpression, emitParameterInitialization, thisAlias, 0, [thisAlias], null);
   }
-  lines.push("  jayess::scope_cleanup_frame jayess_scope;");
-
-  for (const [index, param] of node.params.entries()) {
-    emitMethodParameterInitialization(param, index, { ...methodContext, thisAlias }, lines, emitParameterInitialization);
-  }
-
-  const bodyLines = [];
-  emitStatement(node.body, { ...methodContext, thisAlias }, bodyLines, 1);
-  lines.push(...bodyLines);
-  lines.push("  return jayess::value(std::monostate{});");
-  lines.push("})");
-  return lines.join("\n");
+  return renderSyncCallableClosure({
+    captureList,
+    params: node.params,
+    parameterContext: { ...methodContext, thisAlias },
+    bodyContext: { ...methodContext, thisAlias },
+    emitParameter(param, index, activeContext, lines) {
+      emitMethodParameterInitialization(param, index, activeContext, lines, emitParameterInitialization);
+    },
+    emitBody(activeContext, bodyLines) {
+      emitStatement(node.body, activeContext, bodyLines, 1);
+    },
+    nullReturnExpression: "jayess::value(std::monostate{})"
+  });
 }
 
 function renderInstanceMethodClosure(node, context, emitParameterInitialization, emitStatement, renderExpression) {
   const captureList = context.classSelfAlias != null ? context.classSelfAlias : "";
-  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
   if (node.async) {
-    emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, "this_value", 1);
-    lines.push("})");
-    return lines.join("\n");
+    return renderAsyncMethodClosure(
+      node,
+      context,
+      captureList,
+      emitParameterInitialization,
+      emitStatement,
+      renderExpression,
+      "this_value",
+      1
+    );
   }
   if (node.generator) {
     return renderGeneratorMethodClosure(
@@ -91,28 +105,37 @@ function renderInstanceMethodClosure(node, context, emitParameterInitialization,
       "this_value"
     );
   }
-  lines.push("  jayess::scope_cleanup_frame jayess_scope;");
-  lines.push("  jayess::value this_value = jayess::argument_at(jayess_args, 0);");
-
-  for (const [index, param] of node.params.entries()) {
-    emitMethodParameterInitialization(param, index, { ...context, thisAlias: "this_value" }, lines, emitParameterInitialization, "  ", 1);
-  }
-
-  const bodyLines = [];
-  emitStatement(node.body, { ...context, thisAlias: "this_value" }, bodyLines, 1);
-  lines.push(...bodyLines);
-  lines.push("  return jayess::value(std::monostate{});");
-  lines.push("})");
-  return lines.join("\n");
+  return renderSyncCallableClosure({
+    captureList,
+    params: node.params,
+    parameterContext: { ...context, thisAlias: "this_value" },
+    bodyContext: { ...context, thisAlias: "this_value" },
+    emitParameter(param, index, activeContext, lines) {
+      emitMethodParameterInitialization(param, index, activeContext, lines, emitParameterInitialization, "  ", 1);
+    },
+    emitBody(activeContext, bodyLines) {
+      emitStatement(node.body, activeContext, bodyLines, 1);
+    },
+    nullReturnExpression: "jayess::value(std::monostate{})",
+    beforeParameters(lines) {
+      lines.push("  jayess::value this_value = jayess::argument_at(jayess_args, 0);");
+    }
+  });
 }
 
 function renderPrivateInstanceMethodClosure(node, context, emitParameterInitialization, emitStatement, renderExpression, instanceExpr = "this_value") {
   const captures = [context.classSelfAlias, instanceExpr].filter(Boolean);
-  const lines = [`jayess::make_callable([${captures.join(", ")}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
   if (node.async) {
-    emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, instanceExpr, 0);
-    lines.push("})");
-    return lines.join("\n");
+    return renderAsyncMethodClosure(
+      node,
+      context,
+      captures.join(", "),
+      emitParameterInitialization,
+      emitStatement,
+      renderExpression,
+      instanceExpr,
+      0
+    );
   }
   if (node.generator) {
     return renderGeneratorMethodClosure(
@@ -126,26 +149,36 @@ function renderPrivateInstanceMethodClosure(node, context, emitParameterInitiali
       null
     );
   }
-  lines.push("  jayess::scope_cleanup_frame jayess_scope;");
-
-  for (const [index, param] of node.params.entries()) {
-    emitMethodParameterInitialization(param, index, { ...context, thisAlias: instanceExpr }, lines, emitParameterInitialization);
-  }
-
-  const bodyLines = [];
-  emitStatement(node.body, { ...context, thisAlias: instanceExpr }, bodyLines, 1);
-  lines.push(...bodyLines);
-  lines.push("  return jayess::value(std::monostate{});");
-  lines.push("})");
-  return lines.join("\n");
+  return renderSyncCallableClosure({
+    captureList: captures.join(", "),
+    params: node.params,
+    parameterContext: { ...context, thisAlias: instanceExpr },
+    bodyContext: { ...context, thisAlias: instanceExpr },
+    emitParameter(param, index, activeContext, lines) {
+      emitMethodParameterInitialization(param, index, activeContext, lines, emitParameterInitialization);
+    },
+    emitBody(activeContext, bodyLines) {
+      emitStatement(node.body, activeContext, bodyLines, 1);
+    },
+    nullReturnExpression: "jayess::value(std::monostate{})"
+  });
 }
 
-function emitAsyncMethodClosureBody(node, context, lines, emitParameterInitialization, emitStatement, thisAlias, argumentOffset) {
+function renderAsyncMethodClosure(
+  node,
+  context,
+  captureList,
+  emitParameterInitialization,
+  emitStatement,
+  renderExpression,
+  thisAlias,
+  argumentOffset
+) {
   const methodContext = { ...context, thisAlias };
-  emitAsyncCallableBody(
+  return renderAsyncCallableClosure(
     node,
     methodContext,
-    lines,
+    captureList,
     (param, index, activeContext, activeLines) => {
       emitMethodParameterInitialization(param, index, activeContext, activeLines, emitParameterInitialization, "  ", argumentOffset);
     },

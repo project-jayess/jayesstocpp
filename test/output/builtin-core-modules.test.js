@@ -65,9 +65,11 @@ test("transpileFile resolves built-in Jayess bytes module into generated output"
   assert.match(nativeHeader, /jayessBytesToUtf8/);
   assert.match(nativeHeader, /jayessBytesSlice/);
   assert.match(nativeHeader, /jayessBytesEquals/);
+  assert.match(nativeHeader, /jayessBytesSecureEquals/);
   assert.match(nativeHeader, /jayessBytesIsBytes/);
   assert.match(moduleSource, /jayessBytesFromUtf8/);
   assert.match(moduleSource, /jayessBytesEquals/);
+  assert.match(moduleSource, /jayessBytesSecureEquals/);
 });
 
 test("transpileFile resolves built-in Jayess stream module into generated output", (t) => {
@@ -144,10 +146,10 @@ test("transpileFile resolves built-in Jayess encoding module into generated outp
 
 test("transpileFile resolves built-in Jayess crypto module into generated output", (t) => {
   const targetDir = createManagedTempDir(t, "builtin-crypto-output");
-  const fixture = path.resolve("test/fixtures/modules/crypto-main.js");
+  const fixture = path.resolve("test/fixtures/modules/crypto-pem-main.js");
   const result = transpileFile(fixture, targetDir);
 
-  assert.ok(result.files.some((file) => file.endsWith("crypto_main_js.cpp")));
+  assert.ok(result.files.some((file) => file.endsWith("crypto_pem_main_js.cpp")));
   const modulePath = result.files.find((file) => file.includes("stdlib_jayess_crypto_index_js.cpp"));
   assert.ok(modulePath);
   assert.ok(fs.existsSync(path.join(targetDir, "native", "crypto-primitives.hpp")));
@@ -155,9 +157,15 @@ test("transpileFile resolves built-in Jayess crypto module into generated output
   const nativeHeader = fs.readFileSync(path.join(targetDir, "native", "crypto-primitives.hpp"), "utf8");
   const moduleSource = fs.readFileSync(modulePath, "utf8");
   assert.match(nativeHeader, /jayessCryptoSha256/);
+  assert.match(nativeHeader, /jayessCryptoSha512/);
   assert.match(nativeHeader, /jayessCryptoSha1/);
   assert.match(nativeHeader, /jayessCryptoRandomBytes/);
   assert.match(moduleSource, /jayessCryptoSha256/);
+  assert.match(moduleSource, /jayessCryptoSha512/);
+  assert.match(moduleSource, /hkdfSha256/);
+  assert.match(moduleSource, /parsePemBlocks/);
+  assert.match(moduleSource, /certificateFromPem/);
+  assert.match(moduleSource, /trustAnchorsFromPem/);
   assert.match(moduleSource, /jayessCryptoRandomBytes/);
 });
 

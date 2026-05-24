@@ -4,6 +4,7 @@ import {
   createServer,
   end,
   handle,
+  path,
   params,
   route,
   router,
@@ -11,10 +12,10 @@ import {
 } from "jayess:http";
 
 export function serveMulti(port) {
-  var count = 0;
+  var state = { count: 0 };
   return createServer(function(requestValue, response) {
-    count = count + 1;
-    return end(response, "request " + count);
+    state.count = state.count + 1;
+    return end(response, "request " + state.count);
   }, {
     host: "127.0.0.1",
     port: port,
@@ -47,6 +48,16 @@ export function serveParams(port) {
 
   return createServer(function(requestValue, response) {
     return handle(app, requestValue, response);
+  }, {
+    host: "127.0.0.1",
+    port: port,
+    backlog: 4
+  });
+}
+
+export function serveEchoPath(port) {
+  return createServer(function(requestValue, response) {
+    return sendText(response, path(requestValue), { status: 208 });
   }, {
     host: "127.0.0.1",
     port: port,
