@@ -9,6 +9,13 @@ inline std::string jayessFsString(const jayess::value& input, const std::string&
   return std::get<std::string>(input);
 }
 
+inline jayess::value jayessFsOptionalArgument(const std::vector<jayess::value>& jayessArgs, std::size_t index) {
+  if (!jayess::has_argument(jayessArgs, index)) {
+    return jayess::value(std::monostate{});
+  }
+  return jayess::argument_at(jayessArgs, index);
+}
+
 inline jayess::value jayessFsExists(const std::vector<jayess::value>& jayessArgs) {
   const auto pathText = jayess::argument_at(jayessArgs, 0);
   return jayess::fs_exists_path_async(jayessFsString(pathText, "Jayess fs exists expects a string path"));
@@ -114,7 +121,8 @@ inline jayess::value jayessFsCopyRecursive(const std::vector<jayess::value>& jay
   const auto toPathText = jayess::argument_at(jayessArgs, 1);
   return jayess::fs_copy_path_recursive_async(
     jayessFsString(fromPathText, "Jayess fs copyRecursive expects a string from path"),
-    jayessFsString(toPathText, "Jayess fs copyRecursive expects a string to path")
+    jayessFsString(toPathText, "Jayess fs copyRecursive expects a string to path"),
+    jayessFsOptionalArgument(jayessArgs, 2)
   );
 }
 
@@ -123,7 +131,8 @@ inline jayess::value jayessFsCopyRecursiveSync(const std::vector<jayess::value>&
   const auto toPathText = jayess::argument_at(jayessArgs, 1);
   return jayess::fs_copy_path_recursive(
     jayessFsString(fromPathText, "Jayess fs copyRecursive expects a string from path"),
-    jayessFsString(toPathText, "Jayess fs copyRecursive expects a string to path")
+    jayessFsString(toPathText, "Jayess fs copyRecursive expects a string to path"),
+    jayessFsOptionalArgument(jayessArgs, 2)
   );
 }
 
@@ -149,12 +158,18 @@ inline jayess::value jayessFsRemoveSync(const std::vector<jayess::value>& jayess
 
 inline jayess::value jayessFsRemoveRecursive(const std::vector<jayess::value>& jayessArgs) {
   const auto pathText = jayess::argument_at(jayessArgs, 0);
-  return jayess::fs_remove_path_recursive_async(jayessFsString(pathText, "Jayess fs removeRecursive expects a string path"));
+  return jayess::fs_remove_path_recursive_async(
+    jayessFsString(pathText, "Jayess fs removeRecursive expects a string path"),
+    jayessFsOptionalArgument(jayessArgs, 1)
+  );
 }
 
 inline jayess::value jayessFsRemoveRecursiveSync(const std::vector<jayess::value>& jayessArgs) {
   const auto pathText = jayess::argument_at(jayessArgs, 0);
-  return jayess::fs_remove_path_recursive(jayessFsString(pathText, "Jayess fs removeRecursive expects a string path"));
+  return jayess::fs_remove_path_recursive(
+    jayessFsString(pathText, "Jayess fs removeRecursive expects a string path"),
+    jayessFsOptionalArgument(jayessArgs, 1)
+  );
 }
 
 inline jayess::value jayessFsList(const std::vector<jayess::value>& jayessArgs) {
@@ -169,12 +184,18 @@ inline jayess::value jayessFsListSync(const std::vector<jayess::value>& jayessAr
 
 inline jayess::value jayessFsWalk(const std::vector<jayess::value>& jayessArgs) {
   const auto pathText = jayess::argument_at(jayessArgs, 0);
-  return jayess::fs_walk_directory_async(jayessFsString(pathText, "Jayess fs walk expects a string path"));
+  return jayess::fs_walk_directory_async(
+    jayessFsString(pathText, "Jayess fs walk expects a string path"),
+    jayessFsOptionalArgument(jayessArgs, 1)
+  );
 }
 
 inline jayess::value jayessFsWalkSync(const std::vector<jayess::value>& jayessArgs) {
   const auto pathText = jayess::argument_at(jayessArgs, 0);
-  return jayess::fs_walk_directory(jayessFsString(pathText, "Jayess fs walk expects a string path"));
+  return jayess::fs_walk_directory(
+    jayessFsString(pathText, "Jayess fs walk expects a string path"),
+    jayessFsOptionalArgument(jayessArgs, 1)
+  );
 }
 
 inline jayess::value jayessFsRename(const std::vector<jayess::value>& jayessArgs) {

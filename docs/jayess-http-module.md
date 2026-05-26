@@ -14,9 +14,10 @@
 - `textBody(value)` returns an explicit text request body.
 - `bytesBody(value)` returns an explicit bytes request body.
 - `jsonBody(value)` stringifies an explicit JSON request body.
-- `method(request)`, `path(request)`, `headers(request)`, `header(request, name)`, and `body(request)` read fields from server request objects.
+- `method(request)`, `path(request)`, `url(request)`, `pathname(request)`, `headers(request)`, `header(request, name)`, and `body(request)` read fields from server request objects.
 - `bodyText(request, options)`, `bodyBytes(request, options)`, and `collectBody(request, options)` read the runtime-owned server body with optional `maxBytes` checks.
 - `query(request)` parses the request path query string as a Jayess object.
+- `queryParam(request, name)` returns one parsed query value or `null`.
 - `params(request)` returns route parameters attached by `handle(router, request, response)`.
 - `createServer(handler, options)` starts an HTTP server and returns a server handle. `handler(request, response)` receives explicit request and response objects and may return a Jayess async handle.
 - `close(server)` closes a server handle.
@@ -57,13 +58,15 @@ The current shipped scope supports plain HTTP over the Jayess-owned native runti
 - Jayess async handles for client requests
 - Jayess async timeout/cancellation wrappers for client requests
 
-The current shipped scope is deliberately plain HTTP only:
+The current shipped data path is plain HTTP plus an explicit HTTPS backend boundary:
 
-- client URLs must be `http://...`
-- there is no HTTPS or TLS transport in the current slice
-- there is no certificate loading, trust-store integration, or ALPN/HTTP2 surface in the current slice
+- plain client URLs use `http://...`
+- HTTPS client URLs use `https://...`, validate TLS options, and route through the `host-tls` backend hook before reporting the normalized unavailable-backend diagnostic when no adapter is registered
+- HTTPS server options validate `tls.certificate`, `tls.privateKey`, and optional `tls.trustAnchors` before reporting the normalized unavailable-backend diagnostic
+- `tls.alpnProtocols` and request `alpnProtocols` are recognized as unsupported ALPN options and report a focused diagnostic
+- live client TLS is provided through the host adapter hook; server TLS, host trust-store integration, ALPN negotiation, and HTTP/2 remain out of scope
 
-TLS remains out of scope until `jayess:crypto` grows the first approved certificate/key/trust-anchor container primitives needed to support it honestly. Even then, `jayess:http` will continue to own transport sockets and handshake behavior rather than pushing those responsibilities into raw crypto helpers.
+`jayess:crypto` owns certificate/key/trust-anchor container and metadata primitives. `jayess:http` owns transport sockets, handshakes, ALPN, and request/response behavior. See [jayess-https-transport.md](./jayess-https-transport.md).
 
 This is not Node.js `http` compatibility and does not expose Node streams. The server surface is intentionally handle-based and explicit so the runtime can grow without changing the import surface.
 
@@ -73,9 +76,9 @@ The current runtime boundary is now a plain-HTTP socket path on both major host 
 
 - client request helpers use the focused native HTTP runtime path
 - server creation, request handling, response sending, and `close(server)` now have both Unix/POSIX and Windows/Winsock-backed implementations
-- the current Windows slice is still the same bounded HTTP/1.1 close-per-connection server path as the Unix slice; it does not yet widen into TLS, HTTP/2, or broader transport features
+- the current Windows slice is still the same bounded HTTP/1.1 close-per-connection server path as the Unix slice; TLS option validation is platform-neutral, and HTTPS client requests now pass through a named `host-tls` backend hook before reporting the normalized unavailable-backend diagnostic if no hook is registered
 
-This means `jayess:http` now has a first real Windows server/runtime path, but later hardening work such as graceful shutdown and transport security still remains separate.
+This means `jayess:http` now has a first real Windows server/runtime path and a platform-neutral HTTPS validation boundary.
 
 ## Current Production-Level Boundary
 
@@ -88,8 +91,8 @@ For the current shipped slice, "production level" means the module has deliberat
 
 It does not yet mean that the module has fully hardened transport behavior. The following remain outside the current production claim until later slices land:
 
-- HTTPS or TLS
-- certificate, key, or trust-store handling
+- live TLS handshakes and certificate verification
+- live host trust-store integration for transport
 - HTTP/2, HTTP/3, or WebSocket behavior
 - fully incremental streaming across every request and response helper shape
 - server hardening items such as graceful shutdown guarantees
@@ -166,11 +169,14 @@ The shipped server runtime now applies buffered body-size guardrails on both sid
 
 These can be overridden per server through `createServer(handler, options)`:
 
+- `maxHeaderBytes`
+- `maxBodyBytes` as the short request-body guardrail name
 - `maxRequestBodyBytes`
 - `maxResponseBodyBytes`
 
 The current rejection behavior is:
 
+- request headers larger than `maxHeaderBytes`: `431`
 - request body larger than `maxRequestBodyBytes`: `413`
 - buffered response body larger than `maxResponseBodyBytes`: `500`
 
@@ -194,8 +200,21 @@ These guardrails do not yet imply the later streaming slice is complete.
 - `host`
 - `port`
 - `backlog`
+- `maxHeaderBytes`
+- `maxBodyBytes`
 - `maxRequestBodyBytes`
 - `maxResponseBodyBytes`
+- `idleTimeoutMillis`
+- `headerTimeoutMillis`
+- `bodyTimeoutMillis`
+
+Server guardrail options must be positive integers. Unsupported option keys fail before the server socket is opened.
+
+`state(server)` returns a small server-state object for lifecycle verification:
+
+- `closed`
+- `acceptLoopExited`
+- `activeClients`
 
 The response object returned by `request(options)` should include:
 
@@ -210,6 +229,9 @@ The server request object supports:
 - `method(request)`
 - `path(request)`
 - `query(request)`
+- `url(request)`
+- `pathname(request)`
+- `queryParam(request, name)`
 - `params(request)`
 - `headers(request)`
 - `header(request, name)`
@@ -223,6 +245,14 @@ Request body helper functions keep request construction explicit:
 - `textBody(text)`
 - `bytesBody(bytes)`
 - `jsonBody(value)`
+
+## Request Helpers
+
+`url(request)` returns the request path value exactly as provided by the runtime request object. For server requests this is the path plus query string, such as `/users/42?tab=profile`.
+
+`pathname(request)` strips the query string and returns only the route/static-file pathname.
+
+`queryParam(request, name)` parses the query string through `jayess:querystring` and returns the named value or `null` when it is not present. It is a convenience helper over `query(request)` and does not change routing behavior.
 
 ## Response Helpers
 
@@ -283,6 +313,15 @@ export function serve(port) {
 
 Use `jayess:cookie` for focused Cookie parsing and `Set-Cookie` formatting. It layers over `jayess:http` request header and response header helpers without adding Node.js middleware compatibility.
 
+`jayess:http` also exports a small signed-session cookie layer:
+
+- `signSession(value, secret)` returns `value.signature`, using HMAC-SHA-256 over the value.
+- `verifySession(signedValue, secret)` returns the unsigned value or `null`.
+- `getSignedCookie(request, name, secret)` reads a Cookie value through `jayess:cookie` and verifies it.
+- `setSignedCookie(response, name, value, secret, options)` signs a value and writes it through `jayess:cookie`.
+
+Signed session values and secrets must be non-empty strings, and values cannot contain dots or semicolons. This keeps the shipped helper deterministic and reviewable; it is not a middleware framework or encrypted session store.
+
 ## Diagnostics
 
 The module should throw Jayess runtime errors for:
@@ -304,13 +343,20 @@ The module should throw Jayess runtime errors for:
 
 Current host-boundary diagnostics also include:
 
-- `Jayess http request supports only http:// URLs` for unsupported schemes such as HTTPS in the current slice
+- `Jayess http request supports only http:// and https:// URLs` for unsupported URL schemes
+- `Jayess http HTTPS transport backend is not available on this host` after valid HTTPS/TLS client or server option shapes reach a runtime without a live TLS host adapter
+- `Jayess http TLS ALPN is unsupported in the current transport slice` for request or TLS options that provide ALPN protocol selection
+- `Jayess http TLS handshake failed: ...` for a compiled host-TLS adapter that starts but cannot complete a handshake
+- `Jayess http TLS certificate verification failed: ...` for a compiled host-TLS adapter that rejects peer certificate verification
 
 ## Implementation
 
 - Jayess wrappers live in `stdlib/jayess/http/index.js`.
 - Native bridge declarations live in `stdlib/jayess/http/http-primitives.hpp`.
 - Portable C++ runtime helpers live in `src/cpp/runtime-http-source.js`.
+- HTTP client URL parsing and request formatting helpers live in `src/cpp/runtime-http-client-source.js`.
+- HTTPS/TLS option validation helpers live in `src/cpp/runtime-http-tls-source.js`.
+- The host-TLS adapter boundary lives in `src/cpp/runtime-http-tls-backend-source.js`.
 - The module keeps request/response objects explicit and avoids Node.js stream compatibility.
 - HTTP helpers use `jayess:bytes` for binary bodies and strings for text bodies.
 - Stream response helpers reuse `jayess:stream` instead of adding Node.js stream compatibility.
@@ -321,8 +367,8 @@ Current host-boundary diagnostics also include:
 
 The current shipped module does not yet claim:
 
-- HTTPS or TLS
-- certificate or private-key management
+- live TLS handshakes and certificate verification
+- host trust-store integration for transport
 - HTTP/2 or HTTP/3
 - WebSocket support
 - fully incremental body streaming semantics in every helper

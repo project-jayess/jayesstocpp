@@ -30,6 +30,12 @@ int main() {
   require(std::get<double>(items[3]) >= 1.0, "env entry count");
   require(std::get<double>(items[4]) >= 1.0, "cwd length");
   require(std::get<double>(items[5]) == 2.0, "argv length");
+  try {
+    ${namespace}::inspectEnv(std::vector<jayess::value>{std::string("")});
+    throw std::runtime_error("empty env key accepted");
+  } catch (const std::runtime_error& error) {
+    require(std::string(error.what()).find("non-empty string key") != std::string::npos, "empty env key diagnostic");
+  }
   std::cout << "ok\\n";
   return 0;
 }

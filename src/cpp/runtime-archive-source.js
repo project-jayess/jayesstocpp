@@ -1,10 +1,6 @@
 export function getArchiveRuntimeHeaderFragment() {
   return `value archive_create_tar(const value& entries);
-value archive_extract_tar(const value& bytes);
-value archive_write_tar(const value& path, const value& entries);
-value archive_write_tar_sync(const value& path, const value& entries);
-value archive_read_tar(const value& path);
-value archive_read_tar_sync(const value& path);`;
+value archive_extract_tar(const value& bytes);`;
 }
 
 export function getArchiveRuntimeCppFragment() {
@@ -37,25 +33,39 @@ std::string require_archive_string(const value& input, const std::string& messag
   return std::get<std::string>(input);
 }
 
-std::string require_archive_path(const value& input) {
-  return require_archive_string(input, "Jayess archive path must be a string");
-}
-
 value archive_object_field(const object_ptr& object, const std::string& key) {
   const auto found = object->fields.find(key);
   return found == object->fields.end() ? value(std::monostate{}) : found->second;
 }
 
+bool archive_is_windows_absolute_path(const std::string& input) {
+  return input.size() >= 2 && std::isalpha(static_cast<unsigned char>(input[0])) && input[1] == ':';
+}
+
+bool archive_has_field(const object_ptr& object, const std::string& key) {
+  return object->fields.find(key) != object->fields.end();
+}
+
 std::string archive_normalize_path(const std::string& input) {
-  if (input.empty() || input.front() == '/' || input.find('\\\\') != std::string::npos) {
+  if (input.empty() || input.front() == '/' || input.find('\\\\') != std::string::npos || archive_is_windows_absolute_path(input)) {
+    throw std::runtime_error("Jayess archive entry path must be relative");
+  }
+  auto normalizedInput = input;
+  while (!normalizedInput.empty() && normalizedInput.back() == '/') {
+    normalizedInput.pop_back();
+  }
+  if (normalizedInput.empty()) {
     throw std::runtime_error("Jayess archive entry path must be relative");
   }
   std::vector<std::string> parts;
-  std::stringstream stream(input);
+  std::stringstream stream(normalizedInput);
   std::string part;
   while (std::getline(stream, part, '/')) {
-    if (part.empty() || part == ".") {
-      continue;
+    if (part.empty()) {
+      throw std::runtime_error("Jayess archive entry path must not contain empty path segments");
+    }
+    if (part == ".") {
+      throw std::runtime_error("Jayess archive entry path must not contain . segments");
     }
     if (part == "..") {
       throw std::runtime_error("Jayess archive entry path must not contain ..");
@@ -74,6 +84,18 @@ std::string archive_normalize_path(const std::string& input) {
     throw std::runtime_error("Jayess archive first tar slice supports paths up to 100 bytes");
   }
   return output;
+}
+
+std::string archive_entry_type(const object_ptr& entry) {
+  const auto typeValue = archive_object_field(entry, "type");
+  if (std::holds_alternative<std::monostate>(typeValue)) {
+    return "file";
+  }
+  const auto type = require_archive_string(typeValue, "Jayess archive entry type must be a string");
+  if (type != "file" && type != "directory") {
+    throw std::runtime_error("Jayess archive tar slice supports only regular file and directory entries");
+  }
+  return type;
 }
 
 std::vector<unsigned char> archive_entry_content(const object_ptr& entry) {
@@ -97,10 +119,10 @@ std::vector<unsigned char> archive_entry_content(const object_ptr& entry) {
   return {};
 }
 
-int archive_entry_mode(const object_ptr& entry) {
+int archive_entry_mode(const object_ptr& entry, bool directory) {
   const auto modeValue = archive_object_field(entry, "mode");
   if (std::holds_alternative<std::monostate>(modeValue)) {
-    return 0644;
+    return directory ? 0755 : 0644;
   }
   if (!std::holds_alternative<double>(modeValue)) {
     throw std::runtime_error("Jayess archive entry mode must be a number");
@@ -110,6 +132,21 @@ int archive_entry_mode(const object_ptr& entry) {
     throw std::runtime_error("Jayess archive entry mode must be an integer mode");
   }
   return static_cast<int>(numeric);
+}
+
+std::uint64_t archive_entry_mtime(const object_ptr& entry) {
+  const auto mtimeValue = archive_object_field(entry, "mtime");
+  if (std::holds_alternative<std::monostate>(mtimeValue)) {
+    return 0;
+  }
+  if (!std::holds_alternative<double>(mtimeValue)) {
+    throw std::runtime_error("Jayess archive entry mtime must be a number");
+  }
+  const auto numeric = std::get<double>(mtimeValue);
+  if (!std::isfinite(numeric) || std::floor(numeric) != numeric || numeric < 0.0) {
+    throw std::runtime_error("Jayess archive entry mtime must be a non-negative integer");
+  }
+  return static_cast<std::uint64_t>(numeric);
 }
 
 void archive_write_octal(std::vector<unsigned char>& header, std::size_t offset, std::size_t width, std::uint64_t value) {
@@ -164,25 +201,31 @@ void archive_append_padding(std::vector<unsigned char>& output, std::size_t size
 std::vector<unsigned char> archive_create_tar_bytes(const value& entriesValue) {
   const auto entries = require_archive_entries(entriesValue);
   std::vector<unsigned char> output;
+  std::vector<std::string> seenPaths;
   for (const auto& item : entries->items) {
     const auto entry = require_archive_entry(item);
-    const auto typeValue = archive_object_field(entry, "type");
-    if (!std::holds_alternative<std::monostate>(typeValue) && require_archive_string(typeValue, "Jayess archive entry type must be a string") != "file") {
-      throw std::runtime_error("Jayess archive first tar slice supports only regular file entries");
+    const auto type = archive_entry_type(entry);
+    const auto directory = type == "directory";
+    if (directory && (archive_has_field(entry, "bytes") || archive_has_field(entry, "text") || archive_has_field(entry, "content"))) {
+      throw std::runtime_error("Jayess archive directory entries must not include content");
     }
     const auto path = archive_normalize_path(require_archive_string(archive_object_field(entry, "path"), "Jayess archive entry path is required"));
-    const auto content = archive_entry_content(entry);
+    if (std::find(seenPaths.begin(), seenPaths.end(), path) != seenPaths.end()) {
+      throw std::runtime_error("Jayess archive entry paths must be unique");
+    }
+    seenPaths.push_back(path);
+    const auto content = directory ? std::vector<unsigned char>{} : archive_entry_content(entry);
     std::vector<unsigned char> header(512, 0);
     std::copy(path.begin(), path.end(), header.begin());
-    archive_write_octal(header, 100, 8, static_cast<std::uint64_t>(archive_entry_mode(entry)));
+    archive_write_octal(header, 100, 8, static_cast<std::uint64_t>(archive_entry_mode(entry, directory)));
     archive_write_octal(header, 108, 8, 0);
     archive_write_octal(header, 116, 8, 0);
     archive_write_octal(header, 124, 12, static_cast<std::uint64_t>(content.size()));
-    archive_write_octal(header, 136, 12, 0);
+    archive_write_octal(header, 136, 12, archive_entry_mtime(entry));
     for (std::size_t index = 148; index < 156; ++index) {
       header[index] = ' ';
     }
-    header[156] = '0';
+    header[156] = directory ? '5' : '0';
     const std::string magic = "ustar";
     std::copy(magic.begin(), magic.end(), header.begin() + 257);
     header[262] = 0;
@@ -208,36 +251,6 @@ value archive_make_bytes(std::vector<unsigned char> items) {
   bytes->items = std::move(items);
   return bytes;
 }
-
-void archive_write_file(const std::string& pathText, const std::vector<unsigned char>& bytes) {
-  std::ofstream output(std::filesystem::path(pathText), std::ios::binary);
-  if (!output) {
-    throw std::runtime_error("Jayess archive could not open output file");
-  }
-  output.write(reinterpret_cast<const char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
-}
-
-std::vector<unsigned char> archive_read_file(const std::string& pathText) {
-  std::ifstream input(std::filesystem::path(pathText), std::ios::binary);
-  if (!input) {
-    throw std::runtime_error("Jayess archive could not open input file");
-  }
-  return std::vector<unsigned char>(std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>());
-}
-
-value archive_async_result(std::function<value()> operation) {
-  const auto result = make_pending_async();
-  async_schedule([result, operation = std::move(operation)]() mutable {
-    try {
-      async_resolve(result, operation());
-    } catch (const thrown_value& error) {
-      async_reject(result, exception_to_value(error));
-    } catch (const std::exception& error) {
-      async_reject(result, exception_to_value(error));
-    }
-  });
-  return result;
-}
 } // namespace
 
 value archive_create_tar(const value& entries) {
@@ -247,23 +260,34 @@ value archive_create_tar(const value& entries) {
 value archive_extract_tar(const value& input) {
   const auto bytes = require_archive_bytes(input, "Jayess archive extractTar expects bytes input");
   std::vector<value> entries;
+  std::vector<std::string> seenPaths;
   std::size_t offset = 0;
   while (offset + 512 <= bytes->items.size()) {
     if (archive_zero_block(bytes->items, offset)) {
       break;
     }
-    if (bytes->items[offset + 156] != '0' && bytes->items[offset + 156] != 0) {
-      throw std::runtime_error("Jayess archive extractTar supports only regular file entries");
+    const auto typeflag = bytes->items[offset + 156];
+    if (typeflag != '0' && typeflag != 0 && typeflag != '5') {
+      throw std::runtime_error("Jayess archive extractTar supports only regular file and directory entries");
     }
     std::string pathText;
     for (std::size_t index = 0; index < 100 && bytes->items[offset + index] != 0; ++index) {
       pathText.push_back(static_cast<char>(bytes->items[offset + index]));
     }
+    pathText = archive_normalize_path(pathText);
+    if (std::find(seenPaths.begin(), seenPaths.end(), pathText) != seenPaths.end()) {
+      throw std::runtime_error("Jayess archive entry paths must be unique");
+    }
+    seenPaths.push_back(pathText);
     const auto size = archive_read_octal(bytes->items, offset + 124, 12);
     const auto mode = archive_read_octal(bytes->items, offset + 100, 8);
+    const auto mtime = archive_read_octal(bytes->items, offset + 136, 12);
     const auto contentOffset = offset + 512;
     if (contentOffset + size > bytes->items.size()) {
       throw std::runtime_error("Jayess archive extractTar found incomplete entry content");
+    }
+    if (typeflag == '5' && size != 0) {
+      throw std::runtime_error("Jayess archive directory entries must not include content");
     }
     std::vector<unsigned char> content(
       bytes->items.begin() + static_cast<std::ptrdiff_t>(contentOffset),
@@ -272,7 +296,9 @@ value archive_extract_tar(const value& input) {
     const auto text = std::string(content.begin(), content.end());
     entries.push_back(make_object({
       {"path", pathText},
+      {"type", typeflag == '5' ? std::string("directory") : std::string("file")},
       {"mode", static_cast<double>(mode)},
+      {"mtime", static_cast<double>(mtime)},
       {"size", static_cast<double>(size)},
       {"bytes", archive_make_bytes(content)},
       {"text", text}
@@ -285,25 +311,5 @@ value archive_extract_tar(const value& input) {
   }
   return make_array(std::move(entries));
 }
-
-value archive_write_tar_sync(const value& pathValue, const value& entries) {
-  archive_write_file(require_archive_path(pathValue), archive_create_tar_bytes(entries));
-  return value(std::monostate{});
-}
-
-value archive_read_tar_sync(const value& pathValue) {
-  return archive_extract_tar(archive_make_bytes(archive_read_file(require_archive_path(pathValue))));
-}
-
-value archive_write_tar(const value& pathValue, const value& entries) {
-  return archive_async_result([pathValue, entries]() -> value {
-    return archive_write_tar_sync(pathValue, entries);
-  });
-}
-
-value archive_read_tar(const value& pathValue) {
-  return archive_async_result([pathValue]() -> value {
-    return archive_read_tar_sync(pathValue);
-  });
 }`;
 }

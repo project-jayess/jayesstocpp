@@ -18,11 +18,14 @@ Jayess also targets cross-platform native rendering through Jayess-owned standar
 
 - `jayess:color` for color values, parsing, conversion, and blending
 - `jayess:image` for pixel buffers and image file output
-- `jayess:canvas` for off-screen 2D drawing over image buffers
+- `jayess:canvas` for off-screen 2D drawing over image buffers and the Jayess-owned HTML/CSS render engine
+- `jayess:gui` for interactive application/window state over canvas-rendered surfaces
 - `jayess:window` for live native windows, frame presentation, and input events
 - `jayess:gpu` for optional GPU-accelerated resources, pipelines, and draw commands
 
-The current canvas implementation renders into an off-screen software image buffer and can save deterministic PPM files; it does not draw to the screen yet. The intended GUI direction is a Jayess-owned cross-platform toolkit: portable CPU rendering first, live native window support second, and optional GPU acceleration third. GPU support should expose a Jayess-owned API while using focused backend adapters for platform graphics APIs such as Direct3D, Metal, Vulkan, or OpenGL where appropriate, rather than copying a broad third-party GUI or graphics toolkit into the repository.
+The current canvas implementation renders into an off-screen software image buffer and can save deterministic image files. The intended GUI direction is a Jayess-owned cross-platform toolkit: portable CPU rendering first, live native window support second, and optional GPU acceleration third. HTML/CSS support belongs in `jayess:canvas` as a focused renderer over canvas/image/font/layout primitives; `jayess:gui` should consume that renderer for interactive state, window events, invalidation, and presentation. GPU support should expose a Jayess-owned API while using focused backend adapters for platform graphics APIs such as Direct3D, Metal, Vulkan, or OpenGL where appropriate, rather than copying a broad third-party GUI, browser, or graphics toolkit into the repository.
+
+Database support is intentionally not shipped for now. There is no `jayess:db`, `jayess:sqlite`, bundled SQLite adapter, or repository-owned database runtime in the current standard-library surface.
 
 Language-policy note:
 

@@ -22,6 +22,9 @@ test("transpileFile resolves built-in Jayess gui module over layout, font, canva
 
   const guiPath = generatedStdlibCppPath(targetDir, "gui");
   const modelPath = generatedStdlibHelperCppPath(targetDir, "gui", "stdlib_jayess_gui_model_js.cpp");
+  const formControlsPath = generatedStdlibHelperCppPath(targetDir, "gui", "stdlib_jayess_gui_form_controls_js.cpp");
+  const textInputPath = generatedStdlibHelperCppPath(targetDir, "gui", "stdlib_jayess_gui_text_input_js.cpp");
+  const accessibilityPath = generatedStdlibHelperCppPath(targetDir, "gui", "stdlib_jayess_gui_accessibility_js.cpp");
   const layoutPassPath = generatedStdlibHelperCppPath(targetDir, "gui", "stdlib_jayess_gui_layout_pass_js.cpp");
   const paintPath = generatedStdlibHelperCppPath(targetDir, "gui", "stdlib_jayess_gui_paint_js.cpp");
   const layoutPath = generatedStdlibCppPath(targetDir, "layout");
@@ -31,6 +34,9 @@ test("transpileFile resolves built-in Jayess gui module over layout, font, canva
 
   assert.ok(result.files.includes(guiPath));
   assert.ok(result.files.includes(modelPath));
+  assert.ok(result.files.includes(formControlsPath));
+  assert.ok(result.files.includes(textInputPath));
+  assert.ok(result.files.includes(accessibilityPath));
   assert.ok(result.files.includes(layoutPassPath));
   assert.ok(result.files.includes(paintPath));
   assert.ok(result.files.includes(layoutPath));
@@ -43,10 +49,32 @@ test("transpileFile resolves built-in Jayess gui module over layout, font, canva
   assert.match(modelSource, /createButton/);
   assert.match(modelSource, /createColumn/);
   assert.match(modelSource, /needsRedraw/);
+  const guiSource = fs.readFileSync(guiPath, "utf8");
+  const formControlsSource = fs.readFileSync(formControlsPath, "utf8");
+  const textInputSource = fs.readFileSync(textInputPath, "utf8");
+  const accessibilitySource = fs.readFileSync(accessibilityPath, "utf8");
+  assert.match(guiSource, /createTextInput/);
+  assert.match(guiSource, /createCheckbox/);
+  assert.match(guiSource, /createRadio/);
+  assert.match(guiSource, /formState/);
+  assert.match(guiSource, /setValue/);
+  assert.match(guiSource, /value/);
+  assert.match(guiSource, /accessibility/);
+  assert.match(guiSource, /selection/);
+  assert.match(formControlsSource, /createCheckbox/);
+  assert.match(formControlsSource, /createRadio/);
+  assert.match(formControlsSource, /formState/);
+  assert.match(textInputSource, /editTextInput/);
+  assert.match(textInputSource, /cursor/);
+  assert.match(textInputSource, /selectionStart/);
+  assert.match(textInputSource, /Backspace/);
+  assert.match(accessibilitySource, /widgetRole/);
+  assert.match(accessibilitySource, /textbox/);
 
   const layoutPassSource = fs.readFileSync(layoutPassPath, "utf8");
   assert.match(layoutPassSource, /layout\(/);
 
   const paintSource = fs.readFileSync(paintPath, "utf8");
   assert.match(paintSource, /draw\(/);
+  assert.match(paintSource, /textInput/);
 });

@@ -125,6 +125,8 @@ Current language-direction rules:
 - missing array elements do not create a separate `undefined` value
 - falling off the end of a function without `return expr` does not create a separate `undefined` value
 
+Direct source references to `undefined` are unsupported by design. Use `null` when a program needs the built-in missing-value sentinel.
+
 Current runtime contract:
 
 - missing object-property lookups yield Jayess `null`

@@ -58,6 +58,10 @@ inline jayess::value jayessHttpCloseServer(const std::vector<jayess::value>& jay
   return jayess::http_close_server(jayess::argument_at(jayessArgs, 0));
 }
 
+inline jayess::value jayessHttpServerState(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::http_server_state_value(jayess::argument_at(jayessArgs, 0));
+}
+
 inline jayess::value jayessHttpSetStatus(const std::vector<jayess::value>& jayessArgs) {
   return jayess::http_set_status(
     jayess::argument_at(jayessArgs, 0),

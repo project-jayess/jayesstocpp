@@ -25,10 +25,17 @@ Current focused helpers include:
 - `src/cpp/runtime-async-core-source.js` for async handle creation, settlement, continuations, and synchronous await helpers.
 - `src/cpp/runtime-async-cancellation-source.js` for cancellation token creation, cancellation state, and `whenCancelled` behavior.
 - `src/cpp/runtime-async-combinators-source.js` for async composition helpers such as `all`, `race`, `timeout`, `catchError`, `finallyDo`, and retry.
+- `src/cpp/runtime-http-config-source.js` for HTTP runtime constants and request/server option shape structs used by the HTTP runtime fragment.
+- `src/cpp/runtime-http-client-source.js` for HTTP client URL parsing and request formatting helpers used by the HTTP runtime fragment.
 - `src/cpp/runtime-http-request-source.js` for HTTP request accessor functions used by the HTTP runtime fragment.
 - `src/cpp/runtime-http-response-source.js` for HTTP response runtime state and response mutation/output functions used by the HTTP runtime fragment.
 - `src/cpp/runtime-http-server-source.js` for HTTP server runtime state and server lifecycle functions used by the HTTP runtime fragment.
+- `src/cpp/runtime-http-tls-source.js` for platform-neutral HTTP TLS option validation and unavailable-backend diagnostic helpers.
 - `src/cpp/runtime-image-file-source.js` for image metadata, PPM/PGM/BMP/TGA file handling, and PPM byte encoding helpers used by the image runtime fragment.
+- `src/cpp/runtime-gpu-draw-resources-source.js` for GPU draw-resource descriptor validation shared by validation and host-backed GPU runtime paths.
+- `src/cpp/runtime-window-wayland-registry-source.js` for Wayland registry discovery and required-global diagnostics.
+- `src/cpp/runtime-window-wayland-input-source.js` for Wayland seat, pointer, keyboard, and normalized input-event helpers.
+- `src/cpp/runtime-window-wayland-buffer-source.js` for Wayland shared-memory buffer creation and software-buffer presentation helpers.
 - `src/cpp/runtime-net-state-source.js` for TCP socket/server runtime state used by the net runtime fragment.
 - `src/cpp/runtime-net-posix-source.js` for POSIX socket adapter helpers used by the net runtime fragment.
 - `src/cpp/runtime-net-windows-source.js` for Winsock adapter helpers used by the net runtime fragment.

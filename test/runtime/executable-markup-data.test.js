@@ -49,6 +49,8 @@ int main() {
   require(std::get<bool>(items[13]) == true, "markdown heading html");
   require(std::get<bool>(items[14]) == true, "markdown link html");
   require(std::get<bool>(items[15]) == true, "markdown list html");
+  require(std::get<bool>(items[16]) == true, "markdown unsafe link escaped");
+  require(std::get<bool>(items[17]) == true, "markdown safe link preserved");
   require(thrown_message(${namespace}::invalidXml).find("closing tag") != std::string::npos, "xml diagnostic");
   require(thrown_message(${namespace}::invalidYaml).find("mapping line") != std::string::npos, "yaml diagnostic");
   require(thrown_message(${namespace}::invalidMarkdown).find("code fence") != std::string::npos, "markdown diagnostic");

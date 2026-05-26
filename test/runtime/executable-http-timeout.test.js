@@ -157,7 +157,7 @@ int main() {
 
   auto idleResponse = idleTimeoutResponse();
   require(idleResponse.find("HTTP/1.1 408") == 0, "http idle timeout status");
-  require(idleResponse.find("headers timed out") != std::string::npos, "http idle timeout body");
+  require(idleResponse.find("idle timed out") != std::string::npos, "http idle timeout body");
 
   auto partialHeaderResponse = partialHeaderTimeoutResponse();
   require(partialHeaderResponse.find("HTTP/1.1 408") == 0, "http header timeout status");

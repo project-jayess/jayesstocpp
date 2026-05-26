@@ -51,7 +51,13 @@ int main() {
   });
 
   std::this_thread::sleep_for(std::chrono::milliseconds(25));
+  auto runningStateValue = ${namespace}::inspect(std::vector<jayess::value>{slowServer});
+  auto runningState = std::get<jayess::object_ptr>(runningStateValue);
+  require(std::get<bool>(runningState->fields.at("closed")) == false, "http server state starts open");
   ${namespace}::stop(std::vector<jayess::value>{slowServer});
+  auto closedStateValue = ${namespace}::inspect(std::vector<jayess::value>{slowServer});
+  auto closedState = std::get<jayess::object_ptr>(closedStateValue);
+  require(std::get<bool>(closedState->fields.at("closed")) == true, "http server state reports closed");
   inFlight.join();
   std::this_thread::sleep_for(std::chrono::milliseconds(25));
   if (requestFailure != nullptr) {

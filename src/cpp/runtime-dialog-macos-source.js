@@ -124,10 +124,12 @@ bool dialog_macos_has_override(const char* name) {
 
 value dialog_macos_picker_override(const char* name) {
   const auto override = std::string(std::getenv(name));
-  if (override == "cancel") {
-    return std::monostate{};
-  }
-  return override;
+  return dialog_picker_override_result(override, false);
+}
+
+value dialog_macos_open_file_override(const char* name, bool multiple) {
+  const auto override = std::string(std::getenv(name));
+  return dialog_picker_override_result(override, multiple);
 }
 
 value dialog_macos_message_override(const char* name) {
@@ -175,24 +177,51 @@ void dialog_macos_apply_filters(jayess_dialog_objc_id panel, const object_ptr& o
   setTypesFn(panel, dialog_macos_selector("setAllowedFileTypes:"), arrayObject);
 }
 
-value dialog_macos_open_file(const value& optionsValue) {
-  if (dialog_macos_has_override("JAYESS_DIALOG_TEST_OPEN_FILE")) {
-    return dialog_macos_picker_override("JAYESS_DIALOG_TEST_OPEN_FILE");
+void dialog_macos_apply_default_name(jayess_dialog_objc_id panel, const std::string& defaultName) {
+  if (defaultName.empty()) {
+    return;
   }
-
   auto& api = dialog_macos_api();
-  auto pool = dialog_macos_autorelease_pool();
+  auto setNameFn = reinterpret_cast<void (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel, jayess_dialog_objc_id)>(api.msg_send);
+  setNameFn(panel, dialog_macos_selector("setNameFieldStringValue:"), dialog_macos_string(defaultName));
+}
+
+value dialog_macos_panel_urls_result(jayess_dialog_objc_id panel) {
+  auto& api = dialog_macos_api();
+  auto urlsFn = reinterpret_cast<jayess_dialog_objc_id (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel)>(api.msg_send);
+  auto countFn = reinterpret_cast<jayess_dialog_nsuinteger (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel)>(api.msg_send);
+  auto itemFn = reinterpret_cast<jayess_dialog_objc_id (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel, jayess_dialog_nsuinteger)>(api.msg_send);
+  auto pathFn = reinterpret_cast<jayess_dialog_objc_id (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel)>(api.msg_send);
+
+  auto urls = urlsFn(panel, dialog_macos_selector("URLs"));
+  std::vector<value> paths;
+  const auto count = countFn(urls, dialog_macos_selector("count"));
+  for (jayess_dialog_nsuinteger index = 0; index < count; index += 1) {
+    const auto url = itemFn(urls, dialog_macos_selector("objectAtIndex:"), index);
+    const auto pathObject = pathFn(url, dialog_macos_selector("path"));
+    paths.push_back(dialog_macos_utf8(pathObject));
+  }
+  return make_array(std::move(paths));
+}
+
+value dialog_macos_open_file(const value& optionsValue) {
+  auto& api = dialog_macos_api();
   const auto options = dialog_require_options_object(optionsValue, "openFile");
   const auto title = dialog_optional_string_option(options, "title", "openFile");
   const auto defaultPath = dialog_optional_string_option(options, "defaultPath", "openFile");
+  const auto multiple = dialog_optional_bool_option(options, "multiple", "openFile");
+  if (dialog_macos_has_override("JAYESS_DIALOG_TEST_OPEN_FILE")) {
+    return dialog_macos_open_file_override("JAYESS_DIALOG_TEST_OPEN_FILE", multiple);
+  }
 
+  auto pool = dialog_macos_autorelease_pool();
   auto panelClass = api.get_class("NSOpenPanel");
   auto openPanelFn = reinterpret_cast<jayess_dialog_objc_id (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel)>(api.msg_send);
   auto panel = openPanelFn(panelClass, dialog_macos_selector("openPanel"));
   auto boolFn = reinterpret_cast<void (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel, jayess_dialog_objc_bool)>(api.msg_send);
   boolFn(panel, dialog_macos_selector("setCanChooseFiles:"), 1);
   boolFn(panel, dialog_macos_selector("setCanChooseDirectories:"), 0);
-  boolFn(panel, dialog_macos_selector("setAllowsMultipleSelection:"), 0);
+  boolFn(panel, dialog_macos_selector("setAllowsMultipleSelection:"), multiple ? 1 : 0);
   dialog_macos_apply_title(panel, title);
   dialog_macos_apply_directory(panel, defaultPath);
   dialog_macos_apply_filters(panel, options);
@@ -202,6 +231,12 @@ value dialog_macos_open_file(const value& optionsValue) {
   if (response != JAYESS_NS_MODAL_RESPONSE_OK) {
     dialog_macos_drain_pool(pool);
     return std::monostate{};
+  }
+
+  if (multiple) {
+    auto result = dialog_macos_panel_urls_result(panel);
+    dialog_macos_drain_pool(pool);
+    return result;
   }
 
   auto urlFn = reinterpret_cast<jayess_dialog_objc_id (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel)>(api.msg_send);
@@ -223,12 +258,14 @@ value dialog_macos_save_file(const value& optionsValue) {
   const auto options = dialog_require_options_object(optionsValue, "saveFile");
   const auto title = dialog_optional_string_option(options, "title", "saveFile");
   const auto defaultPath = dialog_optional_string_option(options, "defaultPath", "saveFile");
+  const auto defaultName = dialog_optional_string_option(options, "defaultName", "saveFile");
 
   auto panelClass = api.get_class("NSSavePanel");
   auto savePanelFn = reinterpret_cast<jayess_dialog_objc_id (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel)>(api.msg_send);
   auto panel = savePanelFn(panelClass, dialog_macos_selector("savePanel"));
   dialog_macos_apply_title(panel, title);
   dialog_macos_apply_directory(panel, defaultPath);
+  dialog_macos_apply_default_name(panel, defaultName);
   dialog_macos_apply_filters(panel, options);
 
   auto runFn = reinterpret_cast<jayess_dialog_nsinteger (*)(jayess_dialog_objc_id, jayess_dialog_objc_sel)>(api.msg_send);

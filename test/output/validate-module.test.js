@@ -26,5 +26,8 @@ test("transpileFile resolves built-in Jayess validate module with type primitive
   assert.match(runtimeHeader, /value validate_type_of\(const value& input\);/);
   assert.match(runtimeSource, /value validate_type_of\(const value& input\)/);
   assert.match(moduleSource, /objectOf/);
+  assert.match(moduleSource, /strictObjectOf/);
+  assert.match(moduleSource, /config/);
+  assert.match(moduleSource, /is not allowed/);
   assert.match(moduleSource, /assertValid/);
 });

@@ -309,80 +309,39 @@ The module keeps execution explicit:
 - remove-directory trees
 - streams/watchers
 
-## Next Approved `jayess:fs` Slice
+## Current `jayess:fs` Recursive Tree Notes
 
-The next approved `jayess:fs` family is explicit directory-tree traversal and recursive file-tree operations.
-
-Approved next exports:
-
-- `walk(path)`
-- `walkSync(path)`
-- `copyRecursive(fromPath, toPath)`
-- `copyRecursiveSync(fromPath, toPath)`
-- `removeRecursive(path)`
-- `removeRecursiveSync(path)`
-
-Approved next rules:
-
-- `walk(...)` returns a deterministic Jayess array of relative descendant paths rooted at the requested directory
-- recursive helpers stay path-explicit and do not add globbing, filtering, or watch behavior in this slice
-- recursive copy/remove operate only on explicit directory trees and should fail clearly on invalid roots
-- temp-file/temp-directory helpers remain outside this slice
-- stream-backed filesystem helpers remain outside this slice
+- `walk(path, options)` and `walkSync(path, options)` return deterministic arrays of `{ path, relativePath, type }` entry objects rooted at the requested directory.
+- `copyRecursive(fromPath, toPath, options)` and `copyRecursiveSync(fromPath, toPath, options)` copy explicit file trees and reject targets inside the source tree.
+- `removeRecursive(path, options)` and `removeRecursiveSync(path, options)` remove explicit file or directory trees and return the removed-entry count.
+- recursive helpers reject empty paths, traversal segments, non-object options, and unsupported option keys.
+- recursive helpers stay path-explicit and do not add globbing, filtering, temp-file helpers, or watch behavior.
 
 ## Current `jayess:path` Notes
 
+- `parse(path)` returns a narrow Jayess object with `root`, `dir`, `base`, `ext`, and `name` fields
+- `format(parts)` accepts the same narrow object shape and returns a normalized path string
+- `separator()` returns the host path separator
+- `delimiter()` returns the host path-list delimiter
 - `resolve(...)` joins path parts and returns one normalized absolute-style path using the host current directory as the base when needed
 - `relative(fromPath, toPath)` returns a normalized relative path from one location to another
 - `isAbsolute(path)` returns whether a path is already absolute on current host rules
 
-- path parsing objects
 - glob helpers
 - URL/path bridging
-- separator exposure APIs
-
-## Next Approved `jayess:path` Slice
-
-The next approved `jayess:path` family is path-structure inspection and formatting helpers, kept separate from globbing or URL bridging.
-
-Approved next exports:
-
-- `parse(path)`
-- `format(parts)`
-- `separator()`
-- `delimiter()`
-
-Approved next rules:
-
-- `parse(path)` returns a narrow Jayess object with stable path-component fields only
-- `format(parts)` accepts only the narrow object shape produced by Jayess path parsing helpers
-- `separator()` and `delimiter()` expose host path separators explicitly instead of requiring string literals in user code
-- glob helpers remain outside this slice
-- URL/path bridging remains outside this slice
 
 ## Current `jayess:process` Notes
 
 - `argv()` returns a Jayess array of process argument strings from runtime-owned argv storage
+- `cwd()` returns the current working directory
+- `getEnv(name)` returns an environment value string or `null`
+- `hasEnv(name)` returns whether a non-empty environment key is present
+- `envKeys()` returns deterministic environment variable names where the host exposes enumeration
+- `envEntries()` returns deterministic `{ key, value }` environment objects where the host exposes enumeration
 - `exit(code)` remains the only shipped exit primitive
 
 - env mutation helpers such as `setEnv(...)` or `deleteEnv(...)`
 - exit hooks or signals APIs
-
-## Next Approved `jayess:process` Slice
-
-The next approved `jayess:process` family is read-only environment inspection.
-
-Approved next exports:
-
-- `hasEnv(name)`
-- `envKeys()`
-- `envEntries()`
-
-Approved next rules:
-
-- the slice stays read-only and does not add env mutation helpers
-- subprocess execution remains owned by `jayess:subprocess`
-- exit hooks, signals, and process-control helpers remain outside this slice
 
 ## Next Active Host-Module Slice
 

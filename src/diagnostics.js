@@ -60,6 +60,9 @@ export function inferDiagnosticCode(phase, message) {
     return "JY_PARSE_ERROR";
   }
   if (phase === "semantic") {
+    if (/JavaScript-style 'undefined'/.test(message)) {
+      return "JY_SEMANTIC_UNDEFINED_UNSUPPORTED";
+    }
     if (/ambient global 'eval'/.test(message)) {
       return "JY_SEMANTIC_EVAL_UNSUPPORTED";
     }
@@ -68,6 +71,18 @@ export function inferDiagnosticCode(phase, message) {
     }
     if (/Unsupported built-in/.test(message)) {
       return "JY_SEMANTIC_UNSUPPORTED_BUILTIN";
+    }
+    if (/generator lowering/.test(message)) {
+      return "JY_SEMANTIC_GENERATOR_UNSUPPORTED";
+    }
+    if (/super/.test(message)) {
+      return "JY_SEMANTIC_SUPER_UNSUPPORTED";
+    }
+    if (/destructuring/.test(message)) {
+      return "JY_SEMANTIC_DESTRUCTURING_UNSUPPORTED";
+    }
+    if (/Unsupported .*operator/.test(message) || /Invalid .* target/.test(message)) {
+      return "JY_SEMANTIC_OPERATOR_UNSUPPORTED";
     }
     return "JY_SEMANTIC_ERROR";
   }

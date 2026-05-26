@@ -8,5 +8,7 @@ test("module graph resolves repository-owned built-in archive module", () => {
   const sources = graph.modules.map((moduleRecord) => moduleRecord.source);
 
   assert.ok(sources.includes("jayess:archive"));
+  assert.ok(sources.some((source) => source.endsWith("/stdlib/jayess/archive/tar-files.js")));
   assert.ok(sources.includes("jayess:bytes"));
+  assert.ok(sources.includes("jayess:fs"));
 });

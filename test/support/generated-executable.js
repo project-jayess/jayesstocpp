@@ -20,3 +20,17 @@ export function transpileAndRunFixture(t, fixturePath, tempName, mainSource) {
 
   return compileAndRunCppExecutable(cppFiles, targetDir, mainSource(targetDir, generatedEntryForFixture(fixturePath)));
 }
+
+export function runtimeHostSkipMessage({ moduleName, adapter, capability, host = process.platform }) {
+  const adapterLabel = adapter == null ? "host" : adapter;
+  const capabilityLabel = capability == null ? "runtime probe" : capability;
+  return `${moduleName} ${adapterLabel} ${capabilityLabel} is unavailable on this host (${host})`;
+}
+
+export function skipIfRuntimeUnavailableOutput(t, output, marker, details) {
+  if (output.trim() !== marker) {
+    return false;
+  }
+  t.skip(runtimeHostSkipMessage(details));
+  return true;
+}

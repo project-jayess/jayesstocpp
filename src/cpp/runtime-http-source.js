@@ -1,10 +1,34 @@
 import { getHttpRequestRuntimePublicFragment } from "./runtime-http-request-source.js";
 import { getHttpResponseRuntimePublicFragment, getHttpResponseRuntimeStateFragment } from "./runtime-http-response-source.js";
 import { getHttpServerRuntimePublicFragment, getHttpServerRuntimeStateFragment } from "./runtime-http-server-source.js";
+import { getHttpBodyRuntimeFragment } from "./runtime-http-body-source.js";
+import { getHttpClientRuntimeFragment } from "./runtime-http-client-source.js";
+import { getHttpConfigRuntimeFragment } from "./runtime-http-config-source.js";
+import { getHttpTlsRuntimeFragment } from "./runtime-http-tls-source.js";
 
 export function getHttpRuntimeHeaderFragment() {
   return `struct http_server_state;
 struct http_response_state;
+struct http_tls_client_request_data {
+  std::string method;
+  std::string url;
+  std::string host;
+  int port = 443;
+  std::string path;
+  std::unordered_map<std::string, std::string> headers;
+  std::string body;
+  std::string raw_request;
+  int timeout_milliseconds = -1;
+  bool tls_options_provided = false;
+};
+struct http_tls_client_response_data {
+  int status_code = 0;
+  std::unordered_map<std::string, std::string> headers;
+  std::string body;
+};
+using http_tls_client_callback = bool (*)(const http_tls_client_request_data& request, http_tls_client_response_data& response, std::string& error, void* userData);
+void http_tls_register_client_backend(http_tls_client_callback callback, void* userData);
+bool http_tls_client_backend_available();
 value http_request_async(const value& options);
 value http_response_text(const value& response);
 value http_response_bytes(const value& response);
@@ -14,6 +38,7 @@ value http_request_headers(const value& request);
 value http_request_body(const value& request);
 value http_create_server(const value& handler, const value& options);
 value http_close_server(const value& server);
+value http_server_state_value(const value& server);
 value http_set_status(const value& response, int statusCode);
 value http_set_header(const value& response, const std::string& name, const std::string& headerValue);
 value http_write_response(const value& response, const value& body);
@@ -31,35 +56,11 @@ export function getHttpRuntimeCppFragment() {
 ${getHttpResponseRuntimeStateFragment()}
 
 namespace {
-constexpr std::size_t HTTP_MAX_REQUEST_LINE_BYTES = 4096;
-constexpr std::size_t HTTP_MAX_HEADER_BYTES = 16384;
-constexpr std::size_t HTTP_MAX_HEADER_COUNT = 100;
-constexpr int HTTP_SERVER_READ_TIMEOUT_MILLISECONDS = 5000;
-constexpr int HTTP_SERVER_SHUTDOWN_GRACE_MILLISECONDS = 1000;
-constexpr std::size_t HTTP_DEFAULT_MAX_REQUEST_BODY_BYTES = 1024 * 1024;
-constexpr std::size_t HTTP_DEFAULT_MAX_RESPONSE_BODY_BYTES = 1024 * 1024;
+${getHttpConfigRuntimeFragment()}
 
-struct http_url_parts {
-  std::string host;
-  int port = 80;
-  std::string path = "/";
-};
+${getHttpTlsRuntimeFragment()}
 
-struct http_request_options {
-  std::string method = "GET";
-  std::string url;
-  std::unordered_map<std::string, std::string> headers;
-  std::string body;
-  int timeout_milliseconds = -1;
-};
-
-struct http_server_options {
-  std::string host = "127.0.0.1";
-  int port = 0;
-  int backlog = 16;
-  std::size_t max_request_body_bytes = HTTP_DEFAULT_MAX_REQUEST_BODY_BYTES;
-  std::size_t max_response_body_bytes = HTTP_DEFAULT_MAX_RESPONSE_BODY_BYTES;
-};
+${getHttpBodyRuntimeFragment()}
 
 struct http_client_request_error : std::runtime_error {
   int status_code;
@@ -144,31 +145,6 @@ std::string require_http_object_string_field(const value& input, const std::stri
   return require_http_string(require_http_object_field(input, key, message), message);
 }
 
-std::string http_body_text(const value& input) {
-  if (std::holds_alternative<std::monostate>(input)) {
-    return "";
-  }
-  if (std::holds_alternative<std::string>(input)) {
-    return std::get<std::string>(input);
-  }
-  if (std::holds_alternative<bytes_ptr>(input)) {
-    const auto bytes = std::get<bytes_ptr>(input);
-    return std::string(reinterpret_cast<const char*>(bytes->items.data()), bytes->items.size());
-  }
-  throw std::runtime_error("Jayess http body must be a string or bytes");
-}
-
-value http_bytes_from_text(const std::string& text) {
-  std::vector<unsigned char> items(text.begin(), text.end());
-  auto bytes = std::make_shared<bytes_value>();
-  bytes->items = std::move(items);
-  return bytes;
-}
-
-std::string http_body_binary(const value& input) {
-  return http_body_text(input);
-}
-
 std::string trim_http_header_value(std::string valueText) {
   if (!valueText.empty() && valueText.front() == ' ') {
     valueText.erase(valueText.begin());
@@ -196,10 +172,18 @@ std::size_t parse_http_content_length(const std::string& valueText) {
 
 std::size_t require_http_size_limit(const value& input, const std::string& message) {
   const auto numeric = require_http_integer(input, message);
-  if (numeric < 0) {
+  if (numeric <= 0) {
     throw std::runtime_error(message);
   }
   return static_cast<std::size_t>(numeric);
+}
+
+int require_http_positive_milliseconds(const value& input, const std::string& message) {
+  const auto numeric = require_http_integer(input, message);
+  if (numeric <= 0) {
+    throw std::runtime_error(message);
+  }
+  return numeric;
 }
 
 http_parsed_request_head parse_http_request_head(const std::string& headerText) {
@@ -293,36 +277,7 @@ std::unordered_map<std::string, std::string> read_http_headers_option(const valu
   return headers;
 }
 
-http_url_parts parse_http_url(const std::string& url) {
-  const std::string prefix = "http://";
-  if (url.rfind(prefix, 0) != 0) {
-    throw std::runtime_error("Jayess http request supports only http:// URLs");
-  }
-  const auto hostStart = prefix.size();
-  const auto pathStart = url.find('/', hostStart);
-  const auto hostPort = url.substr(hostStart, pathStart == std::string::npos ? std::string::npos : pathStart - hostStart);
-  if (hostPort.empty()) {
-    throw std::runtime_error("Jayess http request URL must include a host");
-  }
-
-  http_url_parts parts;
-  const auto colon = hostPort.find(':');
-  if (colon == std::string::npos) {
-    parts.host = hostPort;
-  } else {
-    parts.host = hostPort.substr(0, colon);
-    const auto portText = hostPort.substr(colon + 1);
-    if (portText.empty()) {
-      throw std::runtime_error("Jayess http request URL has an invalid port");
-    }
-    parts.port = std::stoi(portText);
-  }
-  if (parts.port < 0 || parts.port > 65535) {
-    throw std::runtime_error("Jayess http request port must be between 0 and 65535");
-  }
-  parts.path = pathStart == std::string::npos ? "/" : url.substr(pathStart);
-  return parts;
-}
+${getHttpClientRuntimeFragment()}
 
 http_request_options parse_http_request_options(const value& input) {
   if (!std::holds_alternative<object_ptr>(input)) {
@@ -351,6 +306,21 @@ http_request_options parse_http_request_options(const value& input) {
       if (options.timeout_milliseconds < 0) {
         throw std::runtime_error("Jayess http timeoutMillis option must be non-negative");
       }
+      continue;
+    }
+    if (key == "trustAnchors") {
+      validate_http_trust_anchor_containers(stored, "Jayess http request trustAnchors must be an array of certificate containers");
+      options.tls_options_provided = true;
+      continue;
+    }
+    if (key == "alpnProtocols") {
+      validate_http_alpn_protocols(stored);
+      options.tls_options_provided = true;
+      continue;
+    }
+    if (key == "tls") {
+      validate_http_client_tls_options(stored);
+      options.tls_options_provided = true;
       continue;
     }
     throw_unsupported_option("http request", key);
@@ -385,12 +355,36 @@ http_server_options parse_http_server_options(const value& input) {
       }
       continue;
     }
+    if (key == "maxHeaderBytes") {
+      options.max_header_bytes = require_http_size_limit(stored, "Jayess http server maxHeaderBytes option must be a positive integer");
+      continue;
+    }
+    if (key == "maxBodyBytes") {
+      options.max_request_body_bytes = require_http_size_limit(stored, "Jayess http server maxBodyBytes option must be a positive integer");
+      continue;
+    }
     if (key == "maxRequestBodyBytes") {
-      options.max_request_body_bytes = require_http_size_limit(stored, "Jayess http server maxRequestBodyBytes option must be a non-negative integer");
+      options.max_request_body_bytes = require_http_size_limit(stored, "Jayess http server maxRequestBodyBytes option must be a positive integer");
       continue;
     }
     if (key == "maxResponseBodyBytes") {
-      options.max_response_body_bytes = require_http_size_limit(stored, "Jayess http server maxResponseBodyBytes option must be a non-negative integer");
+      options.max_response_body_bytes = require_http_size_limit(stored, "Jayess http server maxResponseBodyBytes option must be a positive integer");
+      continue;
+    }
+    if (key == "idleTimeoutMillis") {
+      options.idle_timeout_milliseconds = require_http_positive_milliseconds(stored, "Jayess http server idleTimeoutMillis option must be a positive integer");
+      continue;
+    }
+    if (key == "headerTimeoutMillis") {
+      options.header_timeout_milliseconds = require_http_positive_milliseconds(stored, "Jayess http server headerTimeoutMillis option must be a positive integer");
+      continue;
+    }
+    if (key == "bodyTimeoutMillis") {
+      options.body_timeout_milliseconds = require_http_positive_milliseconds(stored, "Jayess http server bodyTimeoutMillis option must be a positive integer");
+      continue;
+    }
+    if (key == "tls") {
+      options.tls_enabled = validate_http_server_tls_options(stored);
       continue;
     }
     throw_unsupported_option("http server", key);
@@ -570,14 +564,14 @@ void http_server_release_client(const http_server_ptr& server, std::intptr_t cli
   }
 }
 
-void http_configure_server_client_socket(std::intptr_t fd) {
+void http_configure_server_client_socket(std::intptr_t fd, int timeoutMilliseconds) {
 #ifdef _WIN32
-  const DWORD timeout = static_cast<DWORD>(HTTP_SERVER_READ_TIMEOUT_MILLISECONDS);
+  const DWORD timeout = static_cast<DWORD>(timeoutMilliseconds);
   ::setsockopt(http_socket_from_handle(fd), SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&timeout), sizeof(timeout));
 #else
   timeval timeout{};
-  timeout.tv_sec = HTTP_SERVER_READ_TIMEOUT_MILLISECONDS / 1000;
-  timeout.tv_usec = (HTTP_SERVER_READ_TIMEOUT_MILLISECONDS % 1000) * 1000;
+  timeout.tv_sec = timeoutMilliseconds / 1000;
+  timeout.tv_usec = (timeoutMilliseconds % 1000) * 1000;
   ::setsockopt(static_cast<int>(fd), SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 #endif
 }
@@ -645,16 +639,17 @@ std::string decode_http_chunked_body(const std::string& body) {
   }
 }
 
-std::string http_recv_request_head(std::intptr_t fd) {
+std::string http_recv_request_head(std::intptr_t fd, std::size_t maxHeaderBytes, int idleTimeoutMilliseconds, int headerTimeoutMilliseconds) {
   std::string text;
   char buffer[1024];
   while (text.find("\\r\\n\\r\\n") == std::string::npos) {
-    const auto count = http_recv_some(fd, buffer, sizeof(buffer), "Jayess http request headers timed out");
+    http_configure_server_client_socket(fd, text.empty() ? idleTimeoutMilliseconds : headerTimeoutMilliseconds);
+    const auto count = http_recv_some(fd, buffer, sizeof(buffer), text.empty() ? "Jayess http request idle timed out" : "Jayess http request headers timed out");
     if (count <= 0) {
       break;
     }
     text.append(buffer, static_cast<std::size_t>(count));
-    if (text.size() > HTTP_MAX_HEADER_BYTES + 4) {
+    if (text.size() > maxHeaderBytes + 4) {
       throw_http_client_request_error(431, "Jayess http request headers exceed the current limit");
     }
   }
@@ -662,21 +657,6 @@ std::string http_recv_request_head(std::intptr_t fd) {
     throw_http_client_request_error(400, "Jayess http request headers are incomplete");
   }
   return text;
-}
-
-std::string http_format_request(const http_request_options& options, const http_url_parts& url) {
-  std::ostringstream request;
-  request << options.method << " " << url.path << " HTTP/1.1\\r\\n";
-  request << "Host: " << url.host << "\\r\\n";
-  for (const auto& [name, valueText] : options.headers) {
-    request << name << ": " << valueText << "\\r\\n";
-  }
-  if (!options.body.empty()) {
-    request << "Content-Length: " << options.body.size() << "\\r\\n";
-  }
-  request << "Connection: close\\r\\n\\r\\n";
-  request << options.body;
-  return request.str();
 }
 
 value http_response_object_from_text(const std::string& text) {
@@ -725,6 +705,9 @@ value http_response_object_from_text(const std::string& text) {
 value http_request_blocking(const value& optionsValue) {
   const auto options = parse_http_request_options(optionsValue);
   const auto url = parse_http_url(options.url);
+  if (url.tls || options.tls_options_provided) {
+    return http_tls_request_blocking(options, url, http_format_request(options, url));
+  }
   auto fd = http_connect_socket(url.host, url.port);
   try {
     http_send_all(fd, http_format_request(options, url));
@@ -767,13 +750,18 @@ value http_request_object_from_text(const std::string& text) {
   });
 }
 
-std::string http_recv_request(std::intptr_t fd, std::size_t maxRequestBodyBytes) {
-  std::string requestText = http_recv_request_head(fd);
+std::string http_recv_request(std::intptr_t fd, const http_server_ptr& server) {
+  std::string requestText = http_recv_request_head(
+    fd,
+    server->max_header_bytes,
+    server->idle_timeout_milliseconds,
+    server->header_timeout_milliseconds
+  );
   const auto headerEnd = requestText.find("\\r\\n\\r\\n");
   const auto headerText = requestText.substr(0, headerEnd);
   const auto parsed = parse_http_request_head(headerText);
   const auto contentLength = parsed.content_length;
-  if (contentLength > maxRequestBodyBytes) {
+  if (contentLength > server->max_request_body_bytes) {
     throw_http_client_request_error(413, "Jayess http request body exceeded maxRequestBodyBytes");
   }
   const auto bodyStart = headerEnd + 4;
@@ -782,6 +770,7 @@ std::string http_recv_request(std::intptr_t fd, std::size_t maxRequestBodyBytes)
   }
   while (requestText.size() - bodyStart < contentLength) {
     char buffer[1024];
+    http_configure_server_client_socket(fd, server->body_timeout_milliseconds);
     const auto count = http_recv_some(fd, buffer, sizeof(buffer), "Jayess http request body timed out");
     if (count <= 0) {
       break;
@@ -872,15 +861,15 @@ void http_send_response(const http_response_ptr& response) {
   response->ended = true;
 }
 
-void http_accept_once(const http_server_ptr& server, std::intptr_t clientFd, value handler, std::size_t maxRequestBodyBytes, std::size_t maxResponseBodyBytes) {
+void http_accept_once(const http_server_ptr& server, std::intptr_t clientFd, value handler) {
   if (clientFd < 0) {
     return;
   }
   auto response = std::make_shared<http_response_state>();
   response->fd = clientFd;
-  response->max_body_bytes = maxResponseBodyBytes;
+  response->max_body_bytes = server->max_response_body_bytes;
   try {
-    const auto requestText = http_recv_request(clientFd, maxRequestBodyBytes);
+    const auto requestText = http_recv_request(clientFd, server);
     const auto produced = call(handler, http_request_object_from_text(requestText), value(response));
     if (is_async(produced)) {
       await_sync(produced);
@@ -950,8 +939,8 @@ void http_accept_loop(http_server_ptr server, value handler) {
       markExitedUnlocked();
       return;
     }
-    http_configure_server_client_socket(clientFd);
-    http_accept_once(server, clientFd, handler, server->max_request_body_bytes, server->max_response_body_bytes);
+    http_configure_server_client_socket(clientFd, server->idle_timeout_milliseconds);
+    http_accept_once(server, clientFd, handler);
   }
 }
 } // namespace

@@ -6,6 +6,9 @@ export function serveProbe(port) {
   }, {
     host: "127.0.0.1",
     port: port,
-    backlog: 4
+    backlog: 4,
+    idleTimeoutMillis: 5000,
+    headerTimeoutMillis: 5000,
+    bodyTimeoutMillis: 5000
   });
 }

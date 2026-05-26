@@ -1,3 +1,7 @@
+import { getWindowWaylandBufferCppFragment } from "./runtime-window-wayland-buffer-source.js";
+import { getWindowWaylandInputCppFragment } from "./runtime-window-wayland-input-source.js";
+import { getWindowWaylandRegistryCppFragment } from "./runtime-window-wayland-registry-source.js";
+
 export function getWindowWaylandAdapterCppFragment() {
   return `struct wl_proxy;
 struct wl_display;
@@ -8,9 +12,14 @@ struct wl_shm;
 struct wl_shm_pool;
 struct wl_buffer;
 struct wl_array;
+struct wl_seat;
+struct wl_pointer;
+struct wl_keyboard;
 struct xdg_wm_base;
 struct xdg_surface;
 struct xdg_toplevel;
+
+using wl_fixed_t = std::int32_t;
 
 struct wl_message {
   const char* name;
@@ -36,6 +45,27 @@ struct wl_array {
 struct wl_registry_listener {
   void (*global)(void* data, wl_registry* registry, std::uint32_t name, const char* interface, std::uint32_t version);
   void (*global_remove)(void* data, wl_registry* registry, std::uint32_t name);
+};
+
+struct wl_seat_listener {
+  void (*capabilities)(void* data, wl_seat* seat, std::uint32_t capabilities);
+  void (*name)(void* data, wl_seat* seat, const char* name);
+};
+
+struct wl_pointer_listener {
+  void (*enter)(void* data, wl_pointer* pointer, std::uint32_t serial, wl_surface* surface, wl_fixed_t surfaceX, wl_fixed_t surfaceY);
+  void (*leave)(void* data, wl_pointer* pointer, std::uint32_t serial, wl_surface* surface);
+  void (*motion)(void* data, wl_pointer* pointer, std::uint32_t time, wl_fixed_t surfaceX, wl_fixed_t surfaceY);
+  void (*button)(void* data, wl_pointer* pointer, std::uint32_t serial, std::uint32_t time, std::uint32_t button, std::uint32_t state);
+  void (*axis)(void* data, wl_pointer* pointer, std::uint32_t time, std::uint32_t axis, wl_fixed_t value);
+};
+
+struct wl_keyboard_listener {
+  void (*keymap)(void* data, wl_keyboard* keyboard, std::uint32_t format, int fd, std::uint32_t size);
+  void (*enter)(void* data, wl_keyboard* keyboard, std::uint32_t serial, wl_surface* surface, wl_array* keys);
+  void (*leave)(void* data, wl_keyboard* keyboard, std::uint32_t serial, wl_surface* surface);
+  void (*key)(void* data, wl_keyboard* keyboard, std::uint32_t serial, std::uint32_t time, std::uint32_t key, std::uint32_t state);
+  void (*modifiers)(void* data, wl_keyboard* keyboard, std::uint32_t serial, std::uint32_t modsDepressed, std::uint32_t modsLatched, std::uint32_t modsLocked, std::uint32_t group);
 };
 
 struct xdg_wm_base_listener {
@@ -85,6 +115,9 @@ struct jayess_wayland_window_host {
   wl_registry* registry = nullptr;
   wl_compositor* compositor = nullptr;
   wl_shm* shm = nullptr;
+  wl_seat* seat = nullptr;
+  wl_pointer* pointer = nullptr;
+  wl_keyboard* keyboard = nullptr;
   xdg_wm_base* wm_base = nullptr;
   wl_surface* surface = nullptr;
   xdg_surface* xdg_surface_object = nullptr;
@@ -95,6 +128,8 @@ struct jayess_wayland_window_host {
   int buffer_fd = -1;
   int buffer_width = 0;
   int buffer_height = 0;
+  int pointer_x = 0;
+  int pointer_y = 0;
   bool configured = false;
 };
 
@@ -106,6 +141,9 @@ const wl_interface wayland_wl_shm_pool_interface = {"wl_shm_pool", 1, 2, nullptr
 const wl_interface wayland_wl_surface_interface = {"wl_surface", 6, 11, nullptr, 2, nullptr};
 const wl_interface wayland_wl_compositor_interface = {"wl_compositor", 6, 4, nullptr, 0, nullptr};
 const wl_interface wayland_wl_shm_interface = {"wl_shm", 1, 1, nullptr, 1, nullptr};
+const wl_interface wayland_wl_pointer_interface = {"wl_pointer", 1, 1, nullptr, 5, nullptr};
+const wl_interface wayland_wl_keyboard_interface = {"wl_keyboard", 1, 1, nullptr, 5, nullptr};
+const wl_interface wayland_wl_seat_interface = {"wl_seat", 1, 3, nullptr, 2, nullptr};
 const wl_interface wayland_xdg_toplevel_interface = {"xdg_toplevel", 6, 14, nullptr, 4, nullptr};
 const wl_interface wayland_xdg_surface_interface = {"xdg_surface", 6, 5, nullptr, 1, nullptr};
 const wl_interface wayland_xdg_wm_base_interface = {"xdg_wm_base", 6, 4, nullptr, 1, nullptr};
@@ -183,44 +221,7 @@ void window_wayland_destroy_proxy(jayess_wayland_window_api& api, wl_proxy* prox
   api.proxy_destroy(proxy);
 }
 
-int window_wayland_create_shm_file(std::size_t size) {
-  const char* runtimeDir = std::getenv("XDG_RUNTIME_DIR");
-  const std::string baseDir = runtimeDir != nullptr && runtimeDir[0] != '\\0'
-    ? std::string(runtimeDir)
-    : std::string("/tmp");
-  std::string templatePath = baseDir + "/jayess-window-XXXXXX";
-  std::vector<char> mutablePath(templatePath.begin(), templatePath.end());
-  mutablePath.push_back('\\0');
-  const int fd = mkstemp(mutablePath.data());
-  if (fd < 0) {
-    return -1;
-  }
-  unlink(mutablePath.data());
-  if (ftruncate(fd, static_cast<off_t>(size)) != 0) {
-    close(fd);
-    return -1;
-  }
-  return fd;
-}
-
-void window_wayland_destroy_buffer_storage(jayess_wayland_window_host* host) {
-  auto& api = window_wayland_api();
-  if (host->buffer != nullptr) {
-    window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(host->buffer), 0, true);
-    host->buffer = nullptr;
-  }
-  if (host->mapped_pixels != nullptr && host->mapped_size > 0) {
-    munmap(host->mapped_pixels, host->mapped_size);
-    host->mapped_pixels = nullptr;
-    host->mapped_size = 0;
-  }
-  if (host->buffer_fd >= 0) {
-    close(host->buffer_fd);
-    host->buffer_fd = -1;
-  }
-  host->buffer_width = 0;
-  host->buffer_height = 0;
-}
+${getWindowWaylandBufferCppFragment()}
 
 void window_wayland_destroy_host(jayess_wayland_window_host* host) {
   if (host == nullptr) {
@@ -228,6 +229,9 @@ void window_wayland_destroy_host(jayess_wayland_window_host* host) {
   }
   auto& api = window_wayland_api();
   window_wayland_destroy_buffer_storage(host);
+  window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(host->keyboard), 0, true);
+  window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(host->pointer), 0, true);
+  window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(host->seat), 2, true);
   window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(host->xdg_toplevel_object), 0, true);
   window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(host->xdg_surface_object), 0, true);
   window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(host->surface), 0, true);
@@ -242,118 +246,9 @@ void window_wayland_destroy_host(jayess_wayland_window_host* host) {
   delete host;
 }
 
-void window_wayland_wm_base_ping(void* data, xdg_wm_base* wmBase, std::uint32_t serial) {
-  auto* host = static_cast<jayess_wayland_window_host*>(data);
-  auto& api = window_wayland_api();
-  api.proxy_marshal_flags(reinterpret_cast<wl_proxy*>(wmBase), 3, nullptr, 0, 0, serial);
-  if (host->display != nullptr) {
-    api.display_flush(host->display);
-  }
-}
+${getWindowWaylandInputCppFragment()}
 
-void window_wayland_xdg_surface_configure(void* data, xdg_surface* surface, std::uint32_t serial) {
-  auto* host = static_cast<jayess_wayland_window_host*>(data);
-  auto& api = window_wayland_api();
-  api.proxy_marshal_flags(reinterpret_cast<wl_proxy*>(surface), 4, nullptr, 0, 0, serial);
-  host->configured = true;
-  if (host->display != nullptr) {
-    api.display_flush(host->display);
-  }
-}
-
-void window_wayland_toplevel_configure(void* data, xdg_toplevel*, std::int32_t width, std::int32_t height, wl_array*) {
-  auto* host = static_cast<jayess_wayland_window_host*>(data);
-  if (width > 0 && height > 0) {
-    window_push_resize_event(host->window, width, height);
-  }
-}
-
-void window_wayland_toplevel_close(void* data, xdg_toplevel*) {
-  auto* host = static_cast<jayess_wayland_window_host*>(data);
-  if (!host->window->close_requested) {
-    window_push_close_event(host->window);
-  }
-}
-
-void window_wayland_registry_global(void* data, wl_registry* registry, std::uint32_t name, const char* interfaceName, std::uint32_t version) {
-  auto* host = static_cast<jayess_wayland_window_host*>(data);
-  auto& api = window_wayland_api();
-  if (std::strcmp(interfaceName, "wl_compositor") == 0 && host->compositor == nullptr) {
-    host->compositor = window_wayland_registry_bind<wl_compositor>(api, registry, name, &wayland_wl_compositor_interface, window_wayland_bind_version(version, 6));
-    return;
-  }
-  if (std::strcmp(interfaceName, "wl_shm") == 0 && host->shm == nullptr) {
-    host->shm = window_wayland_registry_bind<wl_shm>(api, registry, name, &wayland_wl_shm_interface, 1);
-    return;
-  }
-  if (std::strcmp(interfaceName, "xdg_wm_base") == 0 && host->wm_base == nullptr) {
-    host->wm_base = window_wayland_registry_bind<xdg_wm_base>(api, registry, name, &wayland_xdg_wm_base_interface, window_wayland_bind_version(version, 6));
-  }
-}
-
-void window_wayland_registry_global_remove(void*, wl_registry*, std::uint32_t) {}
-
-bool window_wayland_allocate_buffer(jayess_wayland_window_host* host, int width, int height) {
-  auto& api = window_wayland_api();
-  const auto byteCount = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U;
-  if (width <= 0 || height <= 0 || byteCount == 0) {
-    return false;
-  }
-  if (host->buffer != nullptr && host->buffer_width == width && host->buffer_height == height && host->mapped_pixels != nullptr) {
-    return true;
-  }
-  window_wayland_destroy_buffer_storage(host);
-  const int fd = window_wayland_create_shm_file(byteCount);
-  if (fd < 0) {
-    return false;
-  }
-  auto* mapped = static_cast<unsigned char*>(mmap(nullptr, byteCount, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0));
-  if (mapped == MAP_FAILED) {
-    close(fd);
-    return false;
-  }
-  auto* pool = reinterpret_cast<wl_shm_pool*>(api.proxy_marshal_flags(
-    reinterpret_cast<wl_proxy*>(host->shm),
-    0,
-    &wayland_wl_shm_pool_interface,
-    1,
-    0,
-    nullptr,
-    fd,
-    static_cast<std::int32_t>(byteCount)
-  ));
-  if (pool == nullptr) {
-    munmap(mapped, byteCount);
-    close(fd);
-    return false;
-  }
-  auto* buffer = reinterpret_cast<wl_buffer*>(api.proxy_marshal_flags(
-    reinterpret_cast<wl_proxy*>(pool),
-    0,
-    &wayland_wl_buffer_interface,
-    1,
-    0,
-    nullptr,
-    0,
-    width,
-    height,
-    width * 4,
-    jayess_wayland_shm_argb8888
-  ));
-  window_wayland_destroy_proxy(api, reinterpret_cast<wl_proxy*>(pool), 1, true);
-  if (buffer == nullptr) {
-    munmap(mapped, byteCount);
-    close(fd);
-    return false;
-  }
-  host->buffer = buffer;
-  host->mapped_pixels = mapped;
-  host->mapped_size = byteCount;
-  host->buffer_fd = fd;
-  host->buffer_width = width;
-  host->buffer_height = height;
-  return true;
-}
+${getWindowWaylandRegistryCppFragment()}
 
 void window_wayland_platform_create(const window_ptr& window) {
   auto& api = window_wayland_api();
@@ -369,26 +264,21 @@ void window_wayland_platform_create(const window_ptr& window) {
     window_wayland_destroy_host(host);
     throw_window_adapter_unavailable("Wayland", "wl_display_get_registry failed");
   }
-  static const wl_registry_listener registryListener = {
-    window_wayland_registry_global,
-    window_wayland_registry_global_remove
-  };
-  api.proxy_add_listener(
-    reinterpret_cast<wl_proxy*>(host->registry),
-    reinterpret_cast<void (**)(void)>(const_cast<wl_registry_listener*>(&registryListener)),
-    host
-  );
+  window_wayland_add_registry_listener(host);
   api.display_roundtrip(host->display);
-  if (host->compositor == nullptr || host->shm == nullptr || host->wm_base == nullptr) {
+  try {
+    window_wayland_require_registry_globals(host);
+  } catch (...) {
     window_wayland_destroy_host(host);
-    throw_window_adapter_unavailable("Wayland", "required wl_compositor, wl_shm, or xdg_wm_base globals were not advertised");
+    throw;
   }
-  static const xdg_wm_base_listener wmBaseListener = {window_wayland_wm_base_ping};
-  api.proxy_add_listener(
-    reinterpret_cast<wl_proxy*>(host->wm_base),
-    reinterpret_cast<void (**)(void)>(const_cast<xdg_wm_base_listener*>(&wmBaseListener)),
-    host
-  );
+  api.display_roundtrip(host->display);
+  try {
+    window_wayland_require_input_capabilities(host);
+  } catch (...) {
+    window_wayland_destroy_host(host);
+    throw;
+  }
   host->surface = reinterpret_cast<wl_surface*>(api.proxy_marshal_flags(
     reinterpret_cast<wl_proxy*>(host->compositor),
     0,
@@ -418,23 +308,7 @@ void window_wayland_platform_create(const window_ptr& window) {
     window_wayland_destroy_host(host);
     throw_window_adapter_unavailable("Wayland", "surface or xdg-shell object creation failed");
   }
-  static const xdg_surface_listener xdgSurfaceListener = {window_wayland_xdg_surface_configure};
-  static const xdg_toplevel_listener xdgToplevelListener = {
-    window_wayland_toplevel_configure,
-    window_wayland_toplevel_close,
-    nullptr,
-    nullptr
-  };
-  api.proxy_add_listener(
-    reinterpret_cast<wl_proxy*>(host->xdg_surface_object),
-    reinterpret_cast<void (**)(void)>(const_cast<xdg_surface_listener*>(&xdgSurfaceListener)),
-    host
-  );
-  api.proxy_add_listener(
-    reinterpret_cast<wl_proxy*>(host->xdg_toplevel_object),
-    reinterpret_cast<void (**)(void)>(const_cast<xdg_toplevel_listener*>(&xdgToplevelListener)),
-    host
-  );
+  window_wayland_add_shell_listeners(host);
   if (!window->title.empty()) {
     api.proxy_marshal_flags(reinterpret_cast<wl_proxy*>(host->xdg_toplevel_object), 2, nullptr, 0, 0, window->title.c_str());
   }
@@ -488,9 +362,7 @@ void window_wayland_platform_present(const window_ptr& window, const window_canv
   if (canvas.pixels->size() < expectedSize) {
     throw std::runtime_error("Jayess window present found an invalid canvas image buffer");
   }
-  if (!window_wayland_allocate_buffer(host, canvas.width, canvas.height)) {
-    throw std::runtime_error("Jayess window present could not allocate image upload buffer");
-  }
+  window_wayland_allocate_buffer(host, canvas.width, canvas.height);
   for (std::size_t offset = 0; offset < expectedSize; offset += 4U) {
     host->mapped_pixels[offset] = (*canvas.pixels)[offset + 2U];
     host->mapped_pixels[offset + 1U] = (*canvas.pixels)[offset + 1U];

@@ -16,3 +16,23 @@ compileTest("transpileFile built-in gui module project compiles with the availab
   compileCppFiles(cppFiles, targetDir);
   assert.ok(true);
 });
+
+compileTest("transpileFile built-in gui text input project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-gui-text-input-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/gui-text-input-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in gui form controls project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-gui-form-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/gui-form-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});

@@ -32,8 +32,14 @@ test("transpileFile emits dialog module runtime and native bridge output", (t) =
   assert.match(cppSource, /DIALOG_UNAVAILABLE_MESSAGE/);
   assert.match(cppSource, /dialog_async_result/);
   assert.match(cppSource, /dialog_require_options_object/);
+  assert.match(cppSource, /dialog_validate_supported_options/);
+  assert.match(cppSource, /dialog_open_file_multiple_option/);
   assert.match(cppSource, /dialog_validate_filters_option/);
   assert.match(cppSource, /dialog_validate_buttons_option/);
+  assert.match(cppSource, /JAYESS_OFN_ALLOWMULTISELECT/);
+  assert.match(cppSource, /setAllowsMultipleSelection:/);
+  assert.match(cppSource, /setNameFieldStringValue:/);
+  assert.match(cppSource, /setInformativeText:/);
   assert.match(cppSource, /dialog_windows_platform_available/);
   assert.match(cppSource, /dialog_macos_platform_available/);
   assert.match(cppSource, /NSOpenPanel/);

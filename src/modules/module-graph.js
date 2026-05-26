@@ -44,9 +44,11 @@ function throwUnsupportedPackageTarget(source, resolved, failure) {
 
 function describeUnsupportedPackageReason(failure, mappingKind) {
   const arrayLabel = mappingKind === "exports" ? "exports array" : "imports array";
+  const arrayTrace = mappingKind === "exports" ? failure?.exportArrayTrace : failure?.importArrayTrace;
 
   if (failure?.packageUnsupportedReason === "array-no-supported-target") {
-    return `; the ${arrayLabel} contains no supported transpileable target`;
+    const traceDetail = describeArrayTrace(arrayTrace);
+    return `; the ${arrayLabel} contains no supported transpileable target${traceDetail}`;
   }
   if (failure?.packageUnsupportedReason === "unsupported-conditions") {
     const checked = failure.exportConditionTrace ?? failure.importConditionTrace ?? [];
@@ -67,6 +69,25 @@ function describeUnsupportedPackageReason(failure, mappingKind) {
   }
 
   return "";
+}
+
+function describeConditionDecisions(decisions) {
+  if (!Array.isArray(decisions) || decisions.length === 0) {
+    return "";
+  }
+  return ` checked ${decisions.map((decision) => `${decision.condition}:${decision.reason}`).join(", ")}`;
+}
+
+function describeArrayTrace(trace) {
+  if (!Array.isArray(trace) || trace.length === 0) {
+    return "";
+  }
+  const entries = trace.map((entry) => {
+    const conditionDetail = describeConditionDecisions(entry.conditionDecisions);
+    const extensionDetail = entry.attemptedExtension != null && entry.attemptedExtension !== "" ? ` ${entry.attemptedExtension}` : "";
+    return `entry ${entry.index} ${entry.kind} ${entry.reason ?? "selected"}${extensionDetail}${conditionDetail}`;
+  });
+  return ` (${entries.join("; ")})`;
 }
 
 function throwPackageResolutionFailure(source, failure) {
@@ -267,12 +288,14 @@ export function buildModuleGraph(entryFilename) {
         packageExportCondition: classification.kind === "package" ? failure?.exportCondition : undefined,
         packageExportConditionTrace: classification.kind === "package" ? failure?.exportConditionTrace : undefined,
         packageExportRejectedConditions: classification.kind === "package" ? failure?.exportRejectedConditions : undefined,
+        packageExportConditionDecisions: classification.kind === "package" ? failure?.exportConditionDecisions : undefined,
         packageExportArrayTrace: classification.kind === "package" ? failure?.exportArrayTrace : undefined,
         packageImportKey: classification.kind === "package-import" ? failure?.importKey : undefined,
         packageImportPatternMatch: classification.kind === "package-import" ? failure?.importPatternMatch : undefined,
         packageImportCondition: classification.kind === "package-import" ? failure?.importCondition : undefined,
         packageImportConditionTrace: classification.kind === "package-import" ? failure?.importConditionTrace : undefined,
         packageImportRejectedConditions: classification.kind === "package-import" ? failure?.importRejectedConditions : undefined,
+        packageImportConditionDecisions: classification.kind === "package-import" ? failure?.importConditionDecisions : undefined,
         packageImportArrayTrace: classification.kind === "package-import" ? failure?.importArrayTrace : undefined,
         packageMainField: classification.kind === "package" ? failure?.mainField : undefined,
         packageResolutionTrace: classification.kind === "package" ? failure?.packageResolutionTrace : undefined,

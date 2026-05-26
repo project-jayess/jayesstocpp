@@ -42,6 +42,14 @@ export function objectOf(shape) {
   return { kind: "objectOf", shape: shape };
 }
 
+export function strictObjectOf(shape) {
+  return { kind: "objectOf", shape: shape, strict: true };
+}
+
+export function config(shape) {
+  return strictObjectOf(shape);
+}
+
 export function oneOf(values) {
   return { kind: "oneOf", values: values };
 }
@@ -123,6 +131,15 @@ function validateAt(schema, value, path) {
       var fieldResult = validateAt(fieldSchema, value[name], path + "." + name);
       if (!fieldResult.ok) {
         mergeErrors(objectErrors, fieldResult.errors);
+      }
+    }
+    if (schema.strict) {
+      var valueNames = keys(value);
+      for (var valueIndex = 0; valueIndex < valueNames.length; valueIndex = valueIndex + 1) {
+        var valueName = valueNames[valueIndex];
+        if (!objectHas(schema.shape, valueName)) {
+          objectErrors.push(path + "." + valueName + " is not allowed");
+        }
       }
     }
     if (objectErrors.length > 0) {

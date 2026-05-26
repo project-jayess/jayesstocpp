@@ -64,7 +64,7 @@ This is the authoritative quick standard-library/module matrix for shipped `jaye
 | `jayess:time` | monotonic and wall-clock helpers | time |
 | `jayess:toml` | focused TOML config parsing and formatting | object, string, number |
 | `jayess:url` | URL parse/format helpers | url |
-| `jayess:validate` | runtime schema validation helpers | validate, array, object |
+| `jayess:validate` | runtime schema and strict config validation helpers | validate, array, object |
 | `jayess:uuid` | UUID helpers | crypto, encoding, bytes |
 | `jayess:watch` | deterministic filesystem watcher handles | watch |
 | `jayess:window` | native windows, events, and canvas presentation | window, image |

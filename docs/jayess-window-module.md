@@ -12,6 +12,7 @@
 - `pollEvents(window)`
 - `requestFrame(window, callback, args)`
 - `cancelFrame(handle)`
+- `runFrame(window, state, callback, args)`
 - `present(window, canvas)`
 - `width(window)`
 - `height(window)`
@@ -31,11 +32,14 @@
 - `{ type: "resize", width, height }`
 - `{ type: "keyDown", key, code, pressed: true }`
 - `{ type: "keyUp", key, code, pressed: false }`
+- `{ type: "textInput", text }`
 - `{ type: "mouseMove", x, y }`
 - `{ type: "mouseDown", button, x, y, pressed: true }`
 - `{ type: "mouseUp", button, x, y, pressed: false }`
 
-Keys normalize letters to lowercase and preserve digits, arrows, escape, enter, tab, space, shift, control, alt, and meta. Unknown keys use `"unknown"`.
+Keys normalize letters to lowercase and preserve digits, arrows, escape, enter, tab, space, backspace, shift, control, alt, and meta. Unknown keys use `"unknown"`.
+
+`textInput` is emitted after a `keyDown` event when the normalized key maps to one focused text character. This is intentionally small: it covers deterministic printable text input for the first window adapters, while composition, IME pre-edit text, dead keys, and clipboard insertion remain outside the first window slice. GUI text widgets consume `textInput` for character insertion and keep special keys such as `Backspace` on the key-event path.
 
 Mouse buttons normalize to `"left"`, `"middle"`, `"right"`, or `"unknown"`.
 
@@ -45,6 +49,16 @@ Mouse buttons normalize to `"left"`, `"middle"`, `"right"`, or `"unknown"`.
 
 `cancelFrame(handle)` cancels a scheduled frame handle through the same underlying timer-cancellation path as `jayess:timers`.
 
+`runFrame(window, state, callback, args)` is the first ergonomic app-loop helper over `requestFrame(...)`. It returns a deterministic record:
+
+```js
+{ scheduled, done, handle, state }
+```
+
+When `shouldClose(window)` is already true, `scheduled` is `false`, `done` and `handle` are `null`, and the callback is not scheduled. Otherwise, the helper schedules one frame tick and calls `callback(window, state, ...args)`. The callback still owns `pollEvents(window)` explicitly.
+
+`jayess:gui` adds `runGuiFrame(window, windowState, canvas, callback, args)` for the common canvas GUI case. It is still a one-frame helper, not a hidden app loop. The callback contract receives the polled events explicitly as `callback(window, windowState, events, ...args)`. The helper updates GUI state from those events, runs the callback, draws and presents only when redraw is needed and the window is still open, and returns deterministic frame records with `rendered`, `presented`, `closed`, and `queuedActions` fields.
+
 The current platform-neutral lifecycle invariants are explicit:
 
 - `show(window)` is idempotent for an already shown open window
@@ -52,6 +66,8 @@ The current platform-neutral lifecycle invariants are explicit:
 - `close(window)` preserves already queued events, appends one final normalized close event when needed, marks the handle closed, and clears the shown state
 - `present(window, canvas)` records the presented software-buffer dimensions through the neutral runtime layer before the platform adapter uploads pixels
 - `requestFrame(window, callback, args)` shares the timer scheduler with `jayess:timers` but keeps `pollEvents(window)` explicit in user callback code
+- `runFrame(window, state, callback, args)` keeps the same explicit polling model while giving GUI loops a stable per-frame state/callback record
+- `jayess:gui` `runGuiFrame(window, windowState, canvas, callback, args)` keeps events visible in the callback contract while handling GUI update/draw/present for one frame
 
 ## Platform Boundary
 
@@ -61,6 +77,7 @@ The module is cross-platform by shape, but host support lives behind focused pla
 - Windows adapter
 - macOS adapter
 - Linux adapter
+- Linux/Wayland registry, input, and software-buffer helpers split by responsibility
 
 The current host-backed adapters are:
 
@@ -74,21 +91,28 @@ The Linux adapter boundary is now explicit in the project contract:
 - `x11` is one shipped Linux host-backed path
 - `wayland` is a separate shipped Linux adapter family with its own runtime fragment and host requirements
 
-That separation is deliberate. The public `jayess:window` API does not expose protocol-specific Wayland object names, registry details, surfaces, buffers, or seats. Those details must stay inside a later focused Wayland runtime fragment rather than leaking into Jayess source or into the shared neutral window layer.
+That separation is deliberate. The public `jayess:window` API does not expose protocol-specific Wayland object names, registry details, surfaces, buffers, or seats. Those details stay inside focused Wayland runtime fragments rather than leaking into Jayess source or into the shared neutral window layer. The current Wayland implementation keeps protocol setup, input listeners, and software-buffer upload in separate generated-runtime source fragments:
 
-The shipped adapters share the same public queue shape for close, resize, keyboard, mouse movement, and mouse button events. The current Cocoa slice is intentionally narrower than the Win32 and X11 slices: it provides real create/show/close/title/present behavior and focused NSEvent polling through the same normalized surface, while fuller host-backed parity is still a later refinement slice. The first Wayland slice is intentionally narrower than the X11 slice too: it covers create/show/close, title updates, resize/close normalization, and software-buffer presentation, but not keyboard/mouse normalization yet. If the required host libraries or display/session path are unavailable, the normalized unavailable diagnostic is used.
+- `src/cpp/runtime-window-wayland-source.js` for shared Wayland types, loader setup, host lifetime, and public adapter entry points
+- `src/cpp/runtime-window-wayland-registry-source.js` for registry discovery, required-global checks, and xdg-shell listener wiring
+- `src/cpp/runtime-window-wayland-input-source.js` for `wl_seat`, pointer, keyboard, close, and resize normalization
+- `src/cpp/runtime-window-wayland-buffer-source.js` for shared-memory upload buffer allocation and cleanup
+
+The shipped adapters share the same public queue shape for close, resize, keyboard, text input, mouse movement, and mouse button events. The Cocoa adapter polls `NSEvent` values for keyboard down/up, mouse movement, and mouse button down/up, then records the same normalized event objects as Win32 and X11. The Wayland adapter binds `wl_seat` when the compositor advertises it, creates pointer and keyboard listeners for advertised input capabilities, maps focused evdev-style key codes and pointer buttons, and records normalized Jayess events through the same queue helpers. Focus/minimize events stay deferred until all shipped adapters can expose deterministic, testable shapes without leaking platform-specific state. If the required host libraries, display/session path, compositor globals, input-seat capabilities, or shared-memory upload path are unavailable, the normalized unavailable diagnostic is used.
 
 The current automated executable checks cover two layers:
 
 - deterministic normalized unavailable diagnostics plus platform-neutral lifecycle/event-queue behavior on every host
-- a host-conditional Win32 runtime probe for real create/show/present/resize/close behavior plus keyboard and mouse event normalization when a Win32 adapter is available
-- a host-conditional Cocoa runtime probe for real create/show/present/close/title/poll behavior when a Cocoa adapter is available
-- a host-conditional Linux/X11 runtime probe for real create/show/present/resize/close behavior plus keyboard and mouse event normalization when an X11 adapter and display are actually available
-- a host-conditional Linux/Wayland runtime probe for real create/show/present/rename/close behavior when a Wayland compositor and `WAYLAND_DISPLAY` are actually available
+- a host-conditional Win32 runtime probe for real create/show/present/resize/close behavior plus keyboard, text input, and mouse event normalization when a Win32 adapter is available
+- a host-conditional Cocoa runtime probe for real create/show/present/close/title/poll behavior when a Cocoa adapter is available, plus output checks for normalized Cocoa keyboard and mouse bridge emission
+- a host-conditional Linux/X11 runtime probe for real create/show/present/resize/close behavior plus keyboard, text input, and mouse event normalization when an X11 adapter and display are actually available
+- a host-conditional Linux/Wayland runtime probe for real create/show/present/rename/close behavior when a Wayland compositor, `WAYLAND_DISPLAY`, and required input-seat capability path are actually available, plus output checks for normalized Wayland keyboard and pointer bridge emission
 
-Hosts without Win32, Cocoa, or X11 support, or without an available X11 display/session path, report those adapter-specific probes as clean skipped-host runtime checks rather than transpiler regressions.
+Hosts without Win32, Cocoa, X11, or Wayland support, or without an available display/session/input path, report those adapter-specific probes as clean skipped-host runtime checks rather than transpiler regressions.
 
 Generated runtime metadata now lists `win32`, `cocoa`, `x11`, and `wayland` as distinct `jayess:window` adapter families. The current linked-library hints include the shipped Win32/X11 path plus the first Wayland client requirement through `wayland-client`.
+
+The same metadata also records the normalized event families compiled into the generated project: `close`, `resize`, `key`, `text-input`, `pointer`, and `mouse-button`. This is capability metadata for the adapter-neutral queue shape, not a promise that every local host can open every adapter at runtime.
 
 For generated Linux projects, the metadata now reports the compiled adapter set explicitly:
 
@@ -111,13 +135,20 @@ The message keeps that stable prefix but now adds deliberate host detail where t
 - `... (macOS Cocoa adapter is not available on this host: NSWindow allocation failed)`
 - `... (Linux X11 adapter is not available on this host: XOpenDisplay failed)`
 - `... (Linux Wayland adapter is not available on this host: wl_display_connect failed)`
+- `... (Linux Wayland adapter is not available on this host: wl_compositor global was not advertised)`
+- `... (Linux Wayland adapter is not available on this host: wl_shm global was not advertised)`
+- `... (Linux Wayland adapter is not available on this host: xdg_wm_base global was not advertised)`
+- `... (Linux Wayland adapter is not available on this host: wl_seat global was not advertised for input event support)`
+- `... (Linux Wayland adapter is not available on this host: wl_seat did not advertise pointer or keyboard input capabilities)`
+- `... (Linux Wayland adapter is not available on this host: shared-memory upload file creation failed)`
+- `... (Linux Wayland adapter is not available on this host: wl_buffer creation failed)`
 - `... (Linux window support requires a usable X11 or Wayland adapter on this host)`
 
 ## Presentation
 
 `present(window, canvas)` validates that the second argument is a `jayess:canvas` object with a software image buffer, records the presented dimensions, and routes presentation through the platform adapter boundary. It should not make `jayess:canvas` depend on native windows or GPU APIs.
 
-The Windows adapter creates, shows, renames, closes, and polls a native Win32 window through dynamically loaded `user32` functions, then uploads the software RGBA canvas buffer through a narrow GDI DIB path. The Cocoa adapter creates, shows, renames, closes, and presents through dynamically loaded `libobjc` / `AppKit` message sends, using `NSWindow`, `NSImageView`, `NSBitmapImageRep`, and `NSImage` for the first software-buffer slice. The Linux adapter now has two separate host-backed paths: X11 and Wayland. The Wayland path keeps compositor/registry/surface/buffer details inside its own runtime fragment, uses a shared-memory software buffer, and normalizes close plus resize events through the same Jayess queue shape. Canvas presentation uploads the software RGBA canvas buffer through the adapter-specific upload path, records the presented canvas dimensions, and flushes or updates the host window. If the required host libraries, display/session path, upload functions, compositor protocol support, or host window are unavailable, `present` reports the normalized host-unavailable diagnostic.
+The Windows adapter creates, shows, renames, closes, and polls a native Win32 window through dynamically loaded `user32` functions, then uploads the software RGBA canvas buffer through a narrow GDI DIB path. The Cocoa adapter creates, shows, renames, closes, and presents through dynamically loaded `libobjc` / `AppKit` message sends, using `NSWindow`, `NSImageView`, `NSBitmapImageRep`, and `NSImage` for the first software-buffer slice. The Linux adapter now has two separate host-backed paths: X11 and Wayland. The Wayland path keeps compositor/registry/surface/buffer/seat details inside its own runtime fragment, uses a shared-memory software buffer, and normalizes close, resize, keyboard, text input, pointer movement, and pointer button events through the same Jayess queue shape. Canvas presentation uploads the software RGBA canvas buffer through the adapter-specific upload path, records the presented canvas dimensions, and flushes or updates the host window. If the required host libraries, display/session path, upload functions, compositor protocol support, input-seat capabilities, or host window are unavailable, `present` reports the normalized host-unavailable diagnostic.
 
 ## Boundaries
 

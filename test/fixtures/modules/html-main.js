@@ -1,4 +1,4 @@
-import { escapeAttribute, escapeText, fragment, tag } from "jayess:html";
+import { escapeAttribute, escapeText, fragment, sanitizeSubset, tag } from "jayess:html";
 
 export function run() {
   var text = escapeText("Jayess <native> & C++");
@@ -15,7 +15,8 @@ export function run() {
     attr,
     fragment(["a", "b", "c"]),
     link,
-    page
+    page,
+    sanitizeSubset("<p>Hello <script>bad()</script><a href=\"javascript:bad\">bad</a><a href=\"/ok\">ok</a></p>")
   ];
 }
 

@@ -6,12 +6,12 @@ value fs_write_text_file(const std::string& pathText, const std::string& text);
 value fs_write_bytes_file(const std::string& pathText, const value& bytes);
 value fs_append_text_file(const std::string& pathText, const std::string& text);
 value fs_copy_path(const std::string& fromPathText, const std::string& toPathText);
-value fs_copy_path_recursive(const std::string& fromPathText, const std::string& toPathText);
+value fs_copy_path_recursive(const std::string& fromPathText, const std::string& toPathText, const value& optionsValue);
 value fs_create_directories(const std::string& pathText);
 value fs_remove_path(const std::string& pathText);
-value fs_remove_path_recursive(const std::string& pathText);
+value fs_remove_path_recursive(const std::string& pathText, const value& optionsValue);
 value fs_list_directory(const std::string& pathText);
-value fs_walk_directory(const std::string& pathText);
+value fs_walk_directory(const std::string& pathText, const value& optionsValue);
 value fs_rename_path(const std::string& fromPathText, const std::string& toPathText);
 value fs_stat_path(const std::string& pathText);
 value fs_exists_path_async(const std::string& pathText);
@@ -21,12 +21,12 @@ value fs_write_text_file_async(const std::string& pathText, const std::string& t
 value fs_write_bytes_file_async(const std::string& pathText, const value& bytes);
 value fs_append_text_file_async(const std::string& pathText, const std::string& text);
 value fs_copy_path_async(const std::string& fromPathText, const std::string& toPathText);
-value fs_copy_path_recursive_async(const std::string& fromPathText, const std::string& toPathText);
+value fs_copy_path_recursive_async(const std::string& fromPathText, const std::string& toPathText, const value& optionsValue);
 value fs_create_directories_async(const std::string& pathText);
 value fs_remove_path_async(const std::string& pathText);
-value fs_remove_path_recursive_async(const std::string& pathText);
+value fs_remove_path_recursive_async(const std::string& pathText, const value& optionsValue);
 value fs_list_directory_async(const std::string& pathText);
-value fs_walk_directory_async(const std::string& pathText);
+value fs_walk_directory_async(const std::string& pathText, const value& optionsValue);
 value fs_rename_path_async(const std::string& fromPathText, const std::string& toPathText);
 value fs_stat_path_async(const std::string& pathText);`;
 }
@@ -37,8 +37,62 @@ std::filesystem::path fs_require_path(const std::string& pathText) {
   return std::filesystem::path(pathText);
 }
 
+void fs_validate_recursive_options(const value& optionsValue, const std::string& operation) {
+  if (std::holds_alternative<std::monostate>(optionsValue)) {
+    return;
+  }
+  if (!std::holds_alternative<object_ptr>(optionsValue)) {
+    throw std::runtime_error("Jayess fs " + operation + " options must be an object");
+  }
+
+  const auto options = std::get<object_ptr>(optionsValue);
+  for (const auto& [key, stored] : options->fields) {
+    (void)stored;
+    throw std::runtime_error("Jayess fs " + operation + " option is unsupported: " + key);
+  }
+}
+
+std::filesystem::path fs_require_recursive_path(const std::string& pathText, const std::string& operation) {
+  if (pathText.empty()) {
+    throw std::runtime_error("Jayess fs " + operation + " expects a non-empty path");
+  }
+
+  const auto pathValue = fs_require_path(pathText);
+  for (const auto& part : pathValue) {
+    if (part == "..") {
+      throw std::runtime_error("Jayess fs " + operation + " rejects path traversal");
+    }
+  }
+  return pathValue;
+}
+
+bool fs_path_contains_path(const std::filesystem::path& parentPath, const std::filesystem::path& childPath) {
+  const auto parent = std::filesystem::absolute(parentPath).lexically_normal();
+  const auto child = std::filesystem::absolute(childPath).lexically_normal();
+  auto parentIterator = parent.begin();
+  auto childIterator = child.begin();
+  for (; parentIterator != parent.end(); ++parentIterator, ++childIterator) {
+    if (childIterator == child.end() || *parentIterator != *childIterator) {
+      return false;
+    }
+  }
+  return true;
+}
+
 std::string fs_path_string_value(const std::filesystem::path& pathValue) {
   return pathValue.generic_string();
+}
+
+std::string fs_entry_type(const std::filesystem::directory_entry& entry) {
+  std::error_code error;
+  if (entry.is_regular_file(error) && !error) {
+    return "file";
+  }
+  error.clear();
+  if (entry.is_directory(error) && !error) {
+    return "directory";
+  }
+  return "other";
 }
 
 std::vector<value> fs_string_values(const std::vector<std::string>& entries) {
@@ -152,10 +206,16 @@ value fs_copy_path(const std::string& fromPathText, const std::string& toPathTex
   return value(std::monostate{});
 }
 
-value fs_copy_path_recursive(const std::string& fromPathText, const std::string& toPathText) {
+value fs_copy_path_recursive(const std::string& fromPathText, const std::string& toPathText, const value& optionsValue) {
+  fs_validate_recursive_options(optionsValue, "copyRecursive");
+  const auto fromPath = fs_require_recursive_path(fromPathText, "copyRecursive");
+  const auto toPath = fs_require_recursive_path(toPathText, "copyRecursive");
+  if (fs_path_contains_path(fromPath, toPath)) {
+    throw std::runtime_error("Jayess fs copyRecursive target cannot be inside source tree");
+  }
   std::filesystem::copy(
-    fs_require_path(fromPathText),
-    fs_require_path(toPathText),
+    fromPath,
+    toPath,
     std::filesystem::copy_options::recursive | std::filesystem::copy_options::overwrite_existing
   );
   return value(std::monostate{});
@@ -169,8 +229,9 @@ value fs_remove_path(const std::string& pathText) {
   return std::filesystem::remove(fs_require_path(pathText));
 }
 
-value fs_remove_path_recursive(const std::string& pathText) {
-  return static_cast<double>(std::filesystem::remove_all(fs_require_path(pathText)));
+value fs_remove_path_recursive(const std::string& pathText, const value& optionsValue) {
+  fs_validate_recursive_options(optionsValue, "removeRecursive");
+  return static_cast<double>(std::filesystem::remove_all(fs_require_recursive_path(pathText, "removeRecursive")));
 }
 
 value fs_list_directory(const std::string& pathText) {
@@ -182,14 +243,24 @@ value fs_list_directory(const std::string& pathText) {
   return make_array(fs_string_values(entryNames));
 }
 
-value fs_walk_directory(const std::string& pathText) {
-  const auto root = fs_require_path(pathText);
-  std::vector<std::string> entryNames;
+value fs_walk_directory(const std::string& pathText, const value& optionsValue) {
+  fs_validate_recursive_options(optionsValue, "walk");
+  const auto root = fs_require_recursive_path(pathText, "walk");
+  std::vector<value> entries;
   for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
-    entryNames.push_back(fs_path_string_value(std::filesystem::relative(entry.path(), root)));
+    const auto relativePath = fs_path_string_value(std::filesystem::relative(entry.path(), root));
+    entries.push_back(make_object({
+      {"path", fs_path_string_value(entry.path())},
+      {"relativePath", relativePath},
+      {"type", fs_entry_type(entry)}
+    }));
   }
-  std::sort(entryNames.begin(), entryNames.end());
-  return make_array(fs_string_values(entryNames));
+  std::sort(entries.begin(), entries.end(), [](const value& left, const value& right) {
+    const auto leftObject = std::get<object_ptr>(left);
+    const auto rightObject = std::get<object_ptr>(right);
+    return std::get<std::string>(leftObject->fields["relativePath"]) < std::get<std::string>(rightObject->fields["relativePath"]);
+  });
+  return make_array(std::move(entries));
 }
 
 value fs_rename_path(const std::string& fromPathText, const std::string& toPathText) {
@@ -263,8 +334,8 @@ value fs_copy_path_async(const std::string& fromPathText, const std::string& toP
   return fs_async_result([fromPathText, toPathText]() { return fs_copy_path(fromPathText, toPathText); });
 }
 
-value fs_copy_path_recursive_async(const std::string& fromPathText, const std::string& toPathText) {
-  return fs_async_result([fromPathText, toPathText]() { return fs_copy_path_recursive(fromPathText, toPathText); });
+value fs_copy_path_recursive_async(const std::string& fromPathText, const std::string& toPathText, const value& optionsValue) {
+  return fs_async_result([fromPathText, toPathText, optionsValue]() { return fs_copy_path_recursive(fromPathText, toPathText, optionsValue); });
 }
 
 value fs_create_directories_async(const std::string& pathText) {
@@ -275,16 +346,16 @@ value fs_remove_path_async(const std::string& pathText) {
   return fs_async_result([pathText]() { return fs_remove_path(pathText); });
 }
 
-value fs_remove_path_recursive_async(const std::string& pathText) {
-  return fs_async_result([pathText]() { return fs_remove_path_recursive(pathText); });
+value fs_remove_path_recursive_async(const std::string& pathText, const value& optionsValue) {
+  return fs_async_result([pathText, optionsValue]() { return fs_remove_path_recursive(pathText, optionsValue); });
 }
 
 value fs_list_directory_async(const std::string& pathText) {
   return fs_async_result([pathText]() { return fs_list_directory(pathText); });
 }
 
-value fs_walk_directory_async(const std::string& pathText) {
-  return fs_async_result([pathText]() { return fs_walk_directory(pathText); });
+value fs_walk_directory_async(const std::string& pathText, const value& optionsValue) {
+  return fs_async_result([pathText, optionsValue]() { return fs_walk_directory(pathText, optionsValue); });
 }
 
 value fs_rename_path_async(const std::string& fromPathText, const std::string& toPathText) {

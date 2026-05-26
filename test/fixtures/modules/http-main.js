@@ -38,7 +38,11 @@ import {
 } from "jayess:http";
 import { createCancellationToken } from "jayess:async";
 import { length as bytesLength } from "jayess:bytes";
+import { certificateFromPem, privateKeyFromPem, trustAnchorsFromPem } from "jayess:crypto";
 import { close as closeStream, openRead } from "jayess:stream";
+
+const TEST_CERTIFICATE = "-----BEGIN CERTIFICATE-----\nYWJj\n-----END CERTIFICATE-----";
+const TEST_PRIVATE_KEY = "-----BEGIN PRIVATE KEY-----\nYWJj\n-----END PRIVATE KEY-----";
 
 export async function fetchText(url) {
   var response = await request({
@@ -224,4 +228,59 @@ export async function streamResponseHelpers(response, filename) {
   await sendBytesStream(response, bytesReader, null, 4);
   await closeStream(bytesReader);
   return null;
+}
+
+export function httpsServerUnavailable(port) {
+  return createServer(function(requestValue, response) {
+    return sendText(response, "secure", null);
+  }, {
+    host: "127.0.0.1",
+    port: port,
+    tls: {
+      certificate: certificateFromPem(TEST_CERTIFICATE),
+      privateKey: privateKeyFromPem(TEST_PRIVATE_KEY),
+      trustAnchors: trustAnchorsFromPem(TEST_CERTIFICATE)
+    }
+  });
+}
+
+export function invalidHttpsServerCertificate(port) {
+  return createServer(function(requestValue, response) {
+    return sendText(response, "secure", null);
+  }, {
+    host: "127.0.0.1",
+    port: port,
+    tls: {
+      certificate: privateKeyFromPem(TEST_PRIVATE_KEY),
+      privateKey: privateKeyFromPem(TEST_PRIVATE_KEY)
+    }
+  });
+}
+
+export function httpsRequestUnavailable() {
+  return request({
+    method: "GET",
+    url: "https://example.test/",
+    tls: {
+      trustAnchors: trustAnchorsFromPem(TEST_CERTIFICATE)
+    }
+  });
+}
+
+export function invalidHttpsRequestTrustAnchors() {
+  return request({
+    method: "GET",
+    url: "https://example.test/",
+    trustAnchors: [privateKeyFromPem(TEST_PRIVATE_KEY)]
+  });
+}
+
+export function unsupportedHttpsAlpn() {
+  return request({
+    method: "GET",
+    url: "https://example.test/",
+    tls: {
+      alpnProtocols: ["h2"]
+    }
+  });
 }

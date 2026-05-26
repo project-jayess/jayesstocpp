@@ -46,6 +46,7 @@ struct window_canvas_pixels {
 void window_push_close_event(const window_ptr& window);
 void window_push_resize_event(const window_ptr& window, int width, int height);
 void window_push_key_event(const window_ptr& window, const std::string& type, const std::string& key);
+void window_push_text_input_event(const window_ptr& window, const std::string& text);
 void window_push_mouse_move_event(const window_ptr& window, int x, int y);
 void window_push_mouse_button_event(const window_ptr& window, const std::string& type, int button, int x, int y);
 
@@ -154,7 +155,7 @@ std::string window_normalize_key(const std::string& key) {
     }
   }
   if (key == "ArrowLeft" || key == "ArrowRight" || key == "ArrowUp" || key == "ArrowDown" ||
-      key == "Escape" || key == "Enter" || key == "Tab" || key == "Space" ||
+      key == "Escape" || key == "Enter" || key == "Tab" || key == "Space" || key == "Backspace" ||
       key == "Shift" || key == "Control" || key == "Alt" || key == "Meta") {
     return key;
   }
@@ -231,6 +232,19 @@ void window_push_key_event(const window_ptr& window, const std::string& type, co
     {"key", normalized},
     {"code", window_event_code_for_key(normalized)},
     {"pressed", type == "keyDown"}
+  }));
+  if (type == "keyDown" && normalized.size() == 1) {
+    window_push_text_input_event(window, normalized);
+  }
+}
+
+void window_push_text_input_event(const window_ptr& window, const std::string& text) {
+  if (text.empty()) {
+    return;
+  }
+  window->events.push_back(window_event({
+    {"type", std::string("textInput")},
+    {"text", text}
   }));
 }
 

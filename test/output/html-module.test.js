@@ -20,6 +20,7 @@ test("transpileFile emits jayess:html and dependency metadata", (t) => {
 
   assert.ok(result.files.includes(modulePath));
   assert.ok(fs.existsSync(modulePath));
+  assert.ok(result.files.includes(path.join(targetDir, "generated-stdlib", "jayess", "html", "stdlib_jayess_html_sanitize_js.cpp")));
   assert.match(plan, /"source": "jayess:html"/);
   assert.match(plan, /"source": "jayess:string"/);
   assert.match(plan, /"source": "jayess:array"/);

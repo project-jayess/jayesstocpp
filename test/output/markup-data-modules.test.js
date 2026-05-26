@@ -22,4 +22,13 @@ test("transpileFile emits markup and data standard-library modules", (t) => {
     assert.ok(fs.existsSync(modulePath), `missing ${modulePath}`);
     assert.match(plan, new RegExp(`"source": "jayess:${subpath}"`));
   }
+
+  const sanitizePath = path.join(
+    targetDir,
+    "generated-stdlib",
+    "jayess",
+    "html",
+    "stdlib_jayess_html_sanitize_js.cpp"
+  );
+  assert.ok(result.files.includes(sanitizePath), "missing generated html sanitizer helper");
 });

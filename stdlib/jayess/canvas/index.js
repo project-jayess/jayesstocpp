@@ -5,8 +5,6 @@ import {
   copy as copyImage,
   create as createImage,
   fill as fillImage,
-  fillRect as fillImageRect,
-  fillRectAlpha as fillImageRectAlpha,
   getPixel as getImagePixel,
   height as imageHeight,
   savePpm as saveImagePpm,
@@ -17,16 +15,39 @@ import {
   pointInsidePolygon,
   polygonBounds
 } from "./polygon-helpers.js";
+import {
+  clamp,
+  maxValue,
+  minValue,
+  sign
+} from "./scalar-helpers.js";
+import {
+  copyDrawingState,
+  copyDrawingStateStack,
+  defaultDrawingState,
+  popDrawingState,
+  pushDrawingState,
+  scaleState,
+  transformedPoint
+} from "./state.js";
+export { parseHtml } from "./html-parser.js";
+export { parseCss } from "./css-parser.js";
+export { createHtmlDocument } from "./html-style.js";
+export { hitTestHtml, hitTestHtmlNode } from "./html-hit-test.js";
+import { layoutHtml as layoutHtmlDocument } from "./html-layout.js";
+import { paintHtmlDocument } from "./html-paint.js";
 
 function fail(message) {
   throw message;
 }
 
-function makeCanvas(image, title, clipStack) {
+function makeCanvas(image, title, clipStack, state, stateStack) {
   return {
     image: image,
     title: title,
-    clipStack: clipStack
+    clipStack: clipStack,
+    state: state,
+    stateStack: stateStack
   };
 }
 
@@ -81,8 +102,16 @@ function defaultStrokeWidth() {
   return 1;
 }
 
+function defaultTextSize() {
+  return 7;
+}
+
 function defaultClipStack() {
   return [];
+}
+
+function defaultState() {
+  return defaultDrawingState(defaultBackground(), defaultTextColor(), defaultStrokeWidth(), defaultTextColor(), defaultTextSize());
 }
 
 function copyClipStack(stack) {
@@ -91,16 +120,6 @@ function copyClipStack(stack) {
     copied.push(stack[index]);
   }
   return copied;
-}
-
-function sign(value) {
-  if (value < 0) {
-    return -1;
-  }
-  if (value > 0) {
-    return 1;
-  }
-  return 0;
 }
 
 function blendColor(destination, source) {
@@ -114,19 +133,58 @@ function blendColor(destination, source) {
   );
 }
 
+function currentState(canvas) {
+  return requireCanvas(canvas).state;
+}
+
+function transformPoint(canvas, x, y) {
+  return transformedPoint(currentState(canvas), x, y, round);
+}
+
+function fillColorValue(canvas, color) {
+  if (color === null) {
+    return currentState(canvas).fillColor;
+  }
+  return color;
+}
+
+function strokeColorValue(canvas, color) {
+  if (color === null) {
+    return currentState(canvas).strokeColor;
+  }
+  return color;
+}
+
+function textColorValue(canvas, options) {
+  return optionValue(options, "color", currentState(canvas).textColor);
+}
+
+function textSizeValue(canvas, options) {
+  if (canvas === null) {
+    return optionValue(options, "textSize", defaultTextSize());
+  }
+  return optionValue(options, "textSize", currentState(canvas).textSize);
+}
+
 function drawPixel(canvas, x, y, color) {
-  var image = requireCanvas(canvas).image;
-  if (x < 0 || y < 0 || x >= imageWidth(image) || y >= imageHeight(image)) {
+  var checkedCanvas = requireCanvas(canvas);
+  var point = transformPoint(checkedCanvas, x, y);
+  var image = checkedCanvas.image;
+  var clip = currentClipRegion(checkedCanvas);
+  if (point.x < clip.x || point.y < clip.y || point.x >= clip.x + clip.width || point.y >= clip.y + clip.height) {
+    return canvas;
+  }
+  if (point.x < 0 || point.y < 0 || point.x >= imageWidth(image) || point.y >= imageHeight(image)) {
     return canvas;
   }
   if (color.alpha <= 0) {
     return canvas;
   }
   if (color.alpha >= 1) {
-    setPixel(image, x, y, color);
+    setPixel(image, point.x, point.y, color);
     return canvas;
   }
-  setPixel(image, x, y, blendColor(getImagePixel(image, x, y), color));
+  setPixel(image, point.x, point.y, blendColor(getImagePixel(image, point.x, point.y), color));
   return canvas;
 }
 
@@ -138,30 +196,6 @@ function drawStrokePixel(canvas, x, y, color, strokeWidth) {
     }
   }
   return canvas;
-}
-
-function clamp(value, low, high) {
-  if (value < low) {
-    return low;
-  }
-  if (value > high) {
-    return high;
-  }
-  return value;
-}
-
-function minValue(left, right) {
-  if (left < right) {
-    return left;
-  }
-  return right;
-}
-
-function maxValue(left, right) {
-  if (left > right) {
-    return left;
-  }
-  return right;
 }
 
 function normalizeClip(canvas, clip) {
@@ -216,8 +250,8 @@ function drawPixelClipped(canvas, x, y, color, clip) {
   return drawPixel(canvas, x, y, color);
 }
 
-function strokeWidthValue(options) {
-  var width = optionValue(options, "strokeWidth", defaultStrokeWidth());
+function strokeWidthValue(canvas, options) {
+  var width = optionValue(options, "strokeWidth", currentState(canvas).strokeWidth);
   if (width < 1) {
     fail("jayess:canvas strokeWidth must be at least 1");
   }
@@ -227,11 +261,11 @@ function strokeWidthValue(options) {
 export function create(width, height, options) {
   var background = optionValue(options, "background", defaultBackground());
   var title = optionValue(options, "title", "");
-  return makeCanvas(createImage(width, height, background), title, defaultClipStack());
+  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), []);
 }
 
 export function clear(canvas, color) {
-  fillImage(requireCanvas(canvas).image, color);
+  fillImage(requireCanvas(canvas).image, fillColorValue(canvas, color));
   return canvas;
 }
 
@@ -249,15 +283,63 @@ export function getPixel(canvas, x, y) {
 
 export function copy(canvas) {
   var source = requireCanvas(canvas);
-  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack));
+  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack));
+}
+
+export function saveState(canvas) {
+  return pushDrawingState(requireCanvas(canvas));
+}
+
+export function restoreState(canvas) {
+  return popDrawingState(requireCanvas(canvas));
+}
+
+export function setFillColor(canvas, color) {
+  currentState(canvas).fillColor = color;
+  return canvas;
+}
+
+export function setStrokeColor(canvas, color) {
+  currentState(canvas).strokeColor = color;
+  return canvas;
+}
+
+export function setStrokeWidth(canvas, width) {
+  if (width < 1) {
+    fail("jayess:canvas strokeWidth must be at least 1");
+  }
+  currentState(canvas).strokeWidth = round(width);
+  return canvas;
+}
+
+export function setTextColor(canvas, color) {
+  currentState(canvas).textColor = color;
+  return canvas;
+}
+
+export function setTextSize(canvas, size) {
+  if (size < 1) {
+    fail("jayess:canvas text size must be at least 1");
+  }
+  currentState(canvas).textSize = round(size);
+  return canvas;
+}
+
+export function translate(canvas, x, y) {
+  var state = currentState(canvas);
+  state.translateX = state.translateX + x;
+  state.translateY = state.translateY + y;
+  return canvas;
+}
+
+export function scale(canvas, x, y) {
+  scaleState(currentState(canvas), x, y);
+  return canvas;
 }
 
 export function fillRect(canvas, x, y, width, height, color) {
-  if (color.alpha >= 1) {
-    fillImageRect(requireCanvas(canvas).image, x, y, width, height, color);
-    return canvas;
-  }
-  fillImageRectAlpha(requireCanvas(canvas).image, x, y, width, height, color);
+  var resolvedColor = fillColorValue(canvas, color);
+  fillRectClipped(canvas, x, y, width, height, resolvedColor, null);
   return canvas;
 }
 
@@ -286,10 +368,11 @@ export function popClip(canvas) {
 
 export function fillRectClipped(canvas, x, y, width, height, color, clip) {
   var region = resolveClipRegion(canvas, clip);
+  var resolvedColor = fillColorValue(canvas, color);
   for (var row = y; row < y + height; row = row + 1) {
     for (var column = x; column < x + width; column = column + 1) {
       if (column >= region.x && row >= region.y && column < region.x + region.width && row < region.y + region.height) {
-        drawPixel(canvas, column, row, color);
+        drawPixel(canvas, column, row, resolvedColor);
       }
     }
   }
@@ -297,7 +380,7 @@ export function fillRectClipped(canvas, x, y, width, height, color, clip) {
 }
 
 export function fillRectAlpha(canvas, x, y, rectWidth, rectHeight, color) {
-  fillImageRectAlpha(requireCanvas(canvas).image, x, y, rectWidth, rectHeight, color);
+  fillRectClipped(canvas, x, y, rectWidth, rectHeight, fillColorValue(canvas, color), null);
   return canvas;
 }
 
@@ -305,15 +388,16 @@ export function strokeRect(canvas, x, y, width, height, color, options) {
   if (width <= 0 || height <= 0) {
     return canvas;
   }
-  var strokeWidth = strokeWidthValue(options);
+  var strokeWidth = strokeWidthValue(canvas, options);
+  var resolvedColor = strokeColorValue(canvas, color);
 
   for (var column = x; column < x + width; column = column + 1) {
-    drawStrokePixel(canvas, column, y, color, strokeWidth);
-    drawStrokePixel(canvas, column, y + height - 1, color, strokeWidth);
+    drawStrokePixel(canvas, column, y, resolvedColor, strokeWidth);
+    drawStrokePixel(canvas, column, y + height - 1, resolvedColor, strokeWidth);
   }
   for (var row = y + 1; row < y + height - 1; row = row + 1) {
-    drawStrokePixel(canvas, x, row, color, strokeWidth);
-    drawStrokePixel(canvas, x + width - 1, row, color, strokeWidth);
+    drawStrokePixel(canvas, x, row, resolvedColor, strokeWidth);
+    drawStrokePixel(canvas, x + width - 1, row, resolvedColor, strokeWidth);
   }
   return canvas;
 }
@@ -344,13 +428,14 @@ export function drawCanvas(target, source, x, y) {
 export function fillCircle(canvas, centerX, centerY, radius, color) {
   var checkedRadius = requireRadius(radius);
   var radiusSquared = checkedRadius * checkedRadius;
+  var resolvedColor = fillColorValue(canvas, color);
 
   for (var row = centerY - checkedRadius; row <= centerY + checkedRadius; row = row + 1) {
     for (var column = centerX - checkedRadius; column <= centerX + checkedRadius; column = column + 1) {
       var dx = column - centerX;
       var dy = row - centerY;
       if (dx * dx + dy * dy <= radiusSquared) {
-        drawPixel(canvas, column, row, color);
+        drawPixel(canvas, column, row, resolvedColor);
       }
     }
   }
@@ -360,9 +445,10 @@ export function fillCircle(canvas, centerX, centerY, radius, color) {
 
 export function strokeCircle(canvas, centerX, centerY, radius, color, options) {
   var checkedRadius = requireRadius(radius);
-  var strokeWidth = strokeWidthValue(options);
+  var strokeWidth = strokeWidthValue(canvas, options);
+  var resolvedColor = strokeColorValue(canvas, color);
   if (checkedRadius === 0) {
-    drawStrokePixel(canvas, centerX, centerY, color, strokeWidth);
+    drawStrokePixel(canvas, centerX, centerY, resolvedColor, strokeWidth);
     return canvas;
   }
 
@@ -376,7 +462,7 @@ export function strokeCircle(canvas, centerX, centerY, radius, color, options) {
       var dy = row - centerY;
       var distance = dx * dx + dy * dy;
       if (distance <= outer && distance > inner) {
-        drawStrokePixel(canvas, column, row, color, strokeWidth);
+        drawStrokePixel(canvas, column, row, resolvedColor, strokeWidth);
       }
     }
   }
@@ -387,8 +473,9 @@ export function strokeCircle(canvas, centerX, centerY, radius, color, options) {
 export function fillEllipse(canvas, centerX, centerY, radiusX, radiusY, color) {
   var checkedX = requireEllipseRadius(radiusX);
   var checkedY = requireEllipseRadius(radiusY);
+  var resolvedColor = fillColorValue(canvas, color);
   if (checkedX === 0 && checkedY === 0) {
-    drawPixel(canvas, centerX, centerY, color);
+    drawPixel(canvas, centerX, centerY, resolvedColor);
     return canvas;
   }
 
@@ -400,7 +487,7 @@ export function fillEllipse(canvas, centerX, centerY, radiusX, radiusY, color) {
       var dy = row - centerY;
       var normalized = dx * dx * ySquare + dy * dy * xSquare;
       if (normalized <= xSquare * ySquare) {
-        drawPixel(canvas, column, row, color);
+        drawPixel(canvas, column, row, resolvedColor);
       }
     }
   }
@@ -415,10 +502,11 @@ function drawLine(canvas, x1, y1, x2, y2, color, options) {
   var error = dx - dy;
   var x = x1;
   var y = y1;
-  var strokeWidth = strokeWidthValue(options);
+  var strokeWidth = strokeWidthValue(canvas, options);
+  var resolvedColor = strokeColorValue(canvas, color);
 
   while (true) {
-    drawStrokePixel(canvas, x, y, color, strokeWidth);
+    drawStrokePixel(canvas, x, y, resolvedColor, strokeWidth);
     if (x === x2 && y === y2) {
       return canvas;
     }
@@ -438,7 +526,8 @@ function drawLine(canvas, x1, y1, x2, y2, color, options) {
 export function strokeEllipse(canvas, centerX, centerY, radiusX, radiusY, color, options) {
   var checkedX = requireEllipseRadius(radiusX);
   var checkedY = requireEllipseRadius(radiusY);
-  var strokeWidth = strokeWidthValue(options);
+  var strokeWidth = strokeWidthValue(canvas, options);
+  var resolvedColor = strokeColorValue(canvas, color);
   if (checkedX === 0 || checkedY === 0) {
     return drawLine(canvas, centerX - checkedX, centerY - checkedY, centerX + checkedX, centerY + checkedY, color, options);
   }
@@ -458,7 +547,7 @@ export function strokeEllipse(canvas, centerX, centerY, radiusX, radiusY, color,
       var outerValue = dx * dx * ySquare + dy * dy * xSquare;
       var innerValue = dx * dx * innerYSquare + dy * dy * innerXSquare;
       if (outerValue <= outer && (inner === 0 || innerValue > inner)) {
-        drawStrokePixel(canvas, column, row, color, strokeWidth);
+        drawStrokePixel(canvas, column, row, resolvedColor, strokeWidth);
       }
     }
   }
@@ -534,8 +623,9 @@ export function bezierCurve(canvas, x1, y1, c1x, c1y, c2x, c2y, x2, y2, color, o
 }
 
 export function measureText(canvas, textValue, options) {
-  var charWidth = optionValue(options, "charWidth", 5);
-  var charHeight = optionValue(options, "charHeight", 7);
+  var textSize = textSizeValue(canvas, options);
+  var charWidth = optionValue(options, "charWidth", round(textSize * 5 / 7));
+  var charHeight = optionValue(options, "charHeight", textSize);
   var spacing = optionValue(options, "spacing", 1);
   var lineSpacing = optionValue(options, "lineSpacing", 1);
   var maxWidth = 0;
@@ -571,11 +661,12 @@ function drawBlockGlyph(canvas, x, y, charWidth, charHeight, color) {
 }
 
 export function text(canvas, textValue, x, y, options) {
-  var charWidth = optionValue(options, "charWidth", 5);
-  var charHeight = optionValue(options, "charHeight", 7);
+  var textSize = textSizeValue(canvas, options);
+  var charWidth = optionValue(options, "charWidth", round(textSize * 5 / 7));
+  var charHeight = optionValue(options, "charHeight", textSize);
   var spacing = optionValue(options, "spacing", 1);
   var lineSpacing = optionValue(options, "lineSpacing", 1);
-  var color = optionValue(options, "color", defaultTextColor());
+  var color = textColorValue(canvas, options);
   var cursorX = x;
   var cursorY = y;
   for (var index = 0; index < textValue.length; index = index + 1) {
@@ -652,8 +743,9 @@ function alignedTextY(rect, contentHeight, align) {
 export function drawTextBox(canvas, textValue, rectValue, options) {
   var target = requireCanvas(canvas);
   var rect = requireRect(rectValue);
-  var charWidth = optionValue(options, "charWidth", 5);
-  var charHeight = optionValue(options, "charHeight", 7);
+  var textSize = textSizeValue(target, options);
+  var charWidth = optionValue(options, "charWidth", round(textSize * 5 / 7));
+  var charHeight = optionValue(options, "charHeight", textSize);
   var spacing = optionValue(options, "spacing", 1);
   var lineSpacing = optionValue(options, "lineSpacing", 1);
   var horizontal = optionValue(options, "horizontal", "left");
@@ -676,11 +768,12 @@ export function fillPolygon(canvas, points, color) {
   if (points.length < 3) {
     return canvas;
   }
+  var resolvedColor = fillColorValue(canvas, color);
   var bounds = polygonBounds(points);
   for (var row = bounds.minY; row <= bounds.maxY; row = row + 1) {
     for (var column = bounds.minX; column <= bounds.maxX; column = column + 1) {
       if (pointInsidePolygon(column + 0.5, row + 0.5, points)) {
-        drawPixel(canvas, column, row, color);
+        drawPixel(canvas, column, row, resolvedColor);
       }
     }
   }
@@ -706,4 +799,21 @@ export function savePpm(canvas, path) {
 
 export function saveImage(canvas, path) {
   return savePpm(canvas, path);
+}
+
+export function layoutHtml(document, bounds) {
+  return layoutHtmlDocument(document, bounds, function (textValue, options) {
+    return measureText(null, textValue, options);
+  });
+}
+
+export function drawHtml(canvas, document) {
+  return paintHtmlDocument(canvas, document, {
+    fillRect: fillRect,
+    strokeRect: strokeRect,
+    clipRect: clipRect,
+    popClip: popClip,
+    text: text,
+    drawImage: drawImage
+  });
 }

@@ -41,6 +41,44 @@ int main() {
   auto cancelled = jayess::await_sync(${namespace}::cancelScheduledFrame(std::vector<jayess::value>{cancelledWindow}));
   require(std::holds_alternative<std::monostate>(cancelled), "cancelFrame resolves cancelled frame handle to null");
 
+  auto runWindow = std::make_shared<jayess::window_state>();
+  runWindow->events.push_back(jayess::make_object({
+    {"type", std::string("mouseMove")},
+    {"x", 12.0},
+    {"y", 18.0}
+  }));
+  auto runResult = jayess::await_sync(${namespace}::scheduleRunFrame(std::vector<jayess::value>{runWindow}));
+  const auto& runItems = std::get<jayess::array_ptr>(runResult)->items;
+  require(std::get<std::string>(runItems[0]) == "loop!", "runFrame forwards state and args");
+  require(std::get<double>(runItems[1]) == 1.0, "runFrame callback mutates state");
+  require(std::get<double>(runItems[2]) == 1.0, "runFrame leaves pollEvents explicit");
+
+  auto runClosedWindow = std::make_shared<jayess::window_state>();
+  runClosedWindow->close_requested = true;
+  auto skippedRecord = ${namespace}::skipRunFrame(std::vector<jayess::value>{runClosedWindow});
+  const auto& skippedFields = std::get<jayess::object_ptr>(skippedRecord)->fields;
+  require(std::get<bool>(skippedFields.at("scheduled")) == false, "runFrame reports skipped close state");
+  require(std::holds_alternative<std::monostate>(skippedFields.at("done")), "runFrame skipped done is null");
+
+  auto guiWindow = std::make_shared<jayess::window_state>();
+  guiWindow->events.push_back(jayess::make_object({{"type", std::string("close")}}));
+  auto guiResult = jayess::await_sync(${namespace}::scheduleGuiFrame(std::vector<jayess::value>{guiWindow}));
+  const auto& guiFields = std::get<jayess::object_ptr>(guiResult)->fields;
+  require(std::get<bool>(guiFields.at("scheduled")) == true, "runGuiFrame reports scheduled done result");
+  require(std::get<bool>(guiFields.at("rendered")) == false, "runGuiFrame skips render after close event");
+  require(std::get<bool>(guiFields.at("presented")) == false, "runGuiFrame skips present after close event");
+  require(std::get<bool>(guiFields.at("closed")) == true, "runGuiFrame reports closed state");
+  require(std::get<double>(guiFields.at("queuedActions")) == 1.0, "runGuiFrame reports queued action count");
+  require(std::get<double>(guiFields.at("result")) == 1.0, "runGuiFrame forwards visible events to callback");
+
+  auto skippedGuiWindow = std::make_shared<jayess::window_state>();
+  skippedGuiWindow->close_requested = true;
+  auto skippedGui = ${namespace}::skipGuiFrame(std::vector<jayess::value>{skippedGuiWindow});
+  const auto& skippedGuiFields = std::get<jayess::object_ptr>(skippedGui)->fields;
+  require(std::get<bool>(skippedGuiFields.at("scheduled")) == false, "runGuiFrame skips close-requested windows");
+  require(std::get<bool>(skippedGuiFields.at("closed")) == false, "runGuiFrame preserves app state on skipped close");
+  require(std::holds_alternative<std::monostate>(skippedGuiFields.at("done")), "runGuiFrame skipped done is null");
+
   std::cout << "ok\\n";
   return 0;
 }

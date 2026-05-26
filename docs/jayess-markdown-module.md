@@ -6,6 +6,7 @@
 
 - `tokenize(text)` returns token objects for the supported Markdown subset.
 - `toHtml(text)` renders the supported subset to escaped HTML.
+- `toSafeHtml(text)` renders through `toHtml(text)` and then applies `jayess:html.sanitizeSubset(...)`.
 
 ## Token Shapes
 
@@ -41,7 +42,7 @@ Code fences:
 - fenced code blocks using triple backticks
 - one inline link per line in the form `[label](href)`
 
-`toHtml` escapes text and attribute content through `jayess:html`.
+`toHtml` escapes text and attribute content through `jayess:html`. `toSafeHtml` is the recommended helper when the resulting fragment will be mixed with other Jayess-generated HTML because it applies the same narrow HTML allow-list pass used by `jayess:html`.
 
 ## Diagnostics
 
@@ -49,4 +50,4 @@ The module throws a focused string diagnostic for unclosed code fences and unsup
 
 ## Boundaries
 
-This module does not implement full CommonMark. It intentionally excludes nested lists, tables, emphasis, raw HTML passthrough, images, reference links, and multiple inline links per line in this first focused slice.
+This module does not implement full CommonMark. It intentionally excludes nested lists, tables, emphasis, raw HTML passthrough, images, reference links, and multiple inline links per line in this first focused slice. The safe HTML path is deterministic and narrow; it is not browser DOM compatibility.

@@ -15,14 +15,14 @@
 - `writeJson(path, value)`
 - `appendText(path, text)`
 - `copy(fromPath, toPath)`
-- `copyRecursive(fromPath, toPath)`
+- `copyRecursive(fromPath, toPath, options)`
 - `createDirectories(path)`
 - `tempDirectory(prefix)`
 - `tempFile(prefix, suffix)`
 - `remove(path)`
-- `removeRecursive(path)`
+- `removeRecursive(path, options)`
 - `list(path)`
-- `walk(path)`
+- `walk(path, options)`
 - `rename(fromPath, toPath)`
 - `stat(path)`
 
@@ -43,20 +43,22 @@ Synchronous variants are available with `Sync` suffixes:
 - `writeJsonSync(path, value)`
 - `appendTextSync(path, text)`
 - `copySync(fromPath, toPath)`
-- `copyRecursiveSync(fromPath, toPath)`
+- `copyRecursiveSync(fromPath, toPath, options)`
 - `createDirectoriesSync(path)`
 - `tempDirectorySync(prefix)`
 - `tempFileSync(prefix, suffix)`
 - `removeSync(path)`
-- `removeRecursiveSync(path)`
+- `removeRecursiveSync(path, options)`
 - `listSync(path)`
-- `walkSync(path)`
+- `walkSync(path, options)`
 - `renameSync(fromPath, toPath)`
 - `statSync(path)`
 
 All paths are strings. `writeText` / `writeTextSync` and `appendText` / `appendTextSync` expect string content. `writeBytes` / `writeBytesSync` expects a `jayess:bytes` value, and `readBytes` / `readBytesSync` returns a `jayess:bytes` value.
 
 `readJson` / `readJsonSync` and `writeJson` / `writeJsonSync` are convenience helpers layered over text file operations and [jayess:json](./jayess-json-module.md).
+
+Archive file helpers in [jayess:archive](./jayess-archive-module.md) layer their default async `readTar(path)` and `writeTar(path, entries)` functions over `readBytes(path)` and `writeBytes(path, bytes)`. Directory archive helpers use `walk`, `createDirectories`, `readBytes`, and `writeBytes` with matching `Sync` variants for synchronous flows.
 
 File operation failures are reported by the runtime helper instead of silently producing broken generated C++ behavior.
 
@@ -68,16 +70,34 @@ File operation failures are reported by the runtime helper instead of silently p
 - `writeBytesSync(path, bytes)` writes bytes to a file in binary mode and returns Jayess null directly.
 - `copy(fromPath, toPath)` copies one file to another path and replaces an existing target file, then resolves to Jayess null.
 - `copySync(fromPath, toPath)` performs the same copy synchronously.
-- `copyRecursive(fromPath, toPath)` copies a directory tree and resolves to Jayess null.
-- `copyRecursiveSync(fromPath, toPath)` performs the same recursive copy synchronously.
-- `removeRecursive(path)` removes a file or directory tree and resolves to the removed-entry count.
-- `removeRecursiveSync(path)` performs the same recursive remove synchronously.
-- `walk(path)` resolves to sorted relative entry paths from a recursive directory walk.
-- `walkSync(path)` performs the same directory walk synchronously.
+- `copyRecursive(fromPath, toPath, options)` copies a directory tree and resolves to Jayess null.
+- `copyRecursiveSync(fromPath, toPath, options)` performs the same recursive copy synchronously.
+- `removeRecursive(path, options)` removes a file or directory tree and resolves to the removed-entry count.
+- `removeRecursiveSync(path, options)` performs the same recursive remove synchronously.
+- `walk(path, options)` resolves to sorted plain entry objects from a recursive directory walk.
+- `walkSync(path, options)` performs the same directory walk synchronously.
 - `createReadStream(path)` and `createWriteStream(path)` return Jayess async handles for `jayess:stream` file stream handles.
 - `createReadStreamSync(path)` and `createWriteStreamSync(path)` return `jayess:stream` file stream handles directly.
 
 Binary payloads use the explicit [jayess:bytes](./jayess-bytes-module.md) module rather than strings.
+
+## Recursive Tree Helpers
+
+Recursive tree helpers validate the tree path before touching the host filesystem:
+
+- empty paths are rejected
+- paths containing `..` traversal segments are rejected
+- recursive copy targets inside the source tree are rejected
+- option arguments must be objects
+- the first shipped option shape accepts no keys; unknown keys fail with focused diagnostics
+
+`walk(path, options)` and `walkSync(path, options)` return a deterministic array sorted by `relativePath`. Each item is a plain object:
+
+- `path`: the full entry path as a normalized string
+- `relativePath`: the entry path relative to the walk root
+- `type`: `file`, `directory`, or `other`
+
+The async helpers use the same runtime behavior as their `Sync` variants and settle through the Jayess async scheduler.
 
 ## Text Append
 

@@ -28,6 +28,9 @@ export function createWindowState(options) {
     needsLayout: true,
     hoveredWidget: null,
     pressedWidget: null,
+    focusedWidget: null,
+    htmlDocument: null,
+    htmlFocus: null,
     closed: false
   };
 }
@@ -51,6 +54,7 @@ export function setRoot(windowState, rootWidget) {
   windowState.root = rootWidget;
   windowState.hoveredWidget = null;
   windowState.pressedWidget = null;
+  windowState.focusedWidget = null;
   windowState.needsLayout = true;
   windowState.dirty = true;
   return windowState;

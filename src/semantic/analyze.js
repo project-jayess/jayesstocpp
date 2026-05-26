@@ -16,6 +16,7 @@ import {
   validateUpdateExpressionShape
 } from "./expressions.js";
 import { validateFinallyControlFlow } from "./finally-control-flow.js";
+import { validateGeneratorStatementDeclarationShape } from "./generator-emission-shapes.js";
 import { containsYieldExpression } from "./generator-forms.js";
 import {
   canLowerFocusedGeneratorCatchBodyYield,
@@ -105,6 +106,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       }
       case "FunctionDeclaration": {
+        validateGeneratorStatementDeclarationShape(node, inGeneratorFunction, diagnostics, sourceText);
         if (node.async === true && node.generator === true) {
           diagnostics.push(createSemanticDiagnostic(sourceText, node.id, "Jayess does not support async generator functions"));
         }
@@ -118,6 +120,7 @@ export function analyzeModule(ast, sourceText, options = {}) {
         return;
       }
       case "ClassDeclaration": {
+        validateGeneratorStatementDeclarationShape(node, inGeneratorFunction, diagnostics, sourceText);
         walkClassDeclaration(node, {
           activeScope,
           addScopedBinding,

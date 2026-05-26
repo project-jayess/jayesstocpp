@@ -17,6 +17,20 @@ import {
   parsePemBlocks,
   privateKeyFromPemBlock
 } from "./pem.js";
+import {
+  certificateMetadata as readCertificateMetadata,
+  privateKeyMetadata as readPrivateKeyMetadata,
+  validateTrustAnchors as validateTrustAnchorList
+} from "./pem-metadata.js";
+export {
+  certificateFingerprint,
+  certificateVerificationMetadata
+} from "./certificate-fingerprint.js";
+export {
+  certificateChainMetadata,
+  certificateValidityAt,
+  findTrustAnchorByFingerprint
+} from "./certificate-trust.js";
 
 function fail(message) {
   throw message;
@@ -195,7 +209,47 @@ export function trustAnchorsFromPem(text) {
   for (var index = 0; index < blocks.length; index = index + 1) {
     anchors.push(certificateFromPemBlock(blocks[index]));
   }
-  return anchors;
+  return validateTrustAnchorList(anchors);
+}
+
+export function certificateMetadata(certificate) {
+  return readCertificateMetadata(certificate);
+}
+
+export function certificateSubject(certificate) {
+  return certificateMetadata(certificate).subject;
+}
+
+export function certificateIssuer(certificate) {
+  return certificateMetadata(certificate).issuer;
+}
+
+export function certificateSerialNumber(certificate) {
+  return certificateMetadata(certificate).serialNumber;
+}
+
+export function certificateValidityStart(certificate) {
+  return certificateMetadata(certificate).validityStart;
+}
+
+export function certificateValidityEnd(certificate) {
+  return certificateMetadata(certificate).validityEnd;
+}
+
+export function privateKeyMetadata(privateKey) {
+  return readPrivateKeyMetadata(privateKey);
+}
+
+export function privateKeyKind(privateKey) {
+  return privateKeyMetadata(privateKey).kind;
+}
+
+export function privateKeyEncodedLength(privateKey) {
+  return privateKeyMetadata(privateKey).encodedLength;
+}
+
+export function validateTrustAnchors(anchors) {
+  return validateTrustAnchorList(anchors);
 }
 
 export function createHash(algorithm) {

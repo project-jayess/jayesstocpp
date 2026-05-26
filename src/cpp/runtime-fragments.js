@@ -46,7 +46,7 @@ export const RUNTIME_FRAGMENT_DEFINITIONS = [
   // Fragment dependencies stay here so pruning remains deterministic and reviewable.
   { key: "async-core", header: getAsyncCoreRuntimeHeaderFragment, cpp: getAsyncCoreRuntimeCppFragment },
   { key: "async-helpers", header: getAsyncHelpersRuntimeHeaderFragment, cpp: getAsyncHelpersRuntimeCppFragment, requires: ["async-core"] },
-  { key: "archive", header: getArchiveRuntimeHeaderFragment, cpp: getArchiveRuntimeCppFragment, requires: ["async-core", "bytes"] },
+  { key: "archive", header: getArchiveRuntimeHeaderFragment, cpp: getArchiveRuntimeCppFragment, requires: ["bytes"] },
   { key: "array", header: getArrayRuntimeHeaderFragment, cpp: getArrayRuntimeCppFragment },
   { key: "bytes", header: getBytesRuntimeHeaderFragment, cpp: getBytesRuntimeCppFragment },
   { key: "channel", header: getChannelRuntimeHeaderFragment, cpp: getChannelRuntimeCppFragment },

@@ -41,6 +41,9 @@ std::vector<std::pair<std::string, std::string>> process_environment_pairs() {
     }
     pairs.push_back({entry.substr(0, equals), entry.substr(equals + 1)});
   }
+  std::sort(pairs.begin(), pairs.end(), [](const auto& left, const auto& right) {
+    return left.first < right.first;
+  });
   return pairs;
 }
 #else

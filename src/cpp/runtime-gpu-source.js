@@ -3,6 +3,8 @@ import { getGpuDirect3dAdapterCppFragment } from "./runtime-gpu-direct3d-source.
 import { getGpuMetalAdapterCppFragment } from "./runtime-gpu-metal-source.js";
 import { getGpuOpenGLAdapterCppFragment } from "./runtime-gpu-opengl-source.js";
 import { getGpuVulkanAdapterCppFragment } from "./runtime-gpu-vulkan-source.js";
+import { getGpuDrawResourcesCppFragment } from "./runtime-gpu-draw-resources-source.js";
+import { getGpuHostBindingsCppFragment } from "./runtime-gpu-host-bindings-source.js";
 
 export function getGpuRuntimeHeaderFragment() {
   return `struct gpu_capabilities {
@@ -15,11 +17,18 @@ struct gpu_surface_state {
   window_ptr window = nullptr;
 };
 
+struct gpu_buffer_metadata {
+  int size = 0;
+  std::string usage;
+  std::vector<unsigned char> bytes;
+};
+
 struct gpu_texture_metadata {
   int width = 0;
   int height = 0;
   std::string format;
   bool initialized = false;
+  unsigned int host_texture = 0;
   std::vector<unsigned char> pixels;
 };
 
@@ -27,8 +36,20 @@ struct gpu_frame_state {
   bool open = false;
   bool ended = false;
   std::vector<std::string> commands;
+  std::vector<std::string> resource_bindings;
   std::array<unsigned char, 4> clear_color = {0, 0, 0, 255};
   window_ptr present_window = nullptr;
+};
+
+struct gpu_shader_metadata {
+  std::string stage;
+  std::string source;
+};
+
+struct gpu_pipeline_metadata {
+  gpu_ptr vertex_shader = nullptr;
+  gpu_ptr fragment_shader = nullptr;
+  std::string primitive;
 };
 
 struct gpu_state {
@@ -36,13 +57,17 @@ struct gpu_state {
   std::string backend;
   gpu_capabilities capabilities;
   gpu_surface_state surface;
+  gpu_buffer_metadata buffer;
   gpu_texture_metadata texture;
   gpu_frame_state frame;
+  gpu_shader_metadata shader;
+  gpu_pipeline_metadata pipeline;
 };
 
 value gpu_create_device(const value& options);
 value gpu_create_surface(const value& window);
 value gpu_create_buffer(const value& device, const value& options);
+value gpu_upload_buffer(const value& buffer, const value& data);
 value gpu_create_texture(const value& device, const value& options);
 value gpu_upload_image(const value& texture, const value& image);
 value gpu_create_shader(const value& device, const value& source);
@@ -136,6 +161,78 @@ double gpu_option_positive_integer(const object_ptr& options, const std::string&
   return numeric;
 }
 
+std::string require_gpu_buffer_usage(const std::string& usage) {
+  if (usage == "vertex" || usage == "index" || usage == "uniform" || usage == "storage") {
+    return usage;
+  }
+  throw std::runtime_error("Jayess GPU createBuffer usage must be vertex, index, uniform, or storage");
+}
+
+unsigned char require_gpu_upload_byte(const value& input) {
+  if (!std::holds_alternative<double>(input)) {
+    throw std::runtime_error("Jayess GPU uploadBuffer data items must be integers between 0 and 255");
+  }
+  const auto numeric = std::get<double>(input);
+  if (!std::isfinite(numeric) || std::floor(numeric) != numeric || numeric < 0.0 || numeric > 255.0) {
+    throw std::runtime_error("Jayess GPU uploadBuffer data items must be integers between 0 and 255");
+  }
+  return static_cast<unsigned char>(numeric);
+}
+
+std::vector<unsigned char> require_gpu_upload_bytes(const value& input) {
+  if (std::holds_alternative<bytes_ptr>(input)) {
+    return std::get<bytes_ptr>(input)->items;
+  }
+  if (std::holds_alternative<array_ptr>(input)) {
+    std::vector<unsigned char> output;
+    for (const auto& item : std::get<array_ptr>(input)->items) {
+      output.push_back(require_gpu_upload_byte(item));
+    }
+    return output;
+  }
+  throw std::runtime_error("Jayess GPU uploadBuffer expects jayess:bytes or a numeric array");
+}
+
+std::string require_gpu_shader_stage(const std::string& stage) {
+  if (stage == "vertex" || stage == "fragment") {
+    return stage;
+  }
+  throw std::runtime_error("Jayess GPU createShader stage must be vertex or fragment");
+}
+
+std::string gpu_shader_source_from_value(const value& sourceValue, std::string& stage) {
+  if (std::holds_alternative<std::string>(sourceValue)) {
+    stage = "vertex";
+    return std::get<std::string>(sourceValue);
+  }
+  if (std::holds_alternative<object_ptr>(sourceValue)) {
+    const auto options = std::get<object_ptr>(sourceValue);
+    stage = require_gpu_shader_stage(gpu_option_string(options, "stage", "vertex", "Jayess GPU createShader stage must be a string"));
+    return gpu_option_string(options, "source", "", "Jayess GPU createShader source must be a string");
+  }
+  throw std::runtime_error("Jayess GPU createShader expects shader source text or a shader descriptor");
+}
+
+std::string require_gpu_pipeline_primitive(const object_ptr& options) {
+  const auto primitive = gpu_option_string(options, "primitive", "triangles", "Jayess GPU createPipeline primitive must be a string");
+  if (primitive == "triangles" || primitive == "lines") {
+    return primitive;
+  }
+  throw std::runtime_error("Jayess GPU createPipeline primitive must be triangles or lines");
+}
+
+gpu_ptr optional_gpu_pipeline_shader(const object_ptr& options, const std::string& key, const std::string& expectedStage) {
+  const auto found = options->fields.find(key);
+  if (found == options->fields.end() || std::holds_alternative<std::monostate>(found->second)) {
+    return nullptr;
+  }
+  const auto shader = require_gpu_value(found->second, "shader");
+  if (shader->shader.stage != expectedStage) {
+    throw std::runtime_error("Jayess GPU createPipeline " + key + " must be a " + expectedStage + " shader");
+  }
+  return shader;
+}
+
 value require_gpu_color_field(const object_ptr& color, const std::string& field) {
   const auto found = color->fields.find(field);
   if (found == color->fields.end()) {
@@ -208,7 +305,7 @@ gpu_backend_capabilities gpu_backend_capabilities_for(const std::string& backend
     backend,
     gpu_backend_available(backend),
     true,
-    true
+    backend != "vulkan"
   };
 }
 
@@ -224,6 +321,10 @@ void require_gpu_frame_open(const gpu_ptr& frame, const std::string& operation) 
     throw std::runtime_error("Jayess GPU " + operation + " requires an active frame");
   }
 }
+
+${getGpuDrawResourcesCppFragment()}
+
+${getGpuHostBindingsCppFragment()}
 
 void gpu_present_host_frame(const gpu_ptr& frame) {
   const auto window = frame->frame.present_window;
@@ -259,6 +360,12 @@ void gpu_backend_clear_frame(const gpu_ptr& frame) {
   }
   throw_gpu_unavailable(frame->backend);
 }
+
+void gpu_backend_upload_texture(const gpu_ptr& texture) {
+  if (texture->backend == "opengl") {
+    gpu_opengl_upload_texture(texture);
+  }
+}
 } // namespace
 
 value gpu_create_device(const value& optionsValue) {
@@ -290,6 +397,16 @@ value gpu_create_surface(const value& windowValue) {
     gpu_apply_capabilities(surface, gpu_backend_capabilities_for("metal"));
     return surface;
   }
+#elif defined(__linux__)
+  const auto window = surface->surface.window;
+  if (gpu_vulkan_surface_compatible(window) && gpu_vulkan_available()) {
+    gpu_apply_capabilities(surface, gpu_backend_capabilities_for("vulkan"));
+    return surface;
+  }
+  if (window != nullptr && window->adapter == "linux-x11" && window->host_display != nullptr && window->host_window != 0 && gpu_opengl_available()) {
+    gpu_apply_capabilities(surface, gpu_backend_capabilities_for("opengl"));
+    return surface;
+  }
 #endif
   gpu_apply_capabilities(surface, gpu_backend_capabilities_for("validation"));
   return surface;
@@ -298,11 +415,28 @@ value gpu_create_surface(const value& windowValue) {
 value gpu_create_buffer(const value& deviceValue, const value& optionsValue) {
   const auto device = require_gpu_value(deviceValue, "device");
   const auto options = require_gpu_options(optionsValue, "createBuffer");
-  gpu_option_positive_integer(options, "size", 1.0, "Jayess GPU createBuffer size must be a positive integer");
-  gpu_option_string(options, "usage", "", "Jayess GPU createBuffer usage must be a string");
+  const auto size = static_cast<int>(gpu_option_positive_integer(options, "size", 1.0, "Jayess GPU createBuffer size must be a positive integer"));
+  const auto usage = require_gpu_buffer_usage(gpu_option_string(options, "usage", "vertex", "Jayess GPU createBuffer usage must be a string"));
   auto buffer = make_gpu_handle("buffer", device->backend);
   buffer->capabilities = device->capabilities;
+  buffer->buffer.size = size;
+  buffer->buffer.usage = usage;
+  buffer->buffer.bytes.resize(static_cast<std::size_t>(size), 0);
   return buffer;
+}
+
+value gpu_upload_buffer(const value& bufferValue, const value& dataValue) {
+  const auto buffer = require_gpu_value(bufferValue, "buffer");
+  const auto bytes = require_gpu_upload_bytes(dataValue);
+  if (buffer->buffer.size <= 0) {
+    throw std::runtime_error("Jayess GPU uploadBuffer requires a buffer created by createBuffer");
+  }
+  if (bytes.size() > static_cast<std::size_t>(buffer->buffer.size)) {
+    throw std::runtime_error("Jayess GPU uploadBuffer data exceeds buffer size");
+  }
+  std::fill(buffer->buffer.bytes.begin(), buffer->buffer.bytes.end(), 0);
+  std::copy(bytes.begin(), bytes.end(), buffer->buffer.bytes.begin());
+  return bufferValue;
 }
 
 value gpu_create_texture(const value& deviceValue, const value& optionsValue) {
@@ -329,31 +463,42 @@ value gpu_upload_image(const value& textureValue, const value& imageValue) {
   }
   texture->texture.pixels = image->pixels;
   texture->texture.initialized = true;
+  gpu_backend_upload_texture(texture);
   return textureValue;
 }
 
 value gpu_create_shader(const value& deviceValue, const value& sourceValue) {
   const auto device = require_gpu_value(deviceValue, "device");
-  if (!std::holds_alternative<std::string>(sourceValue)) {
-    throw std::runtime_error("Jayess GPU createShader expects shader source text");
-  }
-  if (std::get<std::string>(sourceValue).empty()) {
+  std::string stage;
+  const auto source = gpu_shader_source_from_value(sourceValue, stage);
+  if (source.empty()) {
     throw std::runtime_error("Jayess GPU createShader expects non-empty shader source text");
   }
   auto shader = make_gpu_handle("shader", device->backend);
   shader->capabilities = device->capabilities;
+  shader->shader.stage = stage;
+  shader->shader.source = source;
   return shader;
 }
 
 value gpu_create_pipeline(const value& deviceValue, const value& optionsValue) {
   const auto device = require_gpu_value(deviceValue, "device");
   const auto options = require_gpu_options(optionsValue, "createPipeline");
-  const auto shader = options->fields.find("shader");
-  if (shader != options->fields.end() && !std::holds_alternative<std::monostate>(shader->second)) {
-    require_gpu_value(shader->second, "shader");
+  auto vertexShader = optional_gpu_pipeline_shader(options, "vertexShader", "vertex");
+  auto fragmentShader = optional_gpu_pipeline_shader(options, "fragmentShader", "fragment");
+  const auto legacyShader = options->fields.find("shader");
+  if (legacyShader != options->fields.end() && !std::holds_alternative<std::monostate>(legacyShader->second)) {
+    vertexShader = require_gpu_value(legacyShader->second, "shader");
+    if (vertexShader->shader.stage != "vertex") {
+      throw std::runtime_error("Jayess GPU createPipeline shader must be a vertex shader");
+    }
   }
+  const auto primitive = require_gpu_pipeline_primitive(options);
   auto pipeline = make_gpu_handle("pipeline", device->backend);
   pipeline->capabilities = device->capabilities;
+  pipeline->pipeline.vertex_shader = vertexShader;
+  pipeline->pipeline.fragment_shader = fragmentShader;
+  pipeline->pipeline.primitive = primitive;
   return pipeline;
 }
 
@@ -388,10 +533,16 @@ value gpu_draw(const value& frameValue, const value& pipelineValue, const value&
   if (frame->backend != pipeline->backend) {
     throw std::runtime_error("Jayess GPU draw requires pipeline backend to match the active frame backend");
   }
-  if (!std::holds_alternative<object_ptr>(resourcesValue) && !std::holds_alternative<array_ptr>(resourcesValue) && !std::holds_alternative<std::monostate>(resourcesValue)) {
-    throw std::runtime_error("Jayess GPU draw expects resources object, array, or null");
+  auto bindings = gpu_validate_draw_resources(frame, resourcesValue);
+  auto hostBindings = gpu_convert_host_draw_bindings(frame, bindings);
+  frame->frame.resource_bindings = bindings;
+  frame->frame.commands.push_back("draw:" + pipeline->pipeline.primitive);
+  for (const auto& binding : bindings) {
+    frame->frame.commands.push_back("bind:" + binding);
   }
-  frame->frame.commands.push_back("draw");
+  for (const auto& hostBinding : hostBindings) {
+    frame->frame.commands.push_back("hostBind:" + hostBinding);
+  }
   return frameValue;
 }
 

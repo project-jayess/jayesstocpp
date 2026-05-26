@@ -282,9 +282,9 @@ Current system-module note:
 - `jayess:system` currently exports `args`, `cwd`, `getEnv`, `hasEnv`, and `exitCode`
 - `jayess:thread` currently exports `spawn`, `join`, `sleep`, `hardwareConcurrency`, and `currentId`
 - `jayess:timers` currently exports `sleep`, `setTimeout`, `clearTimeout`, `setInterval`, and `clearInterval`
-- the next approved `jayess:fs` slice is explicit recursive file-tree helpers: `walk`, `copyRecursive`, and `removeRecursive`, plus matching `Sync` variants
-- the next approved `jayess:path` slice is path-structure helpers: `parse`, `format`, `separator`, and `delimiter`
-- the next approved `jayess:process` slice is read-only environment inspection: `hasEnv`, `envKeys`, and `envEntries`
+- `jayess:fs` includes explicit recursive file-tree helpers: `walk`, `copyRecursive`, and `removeRecursive`, plus matching `Sync` variants
+- `jayess:path` includes path-structure helpers: `parse`, `format`, `separator`, and `delimiter`
+- `jayess:process` includes read-only environment inspection: `hasEnv`, `envKeys`, and `envEntries`
 - the next active host-module implementation slice is `jayess:timers`
 - `jayess:stream` currently exports `openRead`, `openWrite`, `openReadSync`, `openWriteSync`, `readChunk`, `writeChunk`, `close`, `pipe`, `pipeAll`, `pipeWithCancellation`, `copy`, `tee`, `chunks`, `readText`, `readAllBytes`, `readAllText`, `toBytes`, `toText`, `collectBytes`, `collectText`, `readLines`, `writeText`, `writeLine`, and `pipeText`
 - `jayess:assert` currently exports `ok`, `equal`, `notEqual`, `fail`, and `throws`
@@ -293,7 +293,7 @@ Current system-module note:
 - `jayess:buffer` currently exports `create`, `fromBytes`, `toBytes`, `length`, `read`, `write`, and `concat`
 - `jayess:encoding` currently exports `base64Encode`, `base64Decode`, `hexEncode`, `hexDecode`, `asciiEncode`, `asciiDecode`, `utf16Encode`, `utf16Decode`, `uriEncode`, and `uriDecode`
 - `jayess:events` currently exports `create`, `on`, `once`, `off`, `emit`, and `listenerCount`
-- `jayess:crypto` currently exports `sha256`, `sha512`, `sha1`, `hmacSha256`, `hmacSha512`, `hmacSha1`, `hkdfSha256`, `certificateFromPem`, `privateKeyFromPem`, `trustAnchorsFromPem`, `createHash`, `updateHash`, `digestHash`, and `randomBytes`; SHA-1 remains legacy-only for compatibility, while the shipped PEM certificate/key/trust-anchor containers are the first TLS-supporting groundwork for later `jayess:http` transport work
+- `jayess:crypto` currently exports `sha256`, `sha512`, `sha1`, `hmacSha256`, `hmacSha512`, `hmacSha1`, `hkdfSha256`, `certificateFromPem`, `privateKeyFromPem`, `trustAnchorsFromPem`, `createHash`, `updateHash`, `digestHash`, and `randomBytes`; SHA-1 remains legacy-only for compatibility, while the shipped PEM certificate/key/trust-anchor containers feed the current `jayess:http` HTTPS/TLS option validation boundary
 - `jayess:url` currently exports `parse`, `format`, `joinPath`, `getQuery`, and `setQuery`
 - `jayess:time` currently exports `millis`, `seconds`, `minutes`, `elapsed`, and `formatDuration`
 - `jayess:iter` currently exports `next`, `toArray`, `take`, `map`, `filter`, `forEach`, `reduce`, `some`, `every`, `find`, `chain`, and `range` for Jayess generator handles

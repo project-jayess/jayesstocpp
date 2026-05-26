@@ -73,6 +73,7 @@ struct jayess_windows_dialog_api {
 
 constexpr jayess_dialog_dword JAYESS_OFN_EXPLORER = 0x00080000UL;
 constexpr jayess_dialog_dword JAYESS_OFN_NOCHANGEDIR = 0x00000008UL;
+constexpr jayess_dialog_dword JAYESS_OFN_ALLOWMULTISELECT = 0x00000200UL;
 constexpr jayess_dialog_dword JAYESS_OFN_FILEMUSTEXIST = 0x00001000UL;
 constexpr jayess_dialog_dword JAYESS_OFN_PATHMUSTEXIST = 0x00000800UL;
 constexpr jayess_dialog_dword JAYESS_OFN_OVERWRITEPROMPT = 0x00000002UL;
@@ -213,10 +214,13 @@ bool dialog_windows_has_override(const char* name) {
 value dialog_windows_picker_override(const char* name) {
   std::string override;
   dialog_windows_env_value(name, override);
-  if (override == "cancel") {
-    return std::monostate{};
-  }
-  return override;
+  return dialog_picker_override_result(override, false);
+}
+
+value dialog_windows_open_file_override(const char* name, bool multiple) {
+  std::string override;
+  dialog_windows_env_value(name, override);
+  return dialog_picker_override_result(override, multiple);
 }
 
 value dialog_windows_message_override(const char* name) {
@@ -232,6 +236,44 @@ std::runtime_error dialog_windows_common_dialog_error(const std::string& operati
   return std::runtime_error("Jayess dialog " + operationName + " Win32 common dialog failed with code " + std::to_string(errorCode));
 }
 
+std::string dialog_windows_default_file_text(const std::string& defaultPath, const std::string& defaultName) {
+  if (!defaultName.empty()) {
+    if (defaultPath.empty()) {
+      return defaultName;
+    }
+    const auto basePath = std::filesystem::path(defaultPath);
+    if (basePath.has_filename() && basePath.filename().string().find('.') != std::string::npos) {
+      return (basePath.parent_path() / defaultName).string();
+    }
+    return (basePath / defaultName).string();
+  }
+  return defaultPath;
+}
+
+value dialog_windows_open_file_result(const std::array<char, JAYESS_DIALOG_PATH_BUFFER_BYTES>& fileBuffer, bool multiple) {
+  if (!multiple) {
+    return std::string(fileBuffer.data());
+  }
+
+  const char* cursor = fileBuffer.data();
+  const std::string directory(cursor);
+  cursor += directory.size() + 1;
+  if (*cursor == '\\0') {
+    std::vector<value> singlePath;
+    singlePath.push_back(directory);
+    return make_array(std::move(singlePath));
+  }
+
+  std::vector<value> paths;
+  const auto directoryPath = std::filesystem::path(directory);
+  while (*cursor != '\\0') {
+    const std::string filename(cursor);
+    paths.push_back((directoryPath / filename).string());
+    cursor += filename.size() + 1;
+  }
+  return make_array(std::move(paths));
+}
+
 int dialog_windows_browse_callback(jayess_dialog_hwnd hwnd, jayess_dialog_uint message, jayess_dialog_lparam, jayess_dialog_lparam data) {
   if (message != JAYESS_BFFM_INITIALIZED || data == 0) {
     return 0;
@@ -245,8 +287,9 @@ int dialog_windows_browse_callback(jayess_dialog_hwnd hwnd, jayess_dialog_uint m
 }
 
 value dialog_windows_open_file(const value& optionsValue) {
+  const auto multiple = dialog_open_file_multiple_option(optionsValue);
   if (dialog_windows_has_override("JAYESS_DIALOG_TEST_OPEN_FILE")) {
-    return dialog_windows_picker_override("JAYESS_DIALOG_TEST_OPEN_FILE");
+    return dialog_windows_open_file_override("JAYESS_DIALOG_TEST_OPEN_FILE", multiple);
   }
 
   const auto options = dialog_require_options_object(optionsValue, "openFile");
@@ -268,10 +311,13 @@ value dialog_windows_open_file(const value& optionsValue) {
   dialog.lpstrInitialDir = initialDirectory.empty() ? nullptr : initialDirectory.c_str();
   dialog.lpstrTitle = title.empty() ? nullptr : title.c_str();
   dialog.Flags = JAYESS_OFN_EXPLORER | JAYESS_OFN_NOCHANGEDIR | JAYESS_OFN_FILEMUSTEXIST | JAYESS_OFN_PATHMUSTEXIST;
+  if (multiple) {
+    dialog.Flags |= JAYESS_OFN_ALLOWMULTISELECT;
+  }
 
   auto& api = dialog_windows_api();
   if (api.get_open_file_name(&dialog) != 0) {
-    return std::string(fileBuffer.data());
+    return dialog_windows_open_file_result(fileBuffer, multiple);
   }
   const auto errorCode = api.commdlg_extended_error();
   if (errorCode == 0) {
@@ -288,13 +334,15 @@ value dialog_windows_save_file(const value& optionsValue) {
   const auto options = dialog_require_options_object(optionsValue, "saveFile");
   const auto title = dialog_optional_string_option(options, "title", "saveFile");
   const auto defaultPath = dialog_optional_string_option(options, "defaultPath", "saveFile");
+  const auto defaultName = dialog_optional_string_option(options, "defaultName", "saveFile");
+  const auto fileText = dialog_windows_default_file_text(defaultPath, defaultName);
   auto filterBuffer = dialog_windows_filter_buffer(options, "saveFile");
   auto initialDirectory = dialog_windows_initial_directory(defaultPath);
   std::array<char, JAYESS_DIALOG_PATH_BUFFER_BYTES> fileBuffer{};
-  if (defaultPath.size() >= fileBuffer.size()) {
-    throw std::runtime_error("Jayess dialog saveFile option 'defaultPath' is too long for the current Windows adapter");
+  if (fileText.size() >= fileBuffer.size()) {
+    throw std::runtime_error("Jayess dialog saveFile default path/name is too long for the current Windows adapter");
   }
-  std::memcpy(fileBuffer.data(), defaultPath.c_str(), defaultPath.size());
+  std::memcpy(fileBuffer.data(), fileText.c_str(), fileText.size());
 
   jayess_open_file_name_a dialog{};
   dialog.lStructSize = sizeof(dialog);

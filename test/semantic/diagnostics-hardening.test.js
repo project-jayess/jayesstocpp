@@ -133,6 +133,17 @@ test("semantic diagnostics reject async generator functions before emission", ()
   assert.ok(diagnostics.some((diagnostic) => /async generator functions/.test(diagnostic.message)));
 });
 
+test("semantic diagnostics reject generator declarations that emission cannot lower", () => {
+  assert.match(
+    analyzeDiagnostics("function* run(value) { function nested() { return value; } yield value; }")[0].message,
+    /function declarations inside generator bodies/
+  );
+  assert.match(
+    analyzeDiagnostics("function* run(value) { class Nested {} yield value; }")[0].message,
+    /class declarations inside generator bodies/
+  );
+});
+
 test("semantic diagnostics reject computed super outside derived methods", () => {
   const diagnostics = analyzeDiagnostics("class Point { read(name) { return super[name]; } }");
 
@@ -184,7 +195,32 @@ test("api transpile surfaces bare super diagnostics as JayessError", () => {
   );
 });
 
+test("semantic diagnostics reject unsupported operator shapes before emission", () => {
+  const binarySource = createSourceText("var total = 1 + 2;");
+  const binaryAst = parse(binarySource);
+  binaryAst.body[0].declarations[0].init.operator = "<<";
+  const binaryDiagnostics = analyzeModule(binaryAst, binarySource, { throwOnError: false }).diagnostics;
+  assert.match(binaryDiagnostics[0].message, /Unsupported binary operator '<<'/);
+
+  const assignmentSource = createSourceText("var total = 1; total += 2;");
+  const assignmentAst = parse(assignmentSource);
+  assignmentAst.body[1].expression.operator = "<<=";
+  const assignmentDiagnostics = analyzeModule(assignmentAst, assignmentSource, { throwOnError: false }).diagnostics;
+  assert.match(assignmentDiagnostics[0].message, /Unsupported assignment operator '<<='/);
+});
+
 test("semantic diagnostics keep unsupported-by-design global diagnostics", () => {
+  assert.match(analyzeDiagnostics("var missing = undefined;")[0].message, /use 'null' as the built-in missing-value sentinel/);
   assert.match(analyzeDiagnostics("eval(\"value\");")[0].message, /runtime source evaluation is unsupported by design/);
   assert.match(analyzeDiagnostics("Function(\"return 1\");")[0].message, /runtime source evaluation is unsupported by design/);
+});
+
+test("api transpile surfaces undefined as unsupported-by-design", () => {
+  assert.throws(
+    () => transpile("var missing = undefined;", { moduleName: "undefined_diag_case" }),
+    (error) =>
+      error instanceof JayessError
+      && error.diagnostics[0].code === "JY_SEMANTIC_UNDEFINED_UNSUPPORTED"
+      && /use 'null'/.test(error.diagnostics[0].message)
+  );
 });

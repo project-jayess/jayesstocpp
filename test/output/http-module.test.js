@@ -26,6 +26,7 @@ test("transpileFile resolves built-in Jayess http module into generated output",
   const runtimeSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
   const moduleSource = fs.readFileSync(modulePath, "utf8");
   const dependencyPlan = fs.readFileSync(path.join(targetDir, "jayess_dependency_plan.json"), "utf8");
+  const buildHints = JSON.parse(fs.readFileSync(path.join(targetDir, "jayess_build_hints.json"), "utf8"));
 
   assert.match(primitiveSource, /jayessHttpRequest/);
   assert.match(primitiveSource, /jayessHttpResponseText/);
@@ -35,6 +36,7 @@ test("transpileFile resolves built-in Jayess http module into generated output",
   assert.match(primitiveSource, /jayessHttpRequestHeaders/);
   assert.match(primitiveSource, /jayessHttpRequestBody/);
   assert.match(primitiveSource, /jayessHttpCreateServer/);
+  assert.match(primitiveSource, /jayessHttpServerState/);
   assert.match(primitiveSource, /jayessHttpSetStatus/);
   assert.match(primitiveSource, /jayessHttpSetHeader/);
   assert.match(primitiveSource, /jayessHttpWrite/);
@@ -43,6 +45,10 @@ test("transpileFile resolves built-in Jayess http module into generated output",
   assert.match(primitiveSource, /jayessHttpWriteStream/);
   assert.match(primitiveSource, /jayessHttpEndStream/);
   assert.match(runtimeHeader, /struct http_response_state/);
+  assert.match(runtimeHeader, /struct http_tls_client_request_data/);
+  assert.match(runtimeHeader, /using http_tls_client_callback/);
+  assert.match(runtimeHeader, /void http_tls_register_client_backend/);
+  assert.match(runtimeHeader, /bool http_tls_client_backend_available/);
   assert.match(runtimeHeader, /value http_request_async\(const value& options\);/);
   assert.match(runtimeHeader, /value http_response_text\(const value& response\);/);
   assert.match(runtimeHeader, /value http_request_method\(const value& request\);/);
@@ -59,18 +65,49 @@ test("transpileFile resolves built-in Jayess http module into generated output",
   assert.match(runtimeSource, /HTTP_MAX_HEADER_BYTES = 16384/);
   assert.match(runtimeSource, /HTTP_MAX_HEADER_COUNT = 100/);
   assert.match(runtimeSource, /HTTP_SERVER_READ_TIMEOUT_MILLISECONDS = 5000/);
+  assert.match(runtimeSource, /HTTP_SERVER_HEADER_TIMEOUT_MILLISECONDS = 5000/);
+  assert.match(runtimeSource, /HTTP_SERVER_BODY_TIMEOUT_MILLISECONDS = 5000/);
   assert.match(runtimeSource, /HTTP_SERVER_SHUTDOWN_GRACE_MILLISECONDS = 1000/);
   assert.match(runtimeSource, /HTTP_DEFAULT_MAX_REQUEST_BODY_BYTES = 1024 \* 1024/);
   assert.match(runtimeSource, /HTTP_DEFAULT_MAX_RESPONSE_BODY_BYTES = 1024 \* 1024/);
+  assert.match(runtimeSource, /HTTP_TLS_UNAVAILABLE_MESSAGE/);
+  assert.match(runtimeSource, /validate_http_server_tls_options/);
+  assert.match(runtimeSource, /validate_http_client_tls_options/);
+  assert.match(runtimeSource, /validate_http_trust_anchor_containers/);
+  assert.match(runtimeSource, /parse_http_url/);
+  assert.match(runtimeSource, /http_format_request/);
+  assert.match(runtimeSource, /http_tls_client_backend_status/);
+  assert.match(runtimeSource, /http_tls_client_backend_available/);
+  assert.match(runtimeSource, /registered_http_tls_client_backend/);
+  assert.match(runtimeSource, /linked-host-callback/);
+  assert.match(runtimeSource, /http_tls_request_data_from_options/);
+  assert.match(runtimeSource, /http_tls_response_object_from_data/);
+  assert.match(runtimeSource, /http_tls_request_blocking/);
+  assert.match(runtimeSource, /Jayess http TLS ALPN is unsupported/);
+  assert.match(runtimeSource, /Jayess http TLS handshake failed/);
+  assert.match(runtimeSource, /Jayess http TLS certificate verification failed/);
+  assert.match(runtimeSource, /Jayess http HTTPS transport backend is not available on this host/);
   assert.match(runtimeSource, /http_configure_server_client_socket/);
+  assert.match(runtimeSource, /http_server_state_value/);
   assert.match(runtimeSource, /http_server_track_client/);
   assert.match(runtimeSource, /http_server_release_client/);
   assert.match(runtimeSource, /SO_RCVTIMEO/);
   assert.match(runtimeSource, /http_recv_some/);
   assert.match(runtimeSource, /maxRequestBodyBytes/);
+  assert.match(runtimeSource, /maxHeaderBytes/);
+  assert.match(runtimeSource, /maxBodyBytes/);
+  assert.match(runtimeSource, /idleTimeoutMillis/);
+  assert.match(runtimeSource, /headerTimeoutMillis/);
+  assert.match(runtimeSource, /bodyTimeoutMillis/);
+  assert.match(runtimeSource, /trustAnchors/);
+  assert.match(runtimeSource, /tls_enabled/);
   assert.match(runtimeSource, /maxResponseBodyBytes/);
+  assert.match(runtimeSource, /max_header_bytes/);
   assert.match(runtimeSource, /max_request_body_bytes/);
   assert.match(runtimeSource, /max_response_body_bytes/);
+  assert.match(runtimeSource, /idle_timeout_milliseconds/);
+  assert.match(runtimeSource, /header_timeout_milliseconds/);
+  assert.match(runtimeSource, /body_timeout_milliseconds/);
   assert.match(runtimeSource, /http_append_response_body/);
   assert.match(runtimeSource, /http_begin_stream_response/);
   assert.match(runtimeSource, /http_write_stream_response/);
@@ -86,6 +123,7 @@ test("transpileFile resolves built-in Jayess http module into generated output",
   assert.match(moduleSource, /requestWithTimeout/);
   assert.match(moduleSource, /requestWithTimeoutAndCancellation/);
   assert.match(moduleSource, /bodyText/);
+  assert.match(moduleSource, /jayessHttpServerState/);
   assert.match(moduleSource, /bodyBytes/);
   assert.match(moduleSource, /collectBody/);
   assert.match(moduleSource, /sendText/);
@@ -99,7 +137,18 @@ test("transpileFile resolves built-in Jayess http module into generated output",
   assert.match(moduleSource, /sendFile/);
   assert.match(dependencyPlan, /"source": "jayess:stream"/);
   assert.match(dependencyPlan, /"source": "jayess:http"/);
+  assert.match(dependencyPlan, /"source": "jayess:crypto"/);
   assert.match(dependencyPlan, /"source": "jayess:querystring"/);
   assert.match(dependencyPlan, /"source": "jayess:mime"/);
   assert.match(dependencyPlan, /"source": "jayess:fs"/);
+  assert.ok(buildHints.sourceFiles.includes("runtime/jayess_runtime.cpp"));
+  assert.ok(buildHints.nativeArtifacts.includes("native/http-primitives.hpp"));
+  assert.ok(buildHints.nativeArtifacts.includes("native/crypto-primitives.hpp"));
+  assert.deepEqual(buildHints.runtimeRequirements.http.adapters, ["posix-http", "winsock-http", "tls-validation", "host-tls"]);
+  assert.deepEqual(buildHints.runtimeRequirements.http.compiledAdaptersByPlatform, {
+    windows: ["winsock-http", "tls-validation", "host-tls"],
+    macos: ["posix-http", "tls-validation", "host-tls"],
+    linux: ["posix-http", "tls-validation", "host-tls"]
+  });
+  assert.match(buildHints.runtimeRequirements.http.optionalBackendRequirements.join("\\n"), /host-tls is a generated client HTTPS adapter hook/);
 });

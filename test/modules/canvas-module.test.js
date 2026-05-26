@@ -8,6 +8,7 @@ test("module graph resolves repository-owned built-in canvas module and renderin
   const sources = graph.modules.map((moduleRecord) => moduleRecord.source);
 
   assert.ok(sources.includes("jayess:canvas"));
+  assert.ok(sources.includes("./state.js"));
   assert.ok(sources.includes("jayess:image"));
   assert.ok(sources.includes("jayess:color"));
   assert.ok(sources.includes("jayess:math"));

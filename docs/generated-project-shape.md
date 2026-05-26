@@ -96,6 +96,10 @@ The plan includes:
 - each dependency inclusion reason and any runtime features included by that dependency
 - platform adapter requirements for native-backed `jayess:*` modules such as `dialog`, `net`, `window`, `gpu`, `clipboard`, `watch`, and `subprocess`
 
+For `jayess:http`, HTTPS/TLS option validation is recorded through the imported `jayess:http` and `jayess:crypto` modules plus their selected runtime fragments. This validation boundary does not add a mandatory platform TLS library by itself. Generated metadata records `tls-validation` as compiled with HTTP and `host-tls` as the live HTTPS client hook family. A generated project that reaches HTTPS or server `tls` options validates certificate, private-key, trust-anchor, and unsupported ALPN shapes before the runtime reports the normalized unavailable-backend diagnostic when no live host TLS client adapter is registered.
+
+Database support is intentionally not shipped for now. Generated projects do not include `jayess:db`, `jayess:sqlite`, SQLite adapter metadata, or database runtime fragments.
+
 For `jayess:window`, the generated metadata now distinguishes adapter families explicitly rather than treating Linux windowing as one bucket. The current adapter list includes `win32`, `cocoa`, `x11`, and `wayland`.
 
 For `jayess:dialog`, the generated metadata now distinguishes dialog adapter families explicitly too. The current dialog runtime reports:
@@ -106,6 +110,8 @@ For `jayess:dialog`, the generated metadata now distinguishes dialog adapter fam
 
 The Linux entry names the focused `xdg-desktop-portal` adapter family boundary and still allows the runtime to report the normalized unavailable-host diagnostic when that host path cannot be used.
 
+Dialog option support is adapter-neutral before host selection. The runtime validates `openFile({ multiple: true })`, normalized `{ name, extensions }` file filters, `saveFile({ defaultName })`, and `message({ detail })` in the shared dialog fragment, then lets the Win32, Cocoa, or Linux portal-family adapter consume the supported subset for that host.
+
 The same metadata now also reports the compiled adapter set by host platform when that matters. For the current window runtime, generated projects report:
 
 - `windows: ["win32"]`
@@ -114,15 +120,20 @@ The same metadata now also reports the compiled adapter set by host platform whe
 
 The current Linux selection policy is also recorded in metadata: prefer Wayland when `WAYLAND_DISPLAY` is set and the Wayland client path is available; otherwise fall back to X11 when available.
 
-That metadata shape now matches the emitted runtime and the executable verification layer: Linux projects compile both adapter families into the guarded runtime, then host-conditional runtime probes verify X11 and Wayland separately where the local host can actually open those adapters.
+The window metadata also records the normalized event families compiled into the project: `close`, `resize`, `key`, `text-input`, `pointer`, and `mouse-button`.
+
+That metadata shape now matches the emitted runtime and the executable verification layer: Linux projects compile both adapter families into the guarded runtime, then host-conditional runtime probes verify X11 and Wayland separately where the local host can actually open those adapters. The shared runtime event queue is still adapter-neutral; close, resize, key, text-input, pointer, and mouse-button events use the same public object shapes regardless of the selected adapter.
 - `jayess:gpu` now records `validation` alongside the host backend families in generated metadata. `validation` is the deterministic always-available backend used for command execution and executable verification, while `direct3d`, `metal`, `vulkan`, and `opengl` remain explicit host backend families behind guarded adapter files.
 - the generated GPU metadata now also reports the currently compiled backend set by platform:
   windows: `["validation", "direct3d"]`
   macos: `["validation", "metal"]`
   linux: `["validation", "opengl", "vulkan"]`
 - the generated GPU metadata also records current `createSurface(window)` host selection rules:
-  Windows prefers `direct3d`, macOS prefers `metal`, and Linux still falls back to `validation` until the Linux host-backed GPU slice lands
-- package metadata for package imports, including package name, package root, selected package field, export key, export condition, package array trace metadata, and main field when applicable
+  Windows prefers `direct3d`, macOS prefers `metal`, Linux prefers guarded `vulkan` for compatible X11 or Wayland windows, then guarded `opengl` for X11 windows, and other Linux window paths fall back to `validation`
+- GPU resource metadata stays inside the generated runtime handles for now. Buffer bytes, shader stage/source metadata, pipeline primitive metadata, and texture pixels do not add new platform metadata families until a host adapter consumes them directly.
+- package metadata for package imports, including package name, package root, selected package field, export key, export condition, package array trace metadata, attempted path/extension details for skipped array entries, and main field when applicable
+- package condition decision metadata for selected and skipped `exports` / `imports` branches, including missing condition branches and unsupported condition target shapes
+- package self-reference metadata uses the same fields as ordinary package imports, with `packageResolutionMode: "self-reference"` plus any selected export key, pattern match, condition decisions, or array trace entries
 - native import dependency entries for copied headers, native source files, and shared/static libraries
 
 The file is emitted under `targetDirname` and is deterministic for the same input graph.

@@ -105,6 +105,9 @@ export function privateKeyFromPemBlock(block) {
   if (!endsWith(block.label, "PRIVATE KEY")) {
     fail("Jayess crypto privateKeyFromPem expects a PRIVATE KEY block");
   }
+  if (block.label !== "PRIVATE KEY" && block.label !== "RSA PRIVATE KEY" && block.label !== "EC PRIVATE KEY") {
+    fail("Jayess crypto privateKeyFromPem found an unsupported private key algorithm");
+  }
   return {
     kind: "privateKey",
     source: "pem",

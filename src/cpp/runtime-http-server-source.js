@@ -3,8 +3,12 @@ export function getHttpServerRuntimeStateFragment() {
   std::intptr_t fd = -1;
   bool closed = false;
   bool accept_loop_exited = false;
+  std::size_t max_header_bytes = 0;
   std::size_t max_request_body_bytes = 0;
   std::size_t max_response_body_bytes = 0;
+  int idle_timeout_milliseconds = 0;
+  int header_timeout_milliseconds = 0;
+  int body_timeout_milliseconds = 0;
   std::vector<std::intptr_t> active_client_fds;
   std::condition_variable shutdown_condition;
   std::mutex mutex;
@@ -21,10 +25,17 @@ value http_create_server(const value& handler, const value& optionsValue) {
     throw std::runtime_error("Jayess http createServer expects a handler function");
   }
   const auto options = parse_http_server_options(optionsValue);
+  if (options.tls_enabled) {
+    throw_http_tls_unavailable();
+  }
   auto server = std::make_shared<http_server_state>();
   server->fd = http_listen_socket(options);
+  server->max_header_bytes = options.max_header_bytes;
   server->max_request_body_bytes = options.max_request_body_bytes;
   server->max_response_body_bytes = options.max_response_body_bytes;
+  server->idle_timeout_milliseconds = options.idle_timeout_milliseconds;
+  server->header_timeout_milliseconds = options.header_timeout_milliseconds;
+  server->body_timeout_milliseconds = options.body_timeout_milliseconds;
   std::thread([server, handler]() mutable {
     http_accept_loop(server, handler);
   }).detach();
@@ -57,5 +68,15 @@ value http_close_server(const value& serverValue) {
     return server->accept_loop_exited;
   });
   return value(std::monostate{});
+}
+
+value http_server_state_value(const value& serverValue) {
+  const auto server = require_http_server(serverValue);
+  std::lock_guard<std::mutex> lock(server->mutex);
+  return make_object({
+    {"closed", server->closed},
+    {"acceptLoopExited", server->accept_loop_exited},
+    {"activeClients", static_cast<double>(server->active_client_fds.size())}
+  });
 }`;
 }

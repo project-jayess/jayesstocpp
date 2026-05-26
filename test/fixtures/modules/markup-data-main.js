@@ -1,4 +1,4 @@
-import { toHtml, tokenize } from "jayess:markdown";
+import { toHtml, toSafeHtml, tokenize } from "jayess:markdown";
 import { parse as parseXml, stringify as stringifyXml } from "jayess:xml";
 import { parse as parseYaml, stringify as stringifyYaml } from "jayess:yaml";
 
@@ -18,6 +18,7 @@ export function run() {
   var yamlText = stringifyYaml(yamlData);
   var markdownTokens = tokenize("# Jayess\n\n- native\n- c++\n\n```js\nvar name = \"Jayess\";\n```");
   var html = toHtml("# Jayess\n\nBuild [native](https://example.test) tools.\n\n- fast\n- portable");
+  var safeHtml = toSafeHtml("Click [unsafe](javascript:bad)\n\nOpen [safe](/safe)");
   return [
     xml.name,
     xml.attributes.priority,
@@ -34,7 +35,9 @@ export function run() {
     markdownTokens[3].type,
     html.includes("<h1>Jayess</h1>"),
     html.includes("<a href=\"https://example.test\">native</a>"),
-    html.includes("<ul>")
+    html.includes("<ul>"),
+    safeHtml.includes("&lt;a href=\"javascript:bad\"&gt;unsafe</a>"),
+    safeHtml.includes("<a href=\"/safe\">safe</a>")
   ];
 }
 

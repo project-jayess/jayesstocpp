@@ -147,12 +147,12 @@ export function copySync(fromPath, toPath) {
   return jayessFsCopySync(fromPath, toPath);
 }
 
-export function copyRecursive(fromPath, toPath) {
-  return jayessFsCopyRecursive(fromPath, toPath);
+export function copyRecursive(fromPath, toPath, options = null) {
+  return jayessFsCopyRecursive(fromPath, toPath, options);
 }
 
-export function copyRecursiveSync(fromPath, toPath) {
-  return jayessFsCopyRecursiveSync(fromPath, toPath);
+export function copyRecursiveSync(fromPath, toPath, options = null) {
+  return jayessFsCopyRecursiveSync(fromPath, toPath, options);
 }
 
 export function createDirectories(path) {
@@ -195,12 +195,12 @@ export function removeSync(path) {
   return jayessFsRemoveSync(path);
 }
 
-export function removeRecursive(path) {
-  return jayessFsRemoveRecursive(path);
+export function removeRecursive(path, options = null) {
+  return jayessFsRemoveRecursive(path, options);
 }
 
-export function removeRecursiveSync(path) {
-  return jayessFsRemoveRecursiveSync(path);
+export function removeRecursiveSync(path, options = null) {
+  return jayessFsRemoveRecursiveSync(path, options);
 }
 
 export function list(path) {
@@ -211,12 +211,12 @@ export function listSync(path) {
   return jayessFsListSync(path);
 }
 
-export function walk(path) {
-  return jayessFsWalk(path);
+export function walk(path, options = null) {
+  return jayessFsWalk(path, options);
 }
 
-export function walkSync(path) {
-  return jayessFsWalkSync(path);
+export function walkSync(path, options = null) {
+  return jayessFsWalkSync(path, options);
 }
 
 export function rename(fromPath, toPath) {

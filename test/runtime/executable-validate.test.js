@@ -25,6 +25,9 @@ int main() {
   require(std::get<bool>(items[1]) == false, "invalid ok");
   require(std::get<double>(items[2]) == 5.0, "invalid error count");
   require(std::get<std::string>(items[3]) == "Jayess", "asserted value");
+  require(std::get<bool>(items[4]) == true, "valid config ok");
+  require(std::get<bool>(items[5]) == false, "extra config rejected");
+  require(std::get<std::string>(items[6]).find("debug is not allowed") != std::string::npos, "extra config error");
   try {
     ${namespace}::invalidAssert(std::vector<jayess::value>{});
     throw std::runtime_error("expected validate assert diagnostic");

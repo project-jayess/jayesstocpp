@@ -1,6 +1,7 @@
 import { join } from "jayess:array";
 import { keys } from "jayess:object";
 import { includes, replaceAll, slice } from "jayess:string";
+export { sanitizeSubset } from "./sanitize.js";
 
 const htmlNameCharacters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:_-";
 

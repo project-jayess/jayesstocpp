@@ -60,6 +60,53 @@ std::string dialog_optional_string_option(const object_ptr& options, const std::
   return std::get<std::string>(stored);
 }
 
+bool dialog_optional_bool_option(const object_ptr& options, const std::string& key, const std::string& operationName) {
+  const auto stored = dialog_option_value(options, key);
+  if (std::holds_alternative<std::monostate>(stored)) {
+    return false;
+  }
+  if (!std::holds_alternative<bool>(stored)) {
+    throw std::runtime_error("Jayess dialog " + operationName + " option '" + key + "' must be a boolean");
+  }
+  return std::get<bool>(stored);
+}
+
+void dialog_validate_supported_options(const object_ptr& options, const std::string& operationName, const std::vector<std::string>& supportedKeys) {
+  for (const auto& entry : options->fields) {
+    if (std::find(supportedKeys.begin(), supportedKeys.end(), entry.first) == supportedKeys.end()) {
+      throw_unsupported_option("dialog " + operationName, entry.first);
+    }
+  }
+}
+
+bool dialog_open_file_multiple_option(const value& optionsValue) {
+  const auto options = dialog_require_options_object(optionsValue, "openFile");
+  return dialog_optional_bool_option(options, "multiple", "openFile");
+}
+
+value dialog_picker_override_result(const std::string& override, bool multiple) {
+  if (override == "cancel") {
+    return std::monostate{};
+  }
+  if (!multiple) {
+    return override;
+  }
+  std::vector<value> paths;
+  std::size_t start = 0;
+  while (start <= override.size()) {
+    const auto delimiter = override.find(';', start);
+    const auto end = delimiter == std::string::npos ? override.size() : delimiter;
+    if (end > start) {
+      paths.push_back(override.substr(start, end - start));
+    }
+    if (delimiter == std::string::npos) {
+      break;
+    }
+    start = delimiter + 1;
+  }
+  return make_array(std::move(paths));
+}
+
 void dialog_validate_filters_option(const object_ptr& options, const std::string& operationName) {
   const auto stored = dialog_option_value(options, "filters");
   if (std::holds_alternative<std::monostate>(stored)) {
@@ -75,6 +122,7 @@ void dialog_validate_filters_option(const object_ptr& options, const std::string
       throw std::runtime_error("Jayess dialog " + operationName + " filters must contain objects");
     }
     const auto filterObject = std::get<object_ptr>(filter);
+    dialog_validate_supported_options(filterObject, operationName + " filter", {"name", "extensions"});
     dialog_optional_string_option(filterObject, "name", operationName + " filter");
     const auto extensions = dialog_option_value(filterObject, "extensions");
     if (!std::holds_alternative<array_ptr>(extensions)) {
@@ -111,26 +159,32 @@ void dialog_validate_kind_option(const object_ptr& options) {
 
 void dialog_validate_open_file_options(const value& optionsValue) {
   const auto options = dialog_require_options_object(optionsValue, "openFile");
+  dialog_validate_supported_options(options, "openFile", {"title", "defaultPath", "filters", "multiple"});
   dialog_optional_string_option(options, "title", "openFile");
   dialog_optional_string_option(options, "defaultPath", "openFile");
+  dialog_optional_bool_option(options, "multiple", "openFile");
   dialog_validate_filters_option(options, "openFile");
 }
 
 void dialog_validate_save_file_options(const value& optionsValue) {
   const auto options = dialog_require_options_object(optionsValue, "saveFile");
+  dialog_validate_supported_options(options, "saveFile", {"title", "defaultPath", "defaultName", "filters"});
   dialog_optional_string_option(options, "title", "saveFile");
   dialog_optional_string_option(options, "defaultPath", "saveFile");
+  dialog_optional_string_option(options, "defaultName", "saveFile");
   dialog_validate_filters_option(options, "saveFile");
 }
 
 void dialog_validate_open_directory_options(const value& optionsValue) {
   const auto options = dialog_require_options_object(optionsValue, "openDirectory");
+  dialog_validate_supported_options(options, "openDirectory", {"title", "defaultPath"});
   dialog_optional_string_option(options, "title", "openDirectory");
   dialog_optional_string_option(options, "defaultPath", "openDirectory");
 }
 
 void dialog_validate_message_options(const value& optionsValue) {
   const auto options = dialog_require_options_object(optionsValue, "message");
+  dialog_validate_supported_options(options, "message", {"title", "message", "detail", "kind", "buttons"});
   dialog_optional_string_option(options, "title", "message");
   dialog_optional_string_option(options, "message", "message");
   dialog_optional_string_option(options, "detail", "message");

@@ -8,9 +8,16 @@ function intrinsicLength(widget, axis) {
   if (axis === "column" && widget.height !== null) {
     return widget.height;
   }
-  if (widget.kind === "label" || widget.kind === "button") {
-    var measured = measureText(null, widget.text);
+  if (widget.kind === "label" || widget.kind === "button" || widget.kind === "textInput" || widget.kind === "checkbox" || widget.kind === "radio") {
+    var textValue = widget.kind === "textInput" ? widget.value : widget.text;
+    if (widget.kind === "textInput" && textValue === "") {
+      textValue = widget.placeholder;
+    }
+    var measured = measureText(null, textValue);
     if (axis === "row") {
+      if (widget.kind === "checkbox" || widget.kind === "radio") {
+        return measured.width + widget.padding * 2 + 14;
+      }
       return measured.width + widget.padding * 2;
     }
     return lineHeight(null) + widget.padding * 2;

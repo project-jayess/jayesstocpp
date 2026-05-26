@@ -52,6 +52,8 @@ In practical terms, these are the JavaScript features Jayess should continue to 
 Jayess uses `null` as its only built-in “missing” sentinel in the current language direction.
 Jayess also keeps `async` / `await` as Jayess-owned language/runtime behavior rather than adopting JavaScript `Promise` programming style.
 
+Jayess does not currently ship a repository-owned database surface. `jayess:db`, `jayess:sqlite`, bundled SQLite adapters, and database runtime fragments are out of scope for the current standard-library direction.
+
 Jayess also keeps truthiness, equality, and numeric operators explicit rather than coercive:
 
 - empty arrays, empty objects, empty maps, and empty sets are falsey

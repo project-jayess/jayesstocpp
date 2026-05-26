@@ -1,5 +1,5 @@
 import { join } from "jayess:array";
-import { escapeAttribute, escapeText } from "jayess:html";
+import { escapeAttribute, escapeText, sanitizeSubset } from "jayess:html";
 import { startsWith, slice, split, trim } from "jayess:string";
 
 function headingLevel(line) {
@@ -116,4 +116,8 @@ export function toHtml(text) {
     parts.push("</ul>");
   }
   return join(parts, "\n");
+}
+
+export function toSafeHtml(text) {
+  return sanitizeSubset(toHtml(text));
 }

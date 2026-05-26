@@ -14,6 +14,10 @@ inline jayess::value jayessGpuCreateBuffer(const std::vector<jayess::value>& jay
   return jayess::gpu_create_buffer(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }
 
+inline jayess::value jayessGpuUploadBuffer(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::gpu_upload_buffer(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
 inline jayess::value jayessGpuCreateTexture(const std::vector<jayess::value>& jayessArgs) {
   return jayess::gpu_create_texture(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }

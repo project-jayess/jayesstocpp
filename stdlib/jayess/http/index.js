@@ -11,6 +11,7 @@ import {
   jayessHttpEnd,
   jayessHttpEndStream,
   jayessHttpRequest,
+  jayessHttpServerState,
   jayessHttpSetHeader,
   jayessHttpSetStatus,
   jayessHttpWrite,
@@ -26,6 +27,8 @@ import { parse as parseQuery } from "jayess:querystring";
 import { includes, slice, split, startsWith, toLower } from "jayess:string";
 import { readChunk } from "jayess:stream";
 import { timeoutWithCancellation, withCancellation, withTimeout } from "jayess:async";
+export { getSignedCookie, setSignedCookie, signSession, verifySession } from "./session.js";
+export { pathname, queryParam, url } from "./request.js";
 
 export function request(options) {
   return jayessHttpRequest(options);
@@ -136,6 +139,10 @@ export function createServer(handler, options) {
 
 export function close(server) {
   return jayessHttpCloseServer(server);
+}
+
+export function state(server) {
+  return jayessHttpServerState(server);
 }
 
 export function setStatus(response, statusCode) {

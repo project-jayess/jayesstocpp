@@ -4,7 +4,7 @@ import path from "node:path";
 import { transpileFile } from "../../src/api/transpile-file.js";
 import { compileAndRunCppExecutable, findAvailableCompiler } from "../support/compiler.js";
 import { createManagedTempDir } from "../support/temp-dir.js";
-import { generatedEntryForFixture } from "../support/generated-executable.js";
+import { generatedEntryForFixture, skipIfRuntimeUnavailableOutput } from "../support/generated-executable.js";
 
 const runtimeTest = findAvailableCompiler() == null ? test.skip : test;
 
@@ -169,6 +169,17 @@ bool has_key_event(const std::vector<jayess::value>& events, const std::string& 
   return false;
 }
 
+bool has_text_input_event(const std::vector<jayess::value>& events, const std::string& text) {
+  for (const auto& item : events) {
+    const auto event = std::get<jayess::object_ptr>(item);
+    if (std::get<std::string>(event->fields.at("type")) == "textInput"
+        && std::get<std::string>(event->fields.at("text")) == text) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool has_mouse_move_event(const std::vector<jayess::value>& events, double x, double y) {
   for (const auto& item : events) {
     const auto event = std::get<jayess::object_ptr>(item);
@@ -316,6 +327,7 @@ int main() {
       collected.insert(collected.end(), items.begin(), items.end());
       if (has_resize_event(collected, 120.0, 70.0)
           && has_key_event(collected, "keyDown", "a", "KeyA")
+          && has_text_input_event(collected, "a")
           && has_key_event(collected, "keyUp", "Escape", "Escape")
           && has_mouse_move_event(collected, 11.0, 13.0)
           && has_mouse_button_event(collected, "mouseDown", "left", true)
@@ -328,6 +340,7 @@ int main() {
 
     require(has_resize_event(collected, 120.0, 70.0), "x11 resize event normalized");
     require(has_key_event(collected, "keyDown", "a", "KeyA"), "x11 keyDown event normalized");
+    require(has_text_input_event(collected, "a"), "x11 textInput event normalized");
     require(has_key_event(collected, "keyUp", "Escape", "Escape"), "x11 keyUp event normalized");
     require(has_mouse_move_event(collected, 11.0, 13.0), "x11 mouseMove event normalized");
     require(has_mouse_button_event(collected, "mouseDown", "left", true), "x11 mouseDown event normalized");
@@ -367,8 +380,11 @@ runtimeTest("generated C++ verifies current X11 window lifecycle, present, resiz
     windowX11Main(generatedEntryForFixture(fixturePath))
   );
 
-  if (output.trim() === "skip:x11-unavailable") {
-    t.skip("X11 window adapter or display is unavailable on this host");
+  if (skipIfRuntimeUnavailableOutput(t, output, "skip:x11-unavailable", {
+    moduleName: "jayess:window",
+    adapter: "x11",
+    capability: "display and event probe"
+  })) {
     return;
   }
 

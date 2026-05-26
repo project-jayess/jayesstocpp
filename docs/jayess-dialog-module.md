@@ -40,9 +40,10 @@ The first approved normalized result shapes are:
 Returns one of:
 
 - a string absolute or host-native path when the user picks a file
+- an array of string paths when `multiple: true` is passed and the user picks one or more files
 - `null` when the user cancels
 
-The first slice is single-file selection only. Multi-select remains a later separate task.
+Single-select remains the default so existing `openFile(options)` callers keep receiving one path string or `null`.
 
 ### `saveFile(options)`
 
@@ -104,6 +105,18 @@ The first approved option family is:
 - `defaultPath`
 - `filters`
 
+`openFile(options)` also accepts:
+
+- `multiple`
+
+When `multiple` is `true`, `openFile` resolves to an array of selected file paths. When it is omitted or `false`, `openFile` resolves to one selected path string or `null`.
+
+`saveFile(options)` also accepts:
+
+- `defaultName`
+
+`defaultName` gives the host save panel an initial filename without writing file contents.
+
 `filters` should normalize to plain Jayess data such as:
 
 ```js
@@ -114,6 +127,8 @@ The first approved option family is:
 ```
 
 If a host cannot represent a filter exactly, the adapter should either lower it conservatively or reject it with a focused diagnostic. It must not silently reinterpret the filter into unrelated host behavior.
+
+The current Windows and Cocoa adapters lower extension filters into their native picker APIs. The Linux adapter keeps the `xdg-desktop-portal` boundary explicit in this runtime slice and validates options before reporting the normalized unavailable-host diagnostic when the portal path is not available.
 
 ### `openDirectory(options)`
 
@@ -152,7 +167,6 @@ These normalize to the message result strings described above.
 
 The first `jayess:dialog` slice does not yet claim:
 
-- multi-file selection
 - non-blocking dialog handles
 - progress dialogs
 - custom accessory views or embedded widgets

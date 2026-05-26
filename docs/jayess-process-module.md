@@ -26,7 +26,7 @@ import { argv, cwd, getEnv, hasEnv, envKeys, envEntries, exit } from "jayess:pro
 
 The module throws Jayess runtime errors for:
 
-- non-string environment keys passed to `getEnv` or `hasEnv`
+- non-string or empty environment keys passed to `getEnv` or `hasEnv`
 - non-integer exit codes passed to `exit`
 
 ## Implementation

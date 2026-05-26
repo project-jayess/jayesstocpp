@@ -10,6 +10,8 @@ export function serveLimited(port, maxRequestBodyBytes, maxResponseBodyBytes) {
     host: "127.0.0.1",
     port: port,
     backlog: 4,
+    maxHeaderBytes: 16384,
+    maxBodyBytes: maxRequestBodyBytes,
     maxRequestBodyBytes: maxRequestBodyBytes,
     maxResponseBodyBytes: maxResponseBodyBytes
   });

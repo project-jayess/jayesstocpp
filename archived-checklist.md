@@ -4,7 +4,7 @@ This file archives completed milestones that were moved out of the active [check
 
 Use the repository-root [checklist.md](./checklist.md) for current implementation work. Use [Jayess.md](./Jayess.md), [Agents.md](./Agents.md), [docs/feature-matrix.md](./docs/feature-matrix.md), and [docs/standard-library-matrix.md](./docs/standard-library-matrix.md) for current language and shipped-surface guidance.
 
-Completed milestones through section 309 now live here.
+Completed milestones through section 378 now live here.
 
 ## 0. Project Baseline
 
@@ -5520,3 +5520,892 @@ Decision: private static fields, private static methods, static inheritance, com
 - [x] Add focused regression tests only where the audit reveals a real shipped feature without coverage.
 - [x] Update `checklist.md` structure so only active implementation slices remain in the working checklist.
 - [x] Update archived-roadmap references if the audit changes where contributors should look for shipped vs planned surfaces.
+
+## 310. Executable Runtime Verification
+
+- [x] Define the first approved executable-runtime verification scope and keep it separate from pure compile-validation.
+- [x] Add a focused runtime-execution test harness under `test/` that compiles generated output and executes selected exported entry points.
+- [x] Add runtime-execution verification for async completion ordering and failure propagation.
+- [x] Add runtime-execution verification for generator iteration behavior and completion/failure behavior.
+- [x] Add runtime-execution verification for regex helper behavior, especially match and replacement edge cases.
+- [x] Add runtime-execution verification for filesystem/path/process host-module behavior through controlled temp fixtures.
+- [x] Add runtime-execution verification for map/set identity and iteration/data helper behavior.
+- [x] Add runtime-execution verification for exception bridging from Jayess-thrown values and native `std::exception` failures.
+- [x] Keep runtime-verification fixtures small and purpose-built instead of reusing one giant integration project.
+- [x] Update docs to explain which behavior is compile-validated only and which behavior is executable-runtime verified.
+
+## 311. Standard Library Behavioral Hardening
+
+- [x] Audit `jayess:array` exports for argument-count validation, null handling, empty-input behavior, and callback failure propagation.
+- [x] Audit `jayess:string` exports for argument-count validation, empty-string behavior, and non-coercive semantics.
+- [x] Audit `jayess:object` helpers for null/composite handling, ordering guarantees, and invalid-input diagnostics.
+- [x] Audit `jayess:number` helpers for parsing edge cases, invalid-input behavior, and exact return-value semantics.
+- [x] Audit `jayess:regex` helpers for invalid-pattern handling, no-match behavior, and callback-free replacement semantics.
+- [x] Audit `jayess:url` helpers for invalid-input behavior, normalization rules, and result-shape guarantees.
+- [x] Audit `jayess:bytes` and `jayess:buffer` helpers for bounds checks, mutation semantics, and invalid-input diagnostics.
+- [x] Audit `jayess:iter` helpers for completion behavior, callback semantics, and generator failure propagation.
+- [x] Audit `jayess:time` helpers for unit semantics, monotonic behavior, and duration-formatting guarantees.
+- [x] Add focused runtime and API tests for each audited module family instead of broad umbrella tests.
+- [x] Update each affected `docs/jayess-*.md` file so per-export behavior and edge cases are explicit.
+
+## 312. Module And Package Ecosystem Polish
+
+- [x] Audit package-import resolution behavior for root exports, explicit subpath exports, and Jayess-specific package conditions.
+- [x] Add focused fixture coverage for workspaces/monorepo-style local package layouts if the current resolver claims to support them.
+- [x] Tighten diagnostics for invalid Jayess packages versus ordinary installed JavaScript packages that are not transpileable.
+- [x] Tighten diagnostics for unsupported package export maps and unsupported file-type targets.
+- [x] Audit built-in-module resolution so every documented `jayess:*` module is recognized consistently by `transpileFile()`.
+- [x] Audit `transpile()` string-mode diagnostics so built-in-module imports fail consistently with explicit resolver guidance.
+- [x] Add fixture coverage for native header/source/library import packaging into the generated target directory.
+- [x] Verify target-directory layout stability for package modules, scoped packages, and copied native artifacts.
+- [x] Update package-resolution and generated-layout docs after the resolver and packaging behavior are locked.
+
+## 313. Host And System Module Expansion
+
+- [x] Define the next approved `jayess:fs` helper family explicitly instead of broad “more fs”.
+- [x] Define the next approved `jayess:path` helper family explicitly instead of broad “more path”.
+- [x] Define the next approved `jayess:process` helper family explicitly, keeping env mutation and subprocess policy separate.
+- [x] Define whether `jayess:os`, `jayess:url`, `jayess:timers`, `jayess:thread`, or `jayess:subprocess` is the next active host-module slice.
+- [x] Add only the minimal native adapter primitives needed for the approved next host-module slice.
+- [x] Implement the approved next Jayess module wrappers in Jayess source where practical.
+- [x] Add compile-validation and executable-runtime verification for each new host-module slice together.
+- [x] Keep raw `node:*` imports and non-approved host APIs rejected with focused diagnostics.
+- [x] Update host/system-module docs after each slice lands.
+
+## 314. Regex Expansion
+
+- [x] Define the next approved `jayess:regex` slice explicitly: flags policy, `split`, `matchAll`, replacement helpers, and result-shape policy as separate tasks.
+- [x] Decide whether regex literals remain unsupported by design or become an explicitly approved parser slice.
+- [x] Add only the native/runtime support needed for the approved next regex helper family.
+- [x] Implement the approved next `jayess:regex` helpers in Jayess source where practical.
+- [x] Add semantic diagnostics for still-unsupported ambient/global regex forms.
+- [x] Add compile-validation and executable-runtime verification for the new regex slice.
+- [x] Update regex docs after the next slice lands.
+
+## 315. Date, JSON, Map, And Set Depth
+
+- [x] Define the next approved `jayess:date` slice explicitly: richer formatting, richer parsing, arithmetic helpers, and timezone policy as separate tasks.
+- [x] Define the next approved `jayess:json` slice explicitly: validation, transform/replacement policy, and formatting helpers as separate tasks.
+- [x] Define the next approved `jayess:collections/map` slice explicitly: bulk construction, bulk updates, and data/iteration helpers as separate tasks.
+- [x] Define the next approved `jayess:collections/set` slice explicitly: union/intersection/difference, bulk construction, and data/iteration helpers as separate tasks.
+- [x] Add only the primitive/runtime support needed for the approved next built-in-module helpers.
+- [x] Implement the approved next module-level helpers in Jayess source where practical.
+- [x] Add API, runtime, and executable verification for each next built-in-module slice separately.
+- [x] Update built-in module docs after each next slice lands.
+
+## 316. Codegen And Runtime Structure Polish
+
+- [x] Audit large backend files for repeated codegen patterns that can be extracted into focused helpers without semantic change.
+- [x] Audit runtime fragment layout for oversized mixed-responsibility files and split one responsibility at a time where needed.
+- [x] Tighten generated symbol/name stability so repeated runs keep stable helper names where practical.
+- [x] Improve generated project readability only where it does not change semantics or file layout guarantees.
+- [x] Reduce codegen duplication across async, generator, and class lowering where one shared narrow helper is justified.
+- [x] Add regression tests or snapshot updates only where codegen shape intentionally changes.
+- [x] Update generated-project and runtime-architecture docs after any structural cleanup lands.
+
+## 317. Diagnostics And Native Interop UX
+
+- [x] Audit parser diagnostics so unsupported-by-design features are consistently distinguished from not-yet-implemented slices.
+- [x] Audit semantic diagnostics for built-in-module guidance, especially `jayess:*` replacements for ambient JavaScript/Node names.
+- [x] Audit module-resolution diagnostics for missing packages, unsupported targets, and invalid native artifacts.
+- [x] Audit native-import diagnostics for headers, source files, shared libraries, and static libraries.
+- [x] Add or tighten docs that show recommended small C++ adapter patterns for awkward native APIs.
+- [x] Add focused tests for improved diagnostic wording where the messages are part of the intended developer UX.
+
+## 318. `jayess:image` Depth And Hardening
+
+- [x] Audit the shipped `jayess:image` exports against the runtime/image docs and lock the exact first-class supported file-format matrix in `docs/jayess-image-module.md`.
+- [x] Add focused malformed-input validation tests for `loadPpm`, `loadPgm`, `loadBmp`, and `loadTga`, including truncated headers, invalid dimensions, unsupported bit depths, and overflow-prone sizes.
+- [x] Tighten image runtime bounds, dimension, allocation, and multiplication overflow checks so hostile width/height values fail before large allocations.
+- [x] Add bytes-first helper slices for non-filesystem image transport only where the runtime already has a deterministic implementation path.
+- [x] Define and implement one narrow bulk pixel-operation helper family so higher-level drawing code can avoid repeated per-pixel wrapper overhead.
+- [x] Define and implement one narrow image-view/subimage slice only if it can preserve lifetime safety and avoid mutable aliasing surprises.
+- [x] Add executable runtime verification for every shipped image format round-trip and for crop, resize, rotate, flip, blit, and transparent blit edge cases.
+- [x] Update generated-project and runtime-verification docs if image helpers add new runtime fragments or bytes-oriented helper paths.
+
+## 319. `jayess:canvas` Drawing And State Expansion
+
+- [x] Audit the shipped `jayess:canvas` drawing surface against `jayess:image` so overlapping responsibilities stay clearly separated.
+- [x] Define the next approved canvas state slice explicitly: transform stack, clip stack, or draw-state save/restore as separate tasks rather than one umbrella feature.
+- [x] Implement the first approved canvas state helper family in Jayess source without making `jayess:canvas` depend on native window or GPU code.
+- [x] Define and implement one narrow stroke-style slice such as stroke width plus line caps or joins, keeping fill and stroke behavior deterministic.
+- [x] Tighten alpha-blending consistency across rectangles, image blits, and future stroke/fill helpers so all canvas paths share one explicit compositing rule.
+- [x] Extract one focused repeated scanline or shape helper out of `stdlib/jayess/canvas/index.js` if the current file grows further.
+- [x] Add executable image-golden verification for clipping, overlap ordering, alpha blending, curves, polygons, and text-box layout.
+- [x] Update `docs/jayess-canvas-module.md` with explicit per-export edge cases, especially clipping, out-of-bounds drawing, and deterministic text behavior.
+
+## 320. `jayess:window` Cross-Platform Adapters, X11, Wayland, And Event Loop
+
+- [x] Audit the current `jayess:window` surface, docs, and tests so the real Linux/X11-backed behavior is separated clearly from guarded placeholder adapters.
+- [x] Tighten the platform-neutral window handle/runtime layer in `src/cpp/runtime-window-source.js` so create/show/close/requestClose/pollEvents/present invariants are explicit and adapter-independent.
+- [x] Add executable runtime verification for current X11 window lifecycle, present, resize, close, keyboard, and mouse event normalization.
+- [x] Implement the first Windows adapter slice with Win32 window creation, title changes, close lifecycle, event polling, and software-buffer presentation through a narrow GDI/DIB path.
+- [x] Implement the first macOS adapter slice in a focused Objective-C++ runtime fragment with create/show/close/title/event/present parity matching the normalized window surface.
+- [x] Define the first Wayland adapter boundary explicitly in docs and runtime metadata so it stays separate from the X11 adapter and does not leak protocol details into the public Jayess API.
+- [x] Implement the first Wayland adapter slice with create/show/close, normalized close and resize events, and software-buffer presentation through a narrow Wayland client path.
+- [x] Add adapter-selection logic and generated metadata so Linux builds report whether X11, Wayland, or both adapters are compiled into the generated project.
+- [x] Normalize platform-unavailable and adapter-unavailable diagnostics so Linux/X11, Linux/Wayland, Windows, and macOS all fail with deliberate messages instead of host-specific crashes.
+- [x] Define and implement a focused event-loop helper layer shared with `jayess:timers`, keeping `pollEvents(window)` explicit while adding one narrow frame/update scheduling path for real apps.
+- [x] Add executable runtime verification for both Linux/X11 and Linux/Wayland code paths where host availability permits, with explicit skipped-host diagnostics where it does not.
+- [x] Update `docs/jayess-window-module.md`, `docs/jayess-native-gui.md`, and generated-project metadata docs after each adapter slice lands.
+
+## 321. Jayess-Owned GUI Toolkit Over `image`, `canvas`, And `window`
+
+- [x] Add a dedicated `docs/jayess-gui-toolkit.md` file that defines the first Jayess-owned toolkit direction over `jayess:image`, `jayess:canvas`, and `jayess:window`.
+- [x] Define the first toolkit object model explicitly: application, window state, widget tree, layout pass, paint pass, and event dispatch as separate responsibilities.
+- [x] Define the first approved widget slice explicitly instead of broad “GUI toolkit”: label, button, panel, stack/column/row layout, and text input as separate later tasks.
+- [x] Implement the first minimal toolkit module in Jayess source only after the window/event-loop invariants are stable.
+- [x] Keep toolkit rendering purely canvas-based for the first slice so the toolkit does not depend on `jayess:gpu`.
+- [x] Define and implement one narrow invalidation/repaint path so window presentation repaints only through explicit toolkit update/draw steps.
+- [x] Add focused executable runtime verification for first-toolkit interaction behavior: layout, hover/click dispatch, and redraw after state changes.
+- [x] Update docs so contributors understand that Jayess’s default GUI direction is its own toolkit, not browser DOM or Node.js GUI compatibility.
+
+## 322. `jayess:gpu` Real Backend Implementation
+
+- [x] Audit the shipped `jayess:gpu` docs, wrappers, and runtime fragments so placeholder command validation is distinguished clearly from real backend support.
+- [x] Define the first real backend slice explicitly: resource lifetime, texture format subset, shader source policy, pipeline shape, and presentation model as separate tasks.
+- [x] Implement one focused software or validation backend path for deterministic tests so frame-command validation does not depend entirely on hardware-backed execution.
+- [x] Implement the first Windows real backend slice behind the existing backend boundary, keeping Direct3D-specific details inside focused adapter files.
+- [x] Implement the first macOS real backend slice behind the existing backend boundary, keeping Metal-specific details inside focused adapter files.
+- [x] Choose one Linux real backend slice for actual implementation first and keep the other Linux backend as a later separate slice instead of mixing Vulkan and OpenGL in one pass.
+- [x] Tighten backend capability metadata so devices, surfaces, buffers, textures, shaders, pipelines, and frames expose only the minimal stable fields the Jayess layer needs.
+- [x] Define and implement one narrow resource-upload path from `jayess:image` or `jayess:bytes` into GPU textures without making `jayess:canvas` depend on GPU.
+- [x] Add executable runtime verification for backend-unavailable diagnostics, validation-backend command recording, and one real backend clear/draw/present round-trip per supported host family.
+- [x] Update `docs/jayess-gpu-module.md`, `docs/jayess-native-gui.md`, and generated metadata docs after the first real backend slice lands.
+
+## 323. `jayess:http` Cross-Platform Production Server Hardening
+
+- [x] Audit the current `jayess:http` runtime and docs so plain HTTP client/server scope, unsupported host behavior, and non-TLS boundaries are explicit.
+- [x] Implement the first Windows server/runtime support slice so `createServer`, request parsing, response sending, and `close(server)` are not Unix-only.
+- [x] Tighten HTTP request parsing with explicit limits for header count, header size, request line size, and malformed request rejection.
+- [x] Define and implement one explicit connection timeout policy for idle sockets, header read time, and body read time.
+- [x] Add request-body and response-body size guardrails with deliberate defaults and per-request override hooks where the current API already has a place for them.
+- [x] Implement keep-alive handling deliberately, including connection close semantics, response completion rules, and invalid pipelining rejection if pipelining is not supported.
+- [x] Add graceful server shutdown semantics: stop accepting, finish or time out active requests, then close sockets predictably.
+- [x] Tighten static-file serving path normalization, MIME lookup behavior, and file-send error handling under concurrent access.
+- [x] Define and implement one streaming body path that does real incremental send/receive behavior instead of fully buffering first where the current helpers do so.
+- [x] Add executable runtime verification for malformed requests, oversized headers, idle timeout, graceful shutdown, concurrent requests, and Windows plus Unix lifecycle parity.
+- [x] Add or update docs to state clearly what “production level” means for the shipped `jayess:http` slice and what still remains out of scope such as TLS until `jayess:crypto` and certificate support are ready.
+
+## 324. `jayess:dialog` Native Platform Dialogs
+
+- [x] Add `docs/jayess-dialog-module.md` defining the first Jayess-owned native dialog surface and its explicit cross-platform boundaries.
+- [x] Define the first approved dialog exports explicitly: `openFile(options)`, `saveFile(options)`, `openDirectory(options)`, and `message(options)`.
+- [x] Define normalized result shapes and cancellation behavior so dialogs return plain Jayess values instead of host-specific handle types.
+- [x] Implement the platform-neutral runtime and bridge layer for dialog option validation, result normalization, and unavailable-host diagnostics.
+- [x] Implement the first Windows dialog adapter slice using platform-native open/save/message APIs.
+- [x] Implement the first macOS dialog adapter slice using platform-native open/save/message APIs.
+- [x] Define the first Linux dialog adapter path explicitly around a no-default-third-party approach and keep it separate from X11/Wayland window adapters.
+- [x] Implement the first Linux dialog adapter slice only through the approved no-default-third-party path, with normalized unavailable diagnostics where the host path cannot be used.
+- [x] Add executable runtime verification for result normalization, cancellation, invalid-option diagnostics, and platform-unavailable diagnostics.
+- [x] Update standard-library docs, module matrix docs, and generated metadata docs after the first dialog slice lands.
+
+## 325. `jayess:crypto` Hardening, Modernization, And Platform Security Hooks
+
+- [x] Audit the current `jayess:crypto` surface so the docs clearly distinguish shipped digest/HMAC/random support from unimplemented broader cryptographic APIs.
+- [x] Tighten `randomBytes(count)` so the runtime uses explicit platform CSPRNG sources per host family instead of relying on weaker unspecified randomness behavior.
+- [x] Add a constant-time byte comparison helper in the most appropriate Jayess-owned module and document when it should be used instead of ordinary equality.
+- [x] Define the next approved hash/KDF slice explicitly, keeping SHA-512, HKDF, and any later AEAD or public-key work as separate tasks.
+- [x] Implement the first approved modern hash/KDF slice in focused runtime fragments without widening the public API beyond what docs approve.
+- [x] Mark SHA-1 as legacy-only in docs and diagnostics while keeping existing behavior stable for compatibility where already shipped.
+- [x] Add executable runtime verification for random-byte length and variability, streaming-hash correctness, HMAC correctness, and constant-time helper semantics where testable.
+- [x] Define the first approved certificate/key/TLS-supporting primitive direction only when it is needed by `jayess:http`, keeping raw crypto and transport security responsibilities separate.
+- [x] Update `docs/jayess-crypto-module.md`, `docs/overview.md`, and related stdlib docs after each crypto hardening slice lands.
+
+## 326. GPU Host-Probe Portability Follow-Up
+
+- [x] Normalize the Win32 host-backed GPU executable probe so unsupported local Windows executable-test toolchains skip explicitly instead of failing through raw process-abort status codes.
+- [x] Keep the host-backed GPU runtime probes narrow and host-conditional rather than broadening them into unstable all-toolchain assertions.
+- [x] Update GPU runtime-verification docs so host-backed probe behavior is described as host- and toolchain-conditional where that is the current shipped reality.
+
+## 327. Crypto PEM Container Groundwork
+
+- [x] Implement the first shipped `jayess:crypto` PEM certificate container helper in a focused Jayess-owned helper module instead of widening the native runtime.
+- [x] Implement the matching private-key and trust-anchor PEM container helpers with deliberate normalized result shapes and focused diagnostics.
+- [x] Add focused output, compile, and executable runtime verification for PEM container normalization and invalid-label diagnostics.
+- [x] Update crypto, overview, standard-library, and runtime-verification docs after the PEM container slice lands.
+
+## 328. Built-In Buffer Module Audit Repair
+
+- [x] Repair the shipped `jayess:buffer` and `jayess:canvas` modules so their internal helper ordering matches Jayess no-hoist semantics during stdlib transpilation.
+- [x] Re-run the documented built-in-module audit and the focused buffer/canvas output, runtime, and compile checks after the repair.
+
+## 329. Runtime Handle Diagnostics Test Sync
+
+- [x] Update the broader diagnostics regression so it matches the shipped shared invalid-handle message form instead of the older pre-helper wording.
+- [x] Re-run the focused diagnostics source/runtime tests after the handle-diagnostics sync.
+
+## 330. `jayess:fs` Recursive Directory Helpers
+
+- [x] Inspect the shipped `jayess:fs` async and `Sync` helper patterns, primitive declarations, runtime fragment registration, and existing filesystem runtime tests.
+- [x] Add `walk(root, options)` as the default async directory-tree traversal helper.
+- [x] Add `walkSync(root, options)` with the same result shape as `walk`.
+- [x] Add `copyRecursive(source, target, options)` as the default async recursive copy helper.
+- [x] Add `copyRecursiveSync(source, target, options)` with matching overwrite and directory behavior.
+- [x] Add `removeRecursive(path, options)` as the default async recursive remove helper.
+- [x] Add `removeRecursiveSync(path, options)` with matching missing-path and directory behavior.
+- [x] Keep traversal result objects plain and deterministic, including `path`, `relativePath`, `type`, and size/mtime fields only where current `stat` support already provides them.
+- [x] Reject path traversal, empty paths, unsupported option keys, and recursive copy targets inside the source tree with focused diagnostics.
+- [x] Keep platform-specific filesystem behavior inside existing `jayess:fs` runtime primitives.
+- [x] Add module graph tests under `test/modules/`.
+- [x] Add output tests under `test/output/` for generated primitive declarations and runtime fragment inclusion.
+- [x] Add compile tests under `test/cpp/`.
+- [x] Add executable runtime tests under `test/runtime/` using fixture trees under `temp/`.
+- [x] Update `docs/jayess-fs-module.md`, `docs/jayess-system-modules.md`, and `docs/standard-library.md`.
+
+## 331. `jayess:path` Structure Helpers And `jayess:process` Environment Inspection
+
+- [x] Inspect shipped `jayess:path`, `jayess:process`, `jayess:system`, and generated build metadata for host-module behavior.
+- [x] Add `parse(path)` returning a plain object with `root`, `dir`, `base`, `name`, and `ext`.
+- [x] Add `format(parts)` that accepts the `parse` result shape and produces a normalized path string.
+- [x] Add `separator()` or `separator` using the current module export style already used by `jayess:path`.
+- [x] Add `delimiter()` or `delimiter` using the current module export style already used by `jayess:path`.
+- [x] Keep path helpers lexical and deterministic; do not make `parse` or `format` touch the filesystem.
+- [x] Add `hasEnv(name)` to `jayess:process` without mutating the process environment.
+- [x] Add `envKeys()` to return deterministic environment key arrays where the host allows enumeration.
+- [x] Add `envEntries()` to return deterministic key/value pairs where the host allows enumeration.
+- [x] Preserve `node:process` and ambient `process` diagnostics as unsupported.
+- [x] Add focused invalid-input diagnostics for empty environment names, non-string names, and unsupported option shapes.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-path-module.md`, `docs/jayess-process-module.md`, `docs/jayess-system-modules.md`, and `docs/standard-library.md`.
+
+## 332. `jayess:canvas` HTML And CSS Rendering Used By `jayess:gui`
+
+- [x] Inspect `stdlib/jayess/canvas/`, `stdlib/jayess/html/`, `stdlib/jayess/layout/`, `stdlib/jayess/font/`, `stdlib/jayess/image/`, `stdlib/jayess/gui/`, and current canvas/gui runtime tests.
+- [x] Add focused canvas-owned HTML parsing helpers for the first supported element subset: `div`, `span`, `p`, `button`, `input`, `label`, `img`, `ul`, `ol`, and `li`.
+- [x] Preserve deterministic diagnostics for malformed tags, unsupported attributes, mismatched closing tags, and unsupported element names.
+- [x] Add focused canvas-owned CSS parsing helpers for selectors by element, class, id, and direct inline style attributes.
+- [x] Support a first CSS property subset for canvas layout and paint: `display`, `width`, `height`, `margin`, `padding`, `background-color`, `color`, `font-size`, `border-width`, `border-color`, `border-radius`, `text-align`, and `gap`.
+- [x] Add `parseHtml(html, options)` under `jayess:canvas` returning a plain render-tree object, not a browser DOM.
+- [x] Add `parseCss(css, options)` under `jayess:canvas` returning a deterministic style-sheet object.
+- [x] Add `createHtmlDocument(html, css, options)` under `jayess:canvas` to combine parsed HTML and CSS into a render document.
+- [x] Add `layoutHtml(document, bounds)` under `jayess:canvas` using `jayess:layout` and canvas text measurement.
+- [x] Add `drawHtml(canvas, document)` under `jayess:canvas` using existing canvas, font, color, image, and layout helpers.
+- [x] Add image rendering through existing `jayess:image` handles or explicit source objects; do not add network image loading to this slice.
+- [x] Keep HTML/CSS rendering canvas-based and independent from `jayess:gpu`.
+- [x] Keep unsupported browser APIs, JavaScript-in-HTML, CSS animations, flexbox/grid completeness, DOM mutation APIs, and network loading out of the public canvas surface for this slice.
+- [x] Split HTML parsing, CSS parsing, style resolution, layout, and paint into focused files under `stdlib/jayess/canvas/` instead of adding all logic to `stdlib/jayess/canvas/index.js`.
+- [x] Add `jayess:gui` helpers that consume canvas HTML/CSS documents for windowed interaction: attach a canvas document to window state, route normalized `jayess:window` events to hit-tested document nodes, and queue actions such as button clicks and input changes.
+- [x] Keep `jayess:gui` responsible for application/window state, event dispatch, invalidation, action queues, and presentation through `jayess:window`.
+- [x] Add module graph tests under `test/modules/`.
+- [x] Add output tests under `test/output/` for generated stdlib inclusion.
+- [x] Add compile tests under `test/cpp/`.
+- [x] Add executable runtime tests under `test/runtime/` for canvas HTML parsing, CSS style resolution, layout boxes, canvas drawing, GUI click dispatch, text-input focus, and redraw behavior.
+- [x] Add deterministic image-golden tests for a small HTML/CSS scene rendered by `jayess:canvas` under `temp/`.
+- [x] Add `docs/jayess-canvas-html-css.md` and update `docs/jayess-canvas-module.md`, `docs/jayess-gui-module.md`, `docs/jayess-gui-toolkit.md`, `docs/jayess-native-gui.md`, and `docs/standard-library.md`.
+
+## 333. `jayess:window` Cocoa And Wayland Event Parity
+
+- [x] Inspect `src/cpp/runtime-window-source.js`, `runtime-window-macos-source.js`, `runtime-window-wayland-source.js`, and current host-conditional window tests.
+- [x] Preserve the existing `jayess:window` public API and normalized event object shapes.
+- [x] Add Cocoa keyboard down/up event normalization matching the Win32 and X11 field shape.
+- [x] Add Cocoa mouse move, button down, and button up event normalization matching the Win32 and X11 field shape.
+- [x] Add Wayland keyboard down/up event normalization where the current Wayland adapter can access key events.
+- [x] Add Wayland pointer move, button down, and button up event normalization where the current Wayland adapter can access pointer events.
+- [x] Preserve normalized unavailable-host diagnostics for missing AppKit, Wayland display, compositor interfaces, or input-seat capabilities.
+- [x] Keep Cocoa-specific code inside the macOS adapter and Wayland-specific code inside the Wayland adapter.
+- [x] Add output metadata tests for adapter event capability reporting.
+- [x] Add compile tests under `test/cpp/`.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` that skip through explicit unavailable diagnostics when a host cannot provide the adapter.
+- [x] Update `docs/jayess-window-module.md`, `docs/jayess-native-gui.md`, and `docs/runtime-verification.md`.
+
+## 334. Linux `jayess:gpu` OpenGL Backend Slice
+
+- [x] Inspect `src/cpp/runtime-gpu-source.js`, `runtime-gpu-opengl-source.js`, window surface adapters, and generated build-hint metadata.
+- [x] Preserve `jayess:gpu` public exports and current validation-backend behavior.
+- [x] Keep `jayess:canvas` and `jayess:gui` independent from GPU support.
+- [x] Add Linux OpenGL backend availability probing with normalized unavailable diagnostics.
+- [x] Add OpenGL surface creation for a `jayess:window` host surface where the current Linux window adapter exposes the required native handle.
+- [x] Implement `clear(frame, color)` through OpenGL for the first Linux real backend slice.
+- [x] Implement the narrow existing image/bytes texture upload path for OpenGL textures.
+- [x] Route `draw(frame, pipeline, resources)` through the existing validation path unless a minimal OpenGL draw path already has complete resource and shader tests.
+- [x] Add generated build hints for required OpenGL and platform libraries without making GPU mandatory for non-GPU programs.
+- [x] Add output tests for backend metadata, runtime fragment inclusion, and dependency-plan reporting.
+- [x] Add compile tests under `test/cpp/`.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for backend-unavailable diagnostics, clear-frame behavior, and texture upload.
+- [x] Update `docs/jayess-gpu-module.md`, `docs/gpu-backend-slice.md`, `docs/jayess-native-gui.md`, and generated-project metadata docs.
+
+## 335. Configurable `jayess:http` Server Guardrails
+
+- [x] Inspect `stdlib/jayess/http/`, HTTP runtime fragments, and current executable HTTP timeout/body-limit/shutdown tests.
+- [x] Preserve the current plain HTTP/1.1 scope and unsupported HTTPS diagnostics.
+- [x] Add `createServer(handler, options)` support for configurable `maxHeaderBytes`.
+- [x] Add `createServer(handler, options)` support for configurable `maxBodyBytes`.
+- [x] Add `createServer(handler, options)` support for configurable `idleTimeoutMillis`.
+- [x] Add `createServer(handler, options)` support for configurable `headerTimeoutMillis`.
+- [x] Add `createServer(handler, options)` support for configurable `bodyTimeoutMillis`.
+- [x] Add focused option validation for negative, zero, non-number, and unsupported server option keys.
+- [x] Expose one small server-state helper if needed for graceful shutdown verification without widening the API into a full server-management framework.
+- [x] Preserve deterministic malformed-request, oversized-header, oversized-body, and timeout diagnostics.
+- [x] Keep HTTP parsing, response writing, timeout handling, and shutdown helpers split across focused runtime files.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-http-module.md`, `docs/runtime-verification.md`, and `docs/standard-library.md`.
+
+## 336. `jayess:crypto` Certificate Metadata And TLS Preparation
+
+- [x] Inspect `stdlib/jayess/crypto/`, `runtime-crypto-source.js`, PEM helper docs, and current crypto executable tests.
+- [x] Preserve current digest, HMAC, HKDF, random, and PEM container APIs.
+- [x] Add certificate metadata helper exports for subject, issuer, serial number, validity start, and validity end where the PEM container data can support deterministic parsing.
+- [x] Add private-key metadata helper exports for key kind and encoded length without exposing raw host key handles.
+- [x] Add trust-anchor collection validation helpers for certificate arrays and malformed entries.
+- [x] Add focused diagnostics for malformed PEM blocks, unsupported PEM labels, unsupported key algorithms, and invalid trust-anchor inputs.
+- [x] Keep TLS transport behavior out of `jayess:crypto`; only add certificate/key primitives that `jayess:http` can consume in a later HTTPS slice.
+- [x] Add output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-crypto-module.md`, `docs/standard-library.md`, and `docs/jayess-http-module.md` with the TLS-preparation boundary.
+
+## 337. `jayess:dialog` Multi-Select And Filter Options
+
+- [x] Inspect `stdlib/jayess/dialog/`, platform dialog runtime fragments, generated metadata, and executable dialog tests.
+- [x] Preserve existing `openFile`, `saveFile`, `openDirectory`, and `message` result shapes.
+- [x] Add `multiple: true` support to `openFile(options)` returning an array of selected file paths.
+- [x] Preserve single-select `openFile(options)` returning one path or `null`.
+- [x] Add file filter options using normalized `{ name, extensions }` entries.
+- [x] Add `defaultName` support for `saveFile(options)`.
+- [x] Add `detail` text support for `message(options)`.
+- [x] Normalize unsupported host filter capabilities through deliberate diagnostics or ignored no-op behavior documented per adapter.
+- [x] Add platform-neutral option validation before host adapter calls.
+- [x] Keep Win32, Cocoa, and Linux portal behavior isolated in focused adapter files.
+- [x] Add output, compile, and host-conditional executable runtime tests under `test/`.
+- [x] Update `docs/jayess-dialog-module.md`, `docs/standard-library.md`, and generated metadata docs.
+
+## 338. Reviewability Refactors For Large Runtime And Test Files
+
+- [x] Inspect current line counts for `src/`, `stdlib/`, `test/`, and `docs/` before adding new implementation slices.
+- [x] Split one focused responsibility from `src/cpp/runtime-http-source.js` without changing public behavior.
+- [x] Split one focused responsibility from `stdlib/jayess/canvas/index.js` without changing public exports.
+- [x] Split `test/modules/module-graph.test.js` by package imports, built-in resolution, native imports, or export behavior without changing assertions.
+- [x] Split one focused helper from `src/cpp/emit-module.js` if adjacent work would otherwise add unrelated logic there.
+- [x] Split one focused helper from `src/cpp/runtime-image-source.js` if adjacent work would otherwise add unrelated image parsing or operation logic there.
+- [x] Preserve generated C++ output for behavior-preserving refactors unless the test explicitly documents an intentional generated-shape improvement.
+- [x] Add or preserve focused tests for each extracted responsibility.
+- [x] Attempt the smallest relevant output, compile, executable-runtime, and module test set after extraction; local `node` is unavailable in this shell.
+- [x] Update organization docs under `docs/` when source layout changes.
+
+## 339. `jayess:http` HTTPS And TLS Transport Slice
+
+- [x] Inspect `stdlib/jayess/http/`, `stdlib/jayess/crypto/`, HTTP runtime fragments, PEM metadata helpers, generated build hints, and current HTTP executable tests.
+- [x] Preserve current plain HTTP/1.1 request, server, routing, static file, timeout, and guardrail behavior.
+- [x] Add `docs/jayess-https-transport.md` describing the first HTTPS transport surface and its certificate/key/trust-anchor inputs.
+- [x] Add platform-neutral HTTPS option validation for `createServer(handler, options)` using Jayess-owned certificate/private-key containers from `jayess:crypto`.
+- [x] Add platform-neutral HTTPS client option validation for `request(options)` using trust-anchor containers where provided.
+- [x] Add normalized diagnostics for unsupported TLS option shapes, malformed certificate containers, malformed private-key containers, and unavailable TLS host backends.
+- [x] Keep TLS transport code split from `src/cpp/runtime-http-source.js` in focused runtime helper files.
+- [x] Keep certificate parsing and key metadata in `jayess:crypto`; do not duplicate PEM parsing in `jayess:http`.
+- [x] Preserve unsupported HTTP/2, ALPN negotiation beyond the first transport metadata, WebSocket, and Node.js HTTPS compatibility boundaries.
+- [x] Add output tests for runtime fragment inclusion, primitive declarations, dependency-plan metadata, and build hints.
+- [x] Add compile tests under `test/cpp/` for generated HTTPS-capable projects.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for HTTPS unavailable diagnostics and one loopback HTTPS exchange when the host backend is available.
+- [x] Update `docs/jayess-http-module.md`, `docs/jayess-crypto-module.md`, `docs/standard-library.md`, and generated-project metadata docs.
+
+## 340. `jayess:window` Wayland Adapter Hardening
+
+- [x] Inspect `src/cpp/runtime-window-wayland-source.js`, shared window runtime helpers, generated adapter metadata, and current Wayland/X11 executable tests.
+- [x] Preserve current `jayess:window` public exports and normalized event object shapes.
+- [x] Split Wayland registry discovery into a focused helper without changing behavior.
+- [x] Split Wayland seat, pointer, and keyboard capability handling into focused helpers without changing behavior.
+- [x] Split Wayland software-buffer presentation helpers from event/input helpers.
+- [x] Improve normalized diagnostics for missing display, registry, compositor, shm, seat, pointer, keyboard, and buffer capabilities.
+- [x] Preserve Linux adapter selection metadata for Wayland and X11.
+- [x] Add output tests for Wayland adapter capability metadata and emitted helper boundaries.
+- [x] Add compile tests under `test/cpp/`.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for unavailable diagnostics, event normalization, and software-buffer presentation where Wayland is available.
+- [x] Update `docs/jayess-window-module.md`, `docs/jayess-native-gui.md`, and `docs/runtime-verification.md`.
+
+## 341. `jayess:canvas` Drawing State Completion
+
+- [x] Inspect `stdlib/jayess/canvas/`, `stdlib/jayess/image/`, `stdlib/jayess/color/`, canvas HTML/CSS helpers, and current canvas golden/runtime tests.
+- [x] Preserve existing explicit drawing helper signatures and output behavior.
+- [x] Add focused canvas state helper files under `stdlib/jayess/canvas/` instead of growing `index.js`.
+- [x] Add `saveState(canvas)` and `restoreState(canvas)` with deterministic diagnostics for restoring an empty state stack.
+- [x] Add stateful fill color, stroke color, stroke width, text color, and text size helpers.
+- [x] Add a first transform state slice for translate and scale.
+- [x] Apply active clip/state consistently to ordinary rectangle, image, line, shape, and text drawing helpers.
+- [x] Preserve existing clip-stack behavior and current helper return shapes.
+- [x] Add deterministic golden-image tests under `test/runtime/` using output files under `temp/`.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-canvas-module.md`, `docs/jayess-canvas-html-css.md`, and `docs/standard-library.md`.
+
+## 342. `jayess:gui` Text Input And Form Control Slice
+
+- [x] Inspect `stdlib/jayess/gui/`, canvas HTML/CSS document helpers, `jayess:window` event shapes, and current GUI runtime tests.
+- [x] Preserve existing GUI action-queue, invalidation, layout, draw, and HTML-document integration behavior.
+- [x] Add `createTextInput(options)` as a focused first text-entry widget.
+- [x] Add `value(widget)` and `setValue(widget, text)` helpers for text input state.
+- [x] Add focus tracking for text input widgets through normalized pointer/click events.
+- [x] Route normalized keyboard text, backspace, delete, left, right, home, and end events into focused text-edit actions.
+- [x] Queue explicit `input` and `change` actions instead of invoking hidden callbacks.
+- [x] Render text input through `jayess:canvas` without adding browser DOM behavior.
+- [x] Add tests for focus, typing, deletion, cursor movement, action queue results, and redraw invalidation.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-gui-module.md`, `docs/jayess-gui-toolkit.md`, `docs/jayess-native-gui.md`, and `docs/standard-library.md`.
+
+## 343. Linux `jayess:gpu` Vulkan Backend Slice
+
+- [x] Inspect `src/cpp/runtime-gpu-source.js`, current OpenGL/validation backend helpers, window surface metadata, and generated build hints.
+- [x] Preserve current validation, Direct3D, Metal, and OpenGL backend behavior.
+- [x] Add guarded Vulkan availability probing with normalized unavailable diagnostics.
+- [x] Add Vulkan backend metadata to generated dependency plans and build hints without making GPU mandatory for non-GPU programs.
+- [x] Add a focused Vulkan device/surface creation path where the current Linux window adapter exposes a compatible native surface.
+- [x] Implement `clear(frame, color)` through the Vulkan backend for the first real Vulkan slice.
+- [x] Route unsupported Vulkan draw/resource paths through existing validation behavior or focused diagnostics.
+- [x] Keep Vulkan-specific handles, loader calls, and synchronization helpers inside focused Vulkan runtime files.
+- [x] Add output tests for backend metadata, runtime fragment inclusion, and platform library hints.
+- [x] Add compile tests under `test/cpp/`.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for unavailable diagnostics and clear-frame behavior where Vulkan is available.
+- [x] Update `docs/jayess-gpu-module.md`, `docs/gpu-backend-slice.md`, `docs/jayess-native-gui.md`, and generated-project metadata docs.
+
+## 344. Package Resolution Metadata And Diagnostics Polish
+
+- [x] Inspect `src/modules/resolve-package-import.js`, module graph dependency metadata, generated dependency plan output, and package-resolution tests.
+- [x] Preserve current relative import, package import, package export, package import-map, self-reference, and pattern resolution behavior.
+- [x] Add clearer package condition-array diagnostics when no supported transpileable target is selected.
+- [x] Add dependency-plan metadata explaining which package condition branch was selected.
+- [x] Add dependency-plan metadata explaining why unsupported condition branches were skipped.
+- [x] Add package self-reference tests for nested source files, export patterns, imports mappings, and missing targets.
+- [x] Preserve dynamic `import()` as unsupported by design.
+- [x] Add focused module graph and output metadata tests under `test/`.
+- [x] Update `docs/module-resolution.md`, `docs/generated-project-layout.md`, `docs/generated-project-shape.md`, and `docs/diagnostics.md`.
+
+## 345. Semantic Diagnostics Before C++ Emission
+
+- [x] Inspect generator, class, destructuring, operator, and module emission paths for reachable unsupported-shape errors thrown during C++ emission.
+- [x] Preserve unsupported-by-design language boundaries from `Jayess.md`.
+- [x] Add semantic diagnostics for reachable unsupported generator yield positions that can currently reach emission.
+- [x] Add semantic diagnostics for reachable unsupported class and `super` member assignment forms.
+- [x] Add semantic diagnostics for reachable unsupported destructuring assignment targets.
+- [x] Add semantic diagnostics for reachable unsupported operator operand shapes when the source shape can be detected before emission.
+- [x] Keep diagnostic checks split by semantic feature area instead of expanding `src/semantic/analyze.js` with unrelated logic.
+- [x] Add parser or semantic regression tests proving invalid source fails before C++ emission.
+- [x] Update `docs/diagnostics.md`, `docs/javascript-feature-gaps.md`, and `docs/limitations.md`.
+
+## 346. `jayess:archive` Tar Hardening And Async Helpers
+
+- [x] Inspect `stdlib/jayess/archive/`, filesystem helpers, generated stdlib output tests, and current archive docs.
+- [x] Preserve current tar create, extract, read, and write result shapes.
+- [x] Add deterministic path normalization that rejects absolute paths, traversal segments, empty names, and duplicate unsafe entries.
+- [x] Add metadata options for file mode, directory entries, and modification time where the current tar shape can preserve them deterministically.
+- [x] Add async tar read/write helpers layered over default async `jayess:fs` names.
+- [x] Keep zip support separate from this tar-focused slice.
+- [x] Add fixture tar trees under `temp/` during runtime tests.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-archive-module.md`, `docs/jayess-fs-module.md`, and `docs/standard-library.md`.
+
+## 348. Reviewability Refactors For Runtime And Emitter Growth
+
+- [x] Inspect current line counts for `src/`, `stdlib/`, `test/`, and `docs/` before adding new implementation slices.
+- [x] Split one focused responsibility from `src/cpp/runtime-http-source.js` if HTTPS or server work would otherwise add unrelated logic there.
+- [x] Split one focused responsibility from `src/cpp/runtime-window-wayland-source.js` before adding more Wayland behavior.
+- [x] Split one focused responsibility from `src/cpp/emit-module.js` before adding new emitter behavior there.
+- [x] Split one focused responsibility from `src/cpp/runtime-image-source.js` before adding new image or canvas state behavior there.
+- [x] Preserve generated C++ output for behavior-preserving refactors unless the active feature explicitly changes generated behavior.
+- [x] Add or preserve focused tests for each extracted responsibility.
+- [x] Attempt the smallest relevant output, compile, executable-runtime, parser, or semantic test set after each extraction.
+- [x] Update organization docs under `docs/` when source layout changes.
+
+## 349. HTTP TLS Live Backend Slice
+
+- [x] Inspect `src/cpp/runtime-http-source.js`, split HTTP runtime helpers, `stdlib/jayess/http/`, `stdlib/jayess/crypto/`, generated metadata writers, and current HTTP/TLS diagnostics before editing.
+- [x] Preserve current plain HTTP client/server behavior and existing HTTPS/TLS option validation.
+- [x] Define the first live TLS scope as client `https://...` requests only; keep server TLS, HTTP/2, WebSocket, ALPN negotiation, and host trust-store expansion out of this slice.
+- [x] Add a narrow host TLS backend boundary that can report whether a live TLS adapter is compiled and usable.
+- [x] Reuse `jayess:crypto` certificate, private-key, and trust-anchor containers for supported TLS option shapes.
+- [x] Add normalized runtime diagnostics for missing TLS backend, failed TLS handshake, certificate verification failure, unsupported ALPN options, and unsupported TLS option keys.
+- [x] Keep TLS-specific C++ support in focused runtime files rather than expanding an already-large HTTP runtime file with unrelated logic.
+- [x] Add generated dependency-plan and build-hints metadata for TLS adapter requirements only when `jayess:http` HTTPS behavior is used.
+- [x] Add output tests for runtime fragment inclusion, TLS metadata, and unchanged plain HTTP metadata.
+- [x] Add compile tests under `test/cpp/` for generated HTTPS-capable output.
+- [x] Add host-conditional runtime tests under `test/runtime/` for one loopback HTTPS request when a TLS backend is available, and for normalized unavailable-backend diagnostics when it is not.
+- [x] Update `docs/jayess-http-module.md`, `docs/jayess-https-transport.md`, `docs/generated-project-layout.md`, `docs/generated-project-shape.md`, and `docs/diagnostics.md`.
+
+## 350. GUI HTML/CSS Interaction Slice
+
+- [x] Inspect `stdlib/jayess/canvas/html-*`, `stdlib/jayess/gui/`, `docs/jayess-canvas-html-css.md`, `docs/jayess-gui-module.md`, and current GUI/canvas tests before editing.
+- [x] Preserve current canvas HTML/CSS parsing, layout, painting, and GUI action-queue behavior.
+- [x] Add stable render-tree node IDs or target IDs for canvas-rendered HTML nodes without introducing browser DOM compatibility.
+- [x] Add hit-test metadata for painted document boxes, including bounds, target ID, role, and disabled/interactive state where supported.
+- [x] Add a focused hit-test helper that maps window/canvas pointer coordinates to the nearest supported document target.
+- [x] Add button click action queue shapes for canvas-rendered HTML buttons and clickable elements with stable target IDs.
+- [x] Add focused text input editing for canvas-rendered HTML `<input>` elements: focus, insertion, deletion, cursor movement, value update, and queued `input` / `change` actions.
+- [x] Keep form behavior as explicit queued actions; do not add browser navigation, hidden callbacks, JavaScript execution, or DOM mutation APIs.
+- [x] Keep parsing, style, layout, paint, hit-testing, and GUI event routing in small focused files.
+- [x] Add module graph and output tests under `test/` for the new GUI/canvas integration helpers.
+- [x] Add compile tests under `test/cpp/` for generated canvas/GUI HTML interaction output.
+- [x] Add executable runtime tests under `test/runtime/` for layout, hit testing, input focus, typed text, deletion, button click actions, and redraw invalidation.
+- [x] Update `docs/jayess-canvas-html-css.md`, `docs/jayess-canvas-module.md`, `docs/jayess-gui-module.md`, `docs/jayess-gui-toolkit.md`, `docs/jayess-native-gui.md`, and `docs/standard-library.md`.
+
+## 351. `jayess:window` Frame Loop Ergonomics
+
+- [x] Inspect `stdlib/jayess/window/`, `src/cpp/runtime-window-source.js`, platform window runtime fragments, `jayess:timers`, current GUI loop docs, and window runtime tests.
+- [x] Preserve explicit `pollEvents(window)`, `requestFrame(window)`, `present(window, imageOrCanvas)`, close-request, and adapter-unavailable behavior.
+- [x] Define a small Jayess-owned frame helper such as `runFrame(window, state, callback)` or an equivalent focused primitive.
+- [x] Keep event polling visible inside the frame callback contract rather than hiding a broad application loop.
+- [x] Ensure the helper skips callbacks after close, propagates explicit cancellation, and reports normalized diagnostics for invalid or closed window handles.
+- [x] Support a deterministic frame result shape that can be tested without a live display.
+- [x] Keep platform-specific scheduling or presentation code isolated inside existing window adapter boundaries.
+- [x] Add examples or fixtures that show the recommended `window` + `canvas` + `gui` loop shape.
+- [x] Add output tests for runtime fragment inclusion and generated metadata.
+- [x] Add compile tests under `test/cpp/` for generated frame-loop output.
+- [x] Add host-conditional runtime tests under `test/runtime/` for close-request behavior, skipped callbacks after close, and normalized unavailable-host behavior.
+- [x] Update `docs/jayess-window-module.md`, `docs/jayess-gui-toolkit.md`, `docs/jayess-native-gui.md`, and `docs/standard-library.md`.
+
+## 352. `jayess:gpu` Resource Model Slice
+
+- [x] Inspect `src/cpp/runtime-gpu-source.js`, GPU backend helper files, `stdlib/jayess/gpu/`, generated metadata, and current GPU runtime tests before editing.
+- [x] Preserve current validation backend, host backend selection, clear-frame behavior, and backend-unavailable diagnostics.
+- [x] Add buffer upload support for explicit numeric arrays and `jayess:bytes` data with bounds and usage validation.
+- [x] Add texture upload from `jayess:image` or `jayess:canvas` only when ownership and lifetime remain explicit.
+- [x] Define and validate a minimal shader source policy for the current GPU surface; reject unsupported shader shapes with focused diagnostics.
+- [x] Define and validate a minimal pipeline descriptor shape that can run deterministically on the validation backend.
+- [x] Keep `draw(...)` deterministic on the validation backend before wiring any additional host backend behavior.
+- [x] Add host backend support only after the matching validation path and diagnostics are covered.
+- [x] Keep backend-specific resource handles, upload logic, and pipeline conversion in focused runtime files.
+- [x] Add output tests for resource metadata, backend requirements, and runtime fragment inclusion.
+- [x] Add compile tests under `test/cpp/` for generated GPU resource output.
+- [x] Add executable runtime tests under `test/runtime/` for validation-backend buffer upload, texture upload, pipeline validation, draw command recording, and host-unavailable diagnostics.
+- [x] Update `docs/jayess-gpu-module.md`, `docs/gpu-backend-slice.md`, `docs/jayess-native-gui.md`, generated-project metadata docs, and `docs/diagnostics.md`.
+
+## 353. `jayess:archive` Filesystem Directory Helpers
+
+- [x] Inspect `stdlib/jayess/archive/`, `stdlib/jayess/fs/`, archive runtime fragments, archive docs, and current archive tests before editing.
+- [x] Preserve current tar entry creation, in-memory extraction, async read/write helpers, path normalization, duplicate path detection, and traversal protections.
+- [x] Add `extractTarToDirectory(bytes, targetDir, options)` using `jayess:fs` write/create-directory helpers.
+- [x] Add `createTarFromDirectory(root, options)` using `jayess:fs` walk/read/stat helpers.
+- [x] Keep zip support separate from this tar-focused filesystem slice.
+- [x] Reject absolute paths, traversal segments, duplicate normalized entries, empty target paths, and extraction targets outside the requested root.
+- [x] Preserve deterministic directory ordering, file metadata handling, and default async naming with `Sync` suffixed synchronous variants where synchronous helpers are added.
+- [x] Keep tar path validation and filesystem adapter glue in small focused helper files instead of expanding one large archive module.
+- [x] Add fixture directory trees under `temp/` during runtime tests only.
+- [x] Add module graph and output tests under `test/` for archive/fs dependency behavior.
+- [x] Add compile tests under `test/cpp/` for generated archive directory helper output.
+- [x] Add executable runtime tests under `test/runtime/` for directory-to-tar, tar-to-directory, traversal rejection, duplicate rejection, and deterministic entry order.
+- [x] Update `docs/jayess-archive-module.md`, `docs/jayess-fs-module.md`, `docs/standard-library.md`, and generated-project metadata docs if runtime features change.
+
+## 354. Reviewability Refactors For Large Runtime And Emitter Files
+
+- [x] Re-check current line counts for `src/`, `stdlib/`, `test/`, and `docs/` before making refactor edits.
+- [x] Inspect `src/cpp/runtime-http-source.js`, `stdlib/jayess/canvas/index.js`, `src/cpp/emit-module.js`, and `src/cpp/runtime-image-source.js` for the smallest safe extraction candidates.
+- [x] Split one focused HTTP responsibility out of `src/cpp/runtime-http-source.js` before adding unrelated HTTP/TLS logic there.
+- [x] Split canvas text or shape export wiring from `stdlib/jayess/canvas/index.js` if new canvas/GUI work would otherwise grow the index file.
+- [x] Split expression or statement dispatch helpers from `src/cpp/emit-module.js` only if the extraction is behavior-preserving and locally testable.
+- [x] Split one image runtime responsibility from `src/cpp/runtime-image-source.js` only if upcoming canvas/GPU work would otherwise add unrelated image logic there.
+- [x] Preserve generated C++ output for behavior-preserving refactors unless the active feature explicitly changes generated behavior.
+- [x] Avoid broad renames, formatting churn, and moving unrelated code between files.
+- [x] Add or preserve focused tests for each extracted responsibility.
+- [x] Run the smallest relevant output, compile, executable-runtime, parser, or semantic test set after each extraction.
+- [x] Update `docs/cpp-emitter-organization.md`, `docs/review-discipline.md`, and runtime organization docs when source layout changes.
+## 355. Canvas HTML/CSS Box Model And Text Flow Slice
+
+- [x] Inspect `stdlib/jayess/canvas/html-parser.js`, `html-style.js`, `html-layout.js`, `html-paint.js`, `html-hit-test.js`, canvas docs, and current canvas HTML tests before editing.
+- [x] Preserve current deterministic canvas creation, image-buffer drawing, HTML parsing, CSS parsing, layout, painting, hit-testing, and GUI integration behavior.
+- [x] Define the first expanded CSS box-model scope: margin, padding, border width, border color, background color, width, height, and display block/inline handling.
+- [x] Keep unsupported CSS properties ignored or diagnosed according to the existing canvas HTML/CSS policy; do not add browser DOM compatibility.
+- [x] Add inline text measurement and wrapping for simple text runs using existing `jayess:font` / canvas text helpers.
+- [x] Add focused selector support only where deterministic and easy to test, such as element, class, id, and simple descendant selectors if not already covered.
+- [x] Add deterministic layout metadata for boxes so paint and hit-testing share the same computed bounds.
+- [x] Keep parsing, style resolution, layout, painting, and hit-testing changes in separate small files; do not expand `stdlib/jayess/canvas/index.js` with unrelated logic.
+- [x] Add golden-output or pixel-oriented runtime tests under `test/runtime/` using output files under `temp/`.
+- [x] Add module graph, output, and compile tests under `test/` for the expanded canvas HTML/CSS helpers.
+- [x] Update `docs/jayess-canvas-html-css.md`, `docs/jayess-canvas-module.md`, `docs/jayess-gui-toolkit.md`, and `docs/standard-library.md`.
+
+## 356. GUI Form Controls Over Canvas Documents
+
+- [x] Inspect `stdlib/jayess/gui/`, `stdlib/jayess/canvas/html-*`, `docs/jayess-gui-module.md`, and current GUI runtime tests before editing.
+- [x] Preserve current GUI action queue, invalidation model, text input behavior, HTML document attachment, hit-testing, and draw behavior.
+- [x] Add checkbox state helpers with explicit checked/unchecked values and queued change actions.
+- [x] Add radio-group behavior with deterministic group membership and one-selected-value semantics.
+- [x] Add a focused select/dropdown state model only if it can stay explicit and deterministic; otherwise keep select rendering out of this slice.
+- [x] Add form state serialization helpers that return plain Jayess objects without browser form submission behavior.
+- [x] Add keyboard focus traversal for supported GUI controls with predictable ordering.
+- [x] Keep callbacks hidden from the toolkit; all user-observable interactions must flow through explicit queued actions.
+- [x] Keep widget model, event dispatch, layout, paint, text input, and HTML document support split into small focused files.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/` for checkbox/radio/form state and focus traversal.
+- [x] Update `docs/jayess-gui-module.md`, `docs/jayess-gui-toolkit.md`, `docs/jayess-native-gui.md`, and `docs/standard-library.md`.
+
+## 357. Window Event Parity And Host Diagnostics
+
+- [x] Inspect `src/cpp/runtime-window-source.js`, platform window runtime fragments, `stdlib/jayess/window/`, generated metadata, and current host-conditional window tests.
+- [x] Preserve current `create`, `show`, `close`, `requestClose`, `shouldClose`, `pollEvents`, `requestFrame`, `runFrame`, `present`, `width`, `height`, and `setTitle` behavior.
+- [x] Normalize event object shapes across Win32, Cocoa, X11, and Wayland for close, resize, keyboard, pointer, and text-input events where adapters support them.
+- [x] Add resize/minimize/focus events only where they can be represented consistently and tested deterministically.
+- [x] Improve unavailable-host diagnostics so platform, adapter family, and missing host capability are visible.
+- [x] Keep platform-specific event conversion in focused adapter files rather than growing the shared window runtime.
+- [x] Add generated metadata assertions for adapter families and selection policy where event support changes output metadata.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for normalized event shapes and unavailable-host diagnostics.
+- [x] Update `docs/jayess-window-module.md`, `docs/jayess-native-gui.md`, `docs/generated-project-layout.md`, `docs/generated-project-shape.md`, and `docs/diagnostics.md`.
+
+## 358. HTTP Live TLS Client Backend
+
+- [x] Inspect `src/cpp/runtime-http-*`, `stdlib/jayess/http/`, `stdlib/jayess/crypto/`, generated metadata writers, HTTP docs, and current HTTP/TLS tests before editing.
+- [x] Preserve current plain HTTP client/server behavior, server lifecycle helpers, static-file helpers, and TLS option validation.
+- [x] Implement live TLS only for client `https://...` requests in this slice; keep server TLS, HTTP/2, WebSocket, ALPN negotiation, and host trust-store expansion out.
+- [x] Reuse `jayess:crypto` certificate, private-key, and trust-anchor containers for supported client TLS options.
+- [x] Add a host TLS adapter boundary that reports compiled/available state and does not affect plain HTTP projects.
+- [x] Add normalized diagnostics for missing TLS backend, handshake failure, certificate verification failure, unsupported TLS option keys, and unsupported ALPN options.
+- [x] Keep TLS adapter code in focused runtime files; do not grow `src/cpp/runtime-http-source.js` with TLS transport internals.
+- [x] Add generated dependency-plan and build-hints metadata for live TLS requirements only when HTTPS behavior is used.
+- [x] Add output tests for TLS fragment inclusion and unchanged plain HTTP metadata.
+- [x] Add compile tests under `test/cpp/` for generated HTTPS-capable projects.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for one loopback HTTPS request when the backend is available and unavailable-backend diagnostics otherwise.
+- [x] Update `docs/jayess-http-module.md`, `docs/jayess-https-transport.md`, `docs/generated-project-layout.md`, `docs/generated-project-shape.md`, and `docs/diagnostics.md`.
+
+## 359. GPU Binding Descriptor Validation Slice
+
+- [x] Inspect `src/cpp/runtime-gpu-source.js`, GPU backend fragments, `stdlib/jayess/gpu/`, generated metadata, docs, and current GPU tests.
+- [x] Preserve current validation backend, host backend selection, clear behavior, texture upload, buffer upload, shader metadata, pipeline metadata, and backend-unavailable diagnostics.
+- [x] Add a minimal vertex-buffer binding descriptor shape that references explicit `createBuffer` handles.
+- [x] Add a minimal texture binding descriptor shape that references explicit `createTexture` handles and rejects uninitialized textures when required.
+- [x] Add validation-only resource binding checks before adding any host backend binding implementation.
+- [x] Keep draw deterministic on the validation backend and record stable command metadata for descriptor-backed draws.
+- [x] Add backend-specific binding conversion only after validation diagnostics and tests are covered.
+- [x] Keep backend resource handles, binding validation, and backend conversion split into focused runtime/helper files.
+- [x] Add output tests for resource metadata and runtime fragment inclusion.
+- [x] Add compile tests under `test/cpp/` for generated descriptor-backed GPU projects.
+- [x] Add executable runtime tests under `test/runtime/` for valid bindings, wrong handle kinds, backend mismatches, uninitialized textures, and draw command recording.
+- [x] Update `docs/jayess-gpu-module.md`, `docs/gpu-backend-slice.md`, `docs/jayess-native-gui.md`, and `docs/diagnostics.md`.
+
+## 360. Runtime Null Semantics And Diagnostic Hardening
+
+- [x] Inspect `Jayess.md`, `docs/semantics.md`, runtime value helpers, semantic diagnostics, emitter paths, and current limitations docs before editing.
+- [x] Preserve the project rule that `null` is the only built-in missing-value sentinel and JavaScript-style `undefined` remains unsupported.
+- [x] Audit standard-library and runtime helpers for accidental empty string, empty object, or inconsistent missing-value returns where `null` is the intended result.
+- [x] Add focused semantic diagnostics for any reachable unsupported shapes still capable of reaching C++ emission.
+- [x] Add runtime diagnostics for invalid missing-value inputs where silent behavior would produce broken generated C++.
+- [x] Keep unsupported-by-design forms rejected: `let`, dynamic `import()`, `eval`, `Function`, `with`, ambient Node built-ins, regex literals, ambient `RegExp`, and database imports.
+- [x] Keep diagnostic checks split by semantic/runtime feature area instead of expanding one broad analyzer or runtime file.
+- [x] Add parser, semantic, output, or executable runtime regression tests under `test/` for each hardened behavior.
+- [x] Update `docs/semantics.md`, `docs/diagnostics.md`, `docs/limitations.md`, and `docs/javascript-feature-gaps.md`.
+
+## 361. Package Resolution Diagnostics And Metadata Depth
+
+- [x] Inspect `src/modules/resolve-package-import.js`, `module-graph.js`, dependency-plan output, package fixtures, and current module graph tests.
+- [x] Preserve current closed compile-time module graph behavior, relative import behavior, package self-reference behavior, and unsupported dynamic import diagnostics.
+- [x] Add support for additional deterministic package `exports` array cases where each entry is a supported string or condition object.
+- [x] Improve diagnostics for unsupported package condition branches and unsupported package array entries.
+- [x] Add dependency-plan metadata explaining why each resolution branch was selected or skipped.
+- [x] Add package self-reference edge-case fixtures for nested packages, pattern exports, missing targets, and unsupported conditions.
+- [x] Keep Node runtime loading, dynamic import, and ambient Node built-ins unsupported.
+- [x] Add module graph and generated metadata tests under `test/`.
+- [x] Update `docs/module-resolution.md`, `docs/generated-project-layout.md`, `docs/generated-project-shape.md`, and `docs/diagnostics.md`.
+
+## 362. Runtime Test Harness And Temp Fixture Discipline
+
+- [x] Inspect `test/support/`, executable runtime tests, compile tests, temp-directory helpers, and current generated-executable helpers.
+- [x] Preserve existing test placement under `test/` and temporary output placement under `temp/`.
+- [x] Add small reusable helpers for generated executable tests that need fixture trees, golden files, host adapter probing, or skipped-host reporting.
+- [x] Standardize temp fixture directory naming so runtime tests are deterministic and easy to clean up.
+- [x] Improve host-conditional skip messages for window, dialog, GPU, network, and TLS adapter tests.
+- [x] Keep helpers small and avoid moving unrelated test assertions into broad shared utilities.
+- [x] Update existing focused tests only where they directly benefit from the new helper.
+- [x] Add or update docs under `docs/runtime-verification.md` and `docs/review-discipline.md`.
+
+## 363. Reviewability Refactor Pass For Current Hotspots
+
+- [x] Re-check current line counts for `src/`, `stdlib/`, `test/`, and `docs/` before editing.
+- [x] Inspect current largest files, especially `src/cpp/runtime-http-source.js`, `stdlib/jayess/canvas/index.js`, `src/cpp/emit-module.js`, `src/cpp/runtime-image-source.js`, `src/semantic/analyze.js`, and `src/cpp/runtime-gpu-source.js`.
+- [x] Split one focused HTTP responsibility from `src/cpp/runtime-http-source.js` if upcoming HTTP/TLS work would otherwise grow it.
+- [x] Split canvas export wiring or drawing-group wiring from `stdlib/jayess/canvas/index.js` before adding more canvas HTML/CSS behavior.
+- [x] Split one semantic analysis responsibility from `src/semantic/analyze.js` only if behavior can remain unchanged and locally testable.
+- [x] Split one GPU resource-validation helper from `src/cpp/runtime-gpu-source.js` before adding broader binding descriptor behavior.
+- [x] Preserve generated C++ output for behavior-preserving refactors unless the active feature intentionally changes output.
+- [x] Avoid broad renames, formatting churn, and moving unrelated code between files.
+- [x] Add or preserve focused tests for each extracted responsibility.
+- [x] Run the smallest relevant output, compile, executable-runtime, parser, or semantic test set after each extraction where the local toolchain is available.
+- [x] Update `docs/cpp-emitter-organization.md`, `docs/semantic-organization.md`, `docs/review-discipline.md`, or runtime organization docs when source layout changes.
+
+## 364. HTTP Runtime Split And TLS Host Adapter Depth
+
+- [x] Inspect `src/cpp/runtime-http-source.js`, `runtime-http-*` fragments, `stdlib/jayess/http/`, TLS docs, HTTP output tests, HTTP compile tests, and HTTP runtime tests before editing.
+- [x] Preserve current plain HTTP client/server behavior, server lifecycle helpers, static-file helpers, TLS option validation, and generated host TLS callback behavior.
+- [x] Split one focused HTTP responsibility out of `src/cpp/runtime-http-source.js`, such as URL parsing/request formatting or blocking client socket helpers, before adding more TLS code.
+- [x] Keep the extracted HTTP helper in a small `src/cpp/runtime-http-*.js` fragment with no unrelated server, GUI, GPU, or stdlib logic.
+- [x] Add or update output tests proving the runtime still emits the same public HTTP functions and the new fragment is included deterministically.
+- [x] Add compile validation under `test/cpp/` for generated HTTP output after the split.
+- [x] Add a first real client-only `host-tls` adapter path behind the existing generated callback boundary, keeping server TLS, HTTP/2, WebSocket, ALPN negotiation, and host trust-store expansion out.
+- [x] Keep TLS adapter implementation in focused runtime files; do not grow `src/cpp/runtime-http-source.js` with platform TLS internals.
+- [x] Preserve Jayess-owned certificate, private-key, and trust-anchor container validation through `jayess:crypto`.
+- [x] Add normalized diagnostics for missing TLS backend, adapter handshake failure, adapter certificate verification failure, unsupported TLS option keys, and unsupported ALPN options.
+- [x] Add generated dependency-plan and build-hints metadata updates for the selected TLS adapter family and its optional host requirements.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for unavailable TLS backend behavior and one registered or host-backed HTTPS client success path.
+- [x] Update `docs/jayess-http-module.md`, `docs/jayess-https-transport.md`, `docs/generated-project-layout.md`, `docs/generated-project-shape.md`, `docs/cpp-emitter-organization.md`, and `docs/diagnostics.md`.
+
+## 365. Canvas And GUI HTML/CSS Maturity Slice
+
+- [x] Inspect `stdlib/jayess/canvas/html-parser.js`, `html-style.js`, `html-layout.js`, `html-paint.js`, `html-hit-test.js`, `stdlib/jayess/gui/`, and current canvas/GUI HTML tests before editing.
+- [x] Preserve current deterministic canvas drawing, HTML parsing, CSS parsing, layout metadata, painting, hit-testing, GUI action queue, form control state, and invalidation behavior.
+- [x] Add a focused CSS layout improvement set: min width, max width, min height, max height, and overflow clipping for block boxes.
+- [x] Add a narrow flex-like row/column layout helper only for deterministic GUI box layout; do not add full browser flexbox compatibility.
+- [x] Add caret rendering metadata for focused text inputs and keep text editing state in `stdlib/jayess/gui/text-input.js` or a similarly focused helper.
+- [x] Add text selection metadata only for focused input controls; keep browser DOM selection APIs out.
+- [x] Add accessibility-style plain metadata for supported GUI controls, such as role, label, disabled, checked, focused, and value, without adding browser accessibility APIs.
+- [x] Keep parsing, style resolution, layout, painting, hit-testing, form controls, and input editing in small focused files.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/` for each new layout/control behavior.
+- [x] Use `temp/` only for generated runtime output and pixel/golden artifacts.
+- [x] Update `docs/jayess-canvas-html-css.md`, `docs/jayess-canvas-module.md`, `docs/jayess-gui-module.md`, `docs/jayess-gui-toolkit.md`, `docs/jayess-native-gui.md`, and `docs/standard-library.md`.
+
+## 366. Window Canvas GUI App Loop Polish
+
+- [x] Inspect `stdlib/jayess/window/`, `stdlib/jayess/gui/`, `stdlib/jayess/canvas/`, `jayess:timers`, platform window runtime fragments, and current window frame-loop tests before editing.
+- [x] Preserve explicit `pollEvents(window)`, `requestFrame(window)`, `runFrame(window, state, callback)`, `present(window, imageOrCanvas)`, close-request behavior, and adapter-unavailable diagnostics.
+- [x] Add one small Jayess-owned app-loop helper over `window`, `canvas`, and `gui` that keeps event polling visible in the callback contract.
+- [x] Keep cancellation and close behavior deterministic: skip callbacks after close, surface cancellation as a normal result, and avoid hidden infinite loops.
+- [x] Add a deterministic frame result shape that includes rendered, presented, closed, and queued action count fields.
+- [x] Keep platform-specific scheduling and presentation behavior inside existing window adapter boundaries.
+- [x] Add focused fixtures showing recommended `window` + `canvas` + `gui` loop shape.
+- [x] Add output tests for wrapper inclusion and generated metadata where runtime fragments change.
+- [x] Add compile tests under `test/cpp/` for generated app-loop output.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for close-request behavior, skipped callbacks after close, queued GUI actions, and unavailable-host behavior.
+- [x] Update `docs/jayess-window-module.md`, `docs/jayess-gui-toolkit.md`, `docs/jayess-native-gui.md`, and `docs/standard-library.md`.
+
+## 367. GPU Host Binding Conversion Slice
+
+- [x] Inspect `src/cpp/runtime-gpu-source.js`, `runtime-gpu-draw-resources-source.js`, GPU backend fragments, `stdlib/jayess/gpu/`, generated metadata, and current GPU tests before editing.
+- [x] Preserve current validation backend behavior, host backend selection, buffer upload, texture upload, shader metadata, pipeline metadata, descriptor validation, and backend-unavailable diagnostics.
+- [x] Add host conversion for validated vertex-buffer binding descriptors in the first selected backend path without changing the public descriptor shape.
+- [x] Add host conversion for validated texture binding descriptors in the same selected backend path only after vertex-buffer conversion is covered.
+- [x] Keep validation-backend draw command recording deterministic and unchanged except for intentional descriptor metadata additions.
+- [x] Reject backend mismatches, wrong handle kinds, unsupported buffer usage, uninitialized textures, and invalid slots before host conversion.
+- [x] Keep backend-specific binding conversion in focused runtime helper files, not in the shared GPU runtime body.
+- [x] Add output tests for resource metadata and runtime fragment inclusion.
+- [x] Add compile tests under `test/cpp/` for generated descriptor-backed GPU projects.
+- [x] Add executable runtime tests under `test/runtime/` for validation backend descriptors and host-conditional selected-backend conversion.
+- [x] Update `docs/jayess-gpu-module.md`, `docs/gpu-backend-slice.md`, `docs/jayess-native-gui.md`, and `docs/diagnostics.md`.
+
+## 368. Standard Library Depth Pass
+
+- [x] Inspect existing `jayess:fs`, `jayess:crypto`, `jayess:http`, `jayess:html`, `jayess:markdown`, and `jayess:archive` docs/tests before editing.
+- [x] Preserve current module names and avoid adding new database modules or SQLite support.
+- [x] Add one focused `jayess:fs` depth slice for recursive copy/move options, symlink policy, and traversal diagnostics.
+- [x] Add one focused `jayess:crypto` depth slice for certificate fingerprint and verification-helper metadata over existing certificate containers.
+- [x] Add one focused `jayess:http` helper slice for cookie/session utilities layered over existing `jayess:cookie`, `jayess:crypto`, and `jayess:http` modules.
+- [x] Add one focused `jayess:html` / `jayess:markdown` pipeline slice for escaping, sanitizing a narrow safe subset, and deterministic markdown-to-HTML output.
+- [x] Add one focused `jayess:archive` depth slice only after tar directory helpers remain stable; keep zip support separate unless that becomes the active slice.
+- [x] Keep each standard-library change in small module-owned files rather than expanding already-large index files.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/` for each shipped helper.
+- [x] Update the matching `docs/jayess-*.md` files and `docs/standard-library.md`.
+
+## 369. Language Diagnostics And Emitter Error Hardening
+
+- [x] Inspect parser diagnostics, semantic diagnostics, `src/cpp/emit-*`, generator lowering, class lowering, operator lowering, and current diagnostics docs before editing.
+- [x] Preserve unsupported-by-design boundaries from `Jayess.md`: `let`, JavaScript-style `undefined`, JavaScript `Promise`, dynamic `import()`, `eval`, `Function`, `with`, regex literals, ambient `RegExp`, `new RegExp`, ambient Node built-ins, and database imports.
+- [x] Search for reachable emitter-time throws in generator, class, operator, destructuring, module, and runtime-value lowering paths.
+- [x] Move one reachable unsupported source shape from emission-time failure into parser or semantic diagnostics.
+- [x] Add stable diagnostic code mapping for the new diagnostic family if it is not already covered.
+- [x] Keep diagnostic logic split by feature area instead of growing one broad analyzer file.
+- [x] Add parser, semantic, API, or output tests proving invalid source fails before C++ emission.
+- [x] Preserve generated C++ for valid source unless the diagnostic slice intentionally changes lowering.
+- [x] Update `docs/diagnostics.md`, `docs/javascript-feature-gaps.md`, `docs/limitations.md`, and `docs/semantics.md`.
+
+## 370. Module And Package Ecosystem Polish
+
+- [x] Inspect package resolution fixtures, `src/modules/resolve-package-import.js`, `module-graph.js`, dependency-plan output, build hints, and module-resolution docs before editing.
+- [x] Preserve closed compile-time module graph behavior and keep dynamic import/runtime source loading unsupported.
+- [x] Add workspace package fixture coverage for one additional hoisted or nested package layout supported by the current resolver.
+- [x] Add package `exports` condition examples to fixtures and generated dependency-plan metadata tests.
+- [x] Improve diagnostics for mixed JavaScript/Jayess packages that expose unsupported JS targets before a supported Jayess target.
+- [x] Preserve package self-reference, export pattern, import pattern, condition decision, and array trace metadata.
+- [x] Keep resolver changes focused in module-resolution files and avoid touching emitter/runtime code.
+- [x] Add module graph and generated metadata tests under `test/`.
+- [x] Update `docs/module-resolution.md`, `docs/generated-project-layout.md`, and `docs/generated-project-shape.md`.
+
+## 371. Executable Runtime Harness Hook Support
+
+- [x] Inspect `test/support/`, executable runtime tests, host-conditional skip helpers, and current generated executable helper docs before editing.
+- [x] Preserve existing test placement under `test/` and temp output placement under `temp/`.
+- [x] Add a small reusable helper for registering generated runtime host hooks, starting with the HTTP TLS callback shape.
+- [x] Keep the helper generic enough for clipboard, dialog, window, GPU, and TLS probes without hiding feature-specific assertions.
+- [x] Improve skip messages so they include module, adapter, capability, host platform, and whether the path was unavailable or intentionally unregistered.
+- [x] Update only focused runtime tests that directly benefit from the helper.
+- [x] Add unit tests for helper message formatting under `test/support/`.
+- [x] Update `docs/runtime-verification.md` and `docs/review-discipline.md`.
+
+## 372. Canvas And GUI HTML/CSS Maturity
+
+- [x] Inspect `stdlib/jayess/canvas/`, `stdlib/jayess/gui/`, current canvas HTML/CSS docs, GUI docs, canvas output tests, GUI output tests, and runtime GUI tests before editing.
+- [x] Preserve the current Jayess-owned renderer direction: `jayess:canvas` owns focused HTML/CSS rendering and `jayess:gui` owns interaction/action state.
+- [x] Keep the implementation render-tree based and avoid browser DOM compatibility, JavaScript browser globals, or external GUI/webview dependencies.
+- [x] Add focused CSS box-model support for margin shorthand, padding shorthand, border width, border color, and background-color handling.
+- [x] Add deterministic inheritance boundaries for supported text and color properties without introducing full CSS cascade compatibility.
+- [x] Add simple inline text-flow improvements for adjacent text nodes and inline elements where deterministic layout is straightforward.
+- [x] Add disabled-state rendering metadata for canvas-rendered buttons and inputs.
+- [x] Add focused form submit action metadata through the existing GUI action queue rather than hidden callbacks.
+- [x] Keep parsing, style resolution, layout, painting, hit-testing, and GUI state changes in small module-owned files.
+- [x] Add module graph tests under `test/modules/` for any new helper files or imports.
+- [x] Add output tests under `test/output/` for generated stdlib helper inclusion and stable dependency metadata.
+- [x] Add compile tests under `test/cpp/` for generated canvas/GUI HTML-CSS output.
+- [x] Add executable runtime tests under `test/runtime/` for layout, hit testing, disabled control behavior, and queued form actions.
+- [x] Update `docs/jayess-canvas-html-css.md`, `docs/jayess-canvas-module.md`, `docs/jayess-gui-module.md`, `docs/jayess-gui-toolkit.md`, and `docs/standard-library.md`.
+
+## 373. Window Adapter Event Parity
+
+- [x] Inspect `src/cpp/runtime-window-*`, `stdlib/jayess/window/`, generated platform metadata, window docs, and current host-conditional window tests before editing.
+- [x] Preserve the public `jayess:window` API and current adapter-unavailable diagnostics.
+- [x] Normalize close, resize, key, text-input, pointer, and mouse-button event object shapes across X11, Wayland, Win32, and macOS adapter paths.
+- [x] Add adapter capability metadata for which event families are compiled into each generated project.
+- [x] Keep platform-specific event translation inside focused runtime adapter files.
+- [x] Avoid broad event-loop changes; keep `pollEvents(window)` explicit.
+- [x] Add output tests for generated platform metadata and runtime fragment inclusion.
+- [x] Add compile tests under `test/cpp/` for window projects that include each guarded adapter family.
+- [x] Add host-conditional executable runtime tests under `test/runtime/` for normalized event shape and unavailable-host behavior.
+- [x] Update `docs/jayess-window-module.md`, `docs/jayess-native-gui.md`, `docs/generated-project-layout.md`, `docs/generated-project-shape.md`, and `docs/standard-library.md`.
+
+## 374. HTTP Server Helper Usability
+
+- [x] Inspect `stdlib/jayess/http/`, `src/cpp/runtime-http-*`, HTTP docs, route/static/session helpers, and current HTTP runtime tests before editing.
+- [x] Preserve current plain HTTP client/server behavior, timeout/body guardrails, graceful close behavior, and HTTPS/TLS host boundary.
+- [x] Add focused request helper utilities such as `url(request)`, `pathname(request)`, and `queryParam(request, name)` if they fit the existing request shape.
+- [x] Add a small route-prefix or route-group helper only if it can stay deterministic and under the existing router model.
+- [x] Add signed-cookie/session examples or helper tests around `signSession`, `verifySession`, `getSignedCookie`, and `setSignedCookie`.
+- [x] Keep server TLS, HTTP/2, WebSocket, host trust-store integration, and Node.js middleware compatibility outside this slice.
+- [x] Keep new helpers in focused files if adding them would grow `stdlib/jayess/http/index.js` further.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-http-module.md`, `docs/jayess-https-transport.md` if needed, and `docs/standard-library.md`.
+
+## 375. Certificate And Trust Helper Depth
+
+- [x] Inspect `stdlib/jayess/crypto/`, `stdlib/jayess/http/`, crypto docs, HTTPS transport docs, and current crypto PEM/fingerprint tests before editing.
+- [x] Preserve the boundary that `jayess:crypto` owns certificate/key/trust containers and `jayess:http` owns transport behavior.
+- [x] Add trust-anchor lookup by certificate fingerprint over existing certificate containers.
+- [x] Add certificate validity checking against an explicit ISO timestamp string.
+- [x] Add a deterministic certificate-chain metadata shape without claiming full cryptographic chain validation.
+- [x] Keep SHA-1 helpers legacy-only in docs and diagnostics.
+- [x] Avoid live TLS, host trust-store, public-key verification, signature APIs, or database-backed certificate stores in this slice.
+- [x] Keep new crypto helper logic in small focused files rather than expanding `stdlib/jayess/crypto/index.js`.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Update `docs/jayess-crypto-module.md`, `docs/jayess-https-transport.md`, `docs/diagnostics.md` if diagnostics change, and `docs/standard-library.md`.
+
+## 376. Reviewability Refactor Pass
+
+- [x] Re-check current line counts for `src/`, `stdlib/`, `test/`, and `docs/` before editing.
+- [x] Inspect current largest source files, especially `src/cpp/runtime-http-source.js`, `stdlib/jayess/canvas/index.js`, `src/cpp/emit-module.js`, `src/cpp/runtime-image-source.js`, and `src/cpp/runtime-gpu-source.js`.
+- [x] Choose one target subsystem and one responsibility to extract; do not refactor multiple subsystems in one pass.
+- [x] Split one HTTP runtime responsibility only if upcoming HTTP work would otherwise grow `src/cpp/runtime-http-source.js`.
+- [x] Split one canvas drawing or export wiring group from `stdlib/jayess/canvas/index.js` only if upcoming canvas work would otherwise grow it.
+- [x] Split one emitter expression/statement dispatch helper from `src/cpp/emit-module.js` only if generated output can remain stable.
+- [x] Preserve public APIs, diagnostics, module resolution, and generated C++ output unless the active refactor explicitly documents an intended output change.
+- [x] Avoid broad renames, formatting churn, and unrelated code movement.
+- [x] Add or preserve focused output, compile, parser, semantic, or runtime tests for the extracted responsibility.
+- [x] Update `docs/cpp-emitter-organization.md`, `docs/review-discipline.md`, or the relevant runtime organization docs if source layout changes.
+
+## 377. Package Ecosystem Diagnostic Polish
+
+- [x] Inspect package resolution fixtures, `src/modules/resolve-package-import.js`, `src/modules/module-graph.js`, generated dependency-plan output, and module-resolution docs before editing.
+- [x] Preserve closed compile-time module graph behavior and keep dynamic import/runtime source loading unsupported.
+- [x] Add fixture coverage for one nested workspace package self-reference layout not already covered.
+- [x] Improve dependency-plan explanations for unsupported mixed JavaScript/Jayess export branches.
+- [x] Improve diagnostics for packages that expose `.mjs`, `.cjs`, browser-only, or unsupported JavaScript targets before a supported Jayess target.
+- [x] Preserve existing package self-reference, export pattern, import pattern, condition decision, and array trace metadata.
+- [x] Keep changes in module-resolution files and avoid touching emitter/runtime code.
+- [x] Add module graph and generated metadata tests under `test/`.
+- [x] Update `docs/module-resolution.md`, `docs/generated-project-layout.md`, and `docs/generated-project-shape.md`.
+
+## 378. Standard Library Practical Additions
+
+- [x] Inspect `jayess:watch`, `jayess:terminal`, `jayess:test`, `jayess:config`, `jayess:validate`, `jayess:archive`, and `jayess:compress` docs/tests before choosing the first concrete helper.
+- [x] Preserve the project rule that database support is out of scope; do not add `jayess:db`, `jayess:sqlite`, SQLite adapters, or database runtime fragments.
+- [x] Choose one practical stdlib helper slice before editing, such as recursive watch polling, ANSI style helpers, assertion diff helpers, config schema validation, or gzip/tar pipeline helpers.
+- [x] Keep the chosen helper inside the owning `stdlib/jayess/*` module and avoid broad cross-module coupling.
+- [x] Prefer Jayess-written helpers over native runtime primitives unless host access is required.
+- [x] Add only the narrow native primitive bridge required by the chosen helper, if any.
+- [x] Add module graph, output, compile, and executable runtime tests under `test/`.
+- [x] Use `temp/` for generated fixture trees or runtime artifacts.
+- [x] Update the matching `docs/jayess-*.md` module doc and `docs/standard-library.md`.

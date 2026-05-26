@@ -93,3 +93,30 @@ test("transpileFile resolves built-in Jayess canvas alpha compositing helpers", 
   assert.match(canvasSource, /blendColor/);
   assert.match(canvasSource, /fillRectAlpha/);
 });
+
+test("transpileFile resolves built-in Jayess canvas drawing state helpers", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-canvas-state-output");
+  const fixture = path.resolve("test/fixtures/modules/canvas-state-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const canvasPath = generatedStdlibCppPath(targetDir, "canvas");
+  const statePath = result.files.find((file) => file.includes("stdlib_jayess_canvas_state_js.cpp"));
+  assert.ok(result.files.includes(canvasPath));
+  assert.ok(statePath);
+
+  const canvasSource = fs.readFileSync(canvasPath, "utf8");
+  const stateSource = fs.readFileSync(statePath, "utf8");
+  assert.match(canvasSource, /saveState/);
+  assert.match(canvasSource, /restoreState/);
+  assert.match(canvasSource, /setFillColor/);
+  assert.match(canvasSource, /setStrokeColor/);
+  assert.match(canvasSource, /setStrokeWidth/);
+  assert.match(canvasSource, /setTextColor/);
+  assert.match(canvasSource, /setTextSize/);
+  assert.match(canvasSource, /translate/);
+  assert.match(canvasSource, /scale/);
+  assert.match(stateSource, /copyDrawingState/);
+  assert.match(stateSource, /copyDrawingStateStack/);
+  assert.match(stateSource, /transformedPoint/);
+  assert.match(stateSource, /restoreState requires a saved state/);
+});

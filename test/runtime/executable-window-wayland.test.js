@@ -4,7 +4,7 @@ import path from "node:path";
 import { transpileFile } from "../../src/api/transpile-file.js";
 import { compileAndRunCppExecutable, findAvailableCompiler } from "../support/compiler.js";
 import { createManagedTempDir } from "../support/temp-dir.js";
-import { generatedEntryForFixture } from "../support/generated-executable.js";
+import { generatedEntryForFixture, skipIfRuntimeUnavailableOutput } from "../support/generated-executable.js";
 
 const runtimeTest = findAvailableCompiler() == null ? test.skip : test;
 
@@ -117,8 +117,11 @@ runtimeTest("generated C++ verifies current Wayland window lifecycle and softwar
     windowWaylandMain(generatedEntryForFixture(fixturePath))
   );
 
-  if (output.trim() === "skip:wayland-unavailable") {
-    t.skip("Wayland window adapter or compositor is unavailable on this host");
+  if (skipIfRuntimeUnavailableOutput(t, output, "skip:wayland-unavailable", {
+    moduleName: "jayess:window",
+    adapter: "wayland",
+    capability: "compositor and software-buffer probe"
+  })) {
     return;
   }
 

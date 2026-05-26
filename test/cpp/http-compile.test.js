@@ -16,3 +16,13 @@ compileTest("transpileFile http output compiles with the available C++ compiler"
   compileCppFiles(cppFiles, targetDir);
   assert.ok(cppFiles.some((file) => file.includes("stdlib_jayess_http_index_js.cpp")));
 });
+
+compileTest("transpileFile http request helper output compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "http-request-helpers-compile");
+  const fixture = path.resolve("test/fixtures/modules/http-request-helpers-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(cppFiles.some((file) => file.includes("stdlib_jayess_http_request_js.cpp")));
+});

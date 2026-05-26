@@ -56,3 +56,13 @@ compileTest("transpileFile built-in canvas golden scene project compiles with th
   compileCppFiles(cppFiles, targetDir);
   assert.ok(true);
 });
+
+compileTest("transpileFile built-in canvas drawing state project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-canvas-state-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/canvas-state-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});

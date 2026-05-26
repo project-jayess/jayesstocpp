@@ -2,6 +2,7 @@ import {
   arrayOf,
   assertValid,
   boolean,
+  config,
   nullable,
   number,
   objectOf,
@@ -36,11 +37,21 @@ export function run() {
     note: 3
   });
   var asserted = assertValid(userSchema, valid);
+  var configSchema = config({
+    host: string(),
+    port: number(),
+    secure: optional(boolean())
+  });
+  var configResult = validate(configSchema, { host: "127.0.0.1", port: 8080 });
+  var extraConfigResult = validate(configSchema, { host: "127.0.0.1", port: 8080, debug: true });
   return [
     validResult.ok,
     invalidResult.ok,
     invalidResult.errors.length,
-    asserted.name
+    asserted.name,
+    configResult.ok,
+    extraConfigResult.ok,
+    extraConfigResult.errors[0]
   ];
 }
 

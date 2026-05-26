@@ -57,6 +57,21 @@ std::string await_string(jayess::value (*fn)(const std::vector<jayess::value>&))
   return std::get<std::string>(result);
 }
 
+std::vector<std::string> await_string_array(jayess::value (*fn)(const std::vector<jayess::value>&)) {
+  auto result = jayess::await_sync(fn(std::vector<jayess::value>{}));
+  if (!std::holds_alternative<jayess::array_ptr>(result)) {
+    throw std::runtime_error("expected array result");
+  }
+  std::vector<std::string> values;
+  for (const auto& item : std::get<jayess::array_ptr>(result)->items) {
+    if (!std::holds_alternative<std::string>(item)) {
+      throw std::runtime_error("expected string array item");
+    }
+    values.push_back(std::get<std::string>(item));
+  }
+  return values;
+}
+
 jayess::value await_value(jayess::value (*fn)(const std::vector<jayess::value>&)) {
   return jayess::await_sync(fn(std::vector<jayess::value>{}));
 }
@@ -76,6 +91,12 @@ int main() {
   auto invalidButtons = thrown_message(${namespace}::invalidMessageButtons);
   require(invalidButtons.find("message option 'buttons' must be one of") != std::string::npos, "message buttons diagnostic");
 
+  auto invalidMultiple = thrown_message(${namespace}::invalidOpenFileMultiple);
+  require(invalidMultiple.find("openFile option 'multiple' must be a boolean") != std::string::npos, "openFile multiple diagnostic");
+
+  auto invalidOption = thrown_message(${namespace}::invalidOpenFileOption);
+  require(invalidOption.find("option is unsupported") != std::string::npos, "openFile unsupported option diagnostic");
+
 #ifdef _WIN32
   _putenv_s("JAYESS_DIALOG_TEST_OPEN_FILE", "C:\\\\temp\\\\picked.txt");
   _putenv_s("JAYESS_DIALOG_TEST_SAVE_FILE", "cancel");
@@ -84,6 +105,12 @@ int main() {
 
   auto openFileResult = await_string(${namespace}::selectOpenFile);
   require(openFileResult == "C:\\\\temp\\\\picked.txt", "openFile normalized result");
+
+  _putenv_s("JAYESS_DIALOG_TEST_OPEN_FILE", "C:\\\\temp\\\\a.txt;C:\\\\temp\\\\b.txt");
+  auto openFilesResult = await_string_array(${namespace}::selectOpenFiles);
+  require(openFilesResult.size() == 2, "openFile multiple result size");
+  require(openFilesResult[0] == "C:\\\\temp\\\\a.txt", "openFile multiple first path");
+  require(openFilesResult[1] == "C:\\\\temp\\\\b.txt", "openFile multiple second path");
 
   auto saveFileResult = await_value(${namespace}::selectSaveFile);
   require(jayess::is_null(saveFileResult), "saveFile cancellation result");
@@ -102,6 +129,12 @@ int main() {
   auto openFileResult = await_string(${namespace}::selectOpenFile);
   require(openFileResult == "/tmp/picked.txt", "openFile normalized result");
 
+  setenv("JAYESS_DIALOG_TEST_OPEN_FILE", "/tmp/a.txt;/tmp/b.txt", 1);
+  auto openFilesResult = await_string_array(${namespace}::selectOpenFiles);
+  require(openFilesResult.size() == 2, "openFile multiple result size");
+  require(openFilesResult[0] == "/tmp/a.txt", "openFile multiple first path");
+  require(openFilesResult[1] == "/tmp/b.txt", "openFile multiple second path");
+
   auto saveFileResult = await_value(${namespace}::selectSaveFile);
   require(jayess::is_null(saveFileResult), "saveFile cancellation result");
 
@@ -118,6 +151,12 @@ int main() {
 
   auto openFileResult = await_string(${namespace}::selectOpenFile);
   require(openFileResult == "/tmp/picked.txt", "openFile normalized result");
+
+  setenv("JAYESS_DIALOG_TEST_OPEN_FILE", "/tmp/a.txt;/tmp/b.txt", 1);
+  auto openFilesResult = await_string_array(${namespace}::selectOpenFiles);
+  require(openFilesResult.size() == 2, "openFile multiple result size");
+  require(openFilesResult[0] == "/tmp/a.txt", "openFile multiple first path");
+  require(openFilesResult[1] == "/tmp/b.txt", "openFile multiple second path");
 
   auto saveFileResult = await_value(${namespace}::selectSaveFile);
   require(jayess::is_null(saveFileResult), "saveFile cancellation result");

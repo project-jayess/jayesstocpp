@@ -31,7 +31,7 @@ const featureAdapters = new Map([
     feature: "gpu",
     adapters: ["validation", "direct3d", "metal", "opengl", "vulkan"],
     platformLibraries: ["d3d11", "metal", "opengl", "vulkan"],
-    optionalBackendRequirements: ["validation backend is always available for deterministic command execution", "host GPU driver", "selected GPU SDK headers"],
+    optionalBackendRequirements: ["validation backend is always available for deterministic command execution", "Linux Vulkan backend dynamically loads libvulkan.so.1 and probes vkCreateInstance before selecting compatible X11 or Wayland window surfaces", "Linux OpenGL backend dynamically loads libGL.so.1 and uses X11-backed window surfaces when available", "host GPU driver", "selected GPU SDK headers"],
     compiledAdaptersByPlatform: {
       windows: ["validation", "direct3d"],
       macos: ["validation", "metal"],
@@ -41,15 +41,20 @@ const featureAdapters = new Map([
       windowSurface: {
         windows: "Prefer direct3d for createSurface(window) when the Win32 window adapter is available; otherwise fall back to validation.",
         macos: "Prefer metal for createSurface(window) when the Cocoa window adapter is available; otherwise fall back to validation.",
-        linux: "Current createSurface(window) still falls back to validation until the Linux host-backed backend slice lands."
+        linux: "Prefer vulkan for createSurface(window) when a compatible X11 or Wayland window surface and guarded libvulkan path are available; otherwise prefer opengl for X11 when guarded libGL is available, then fall back to validation."
       }
     }
   }],
   ["http", {
     feature: "http",
-    adapters: ["posix-http", "winsock-http"],
+    adapters: ["posix-http", "winsock-http", "tls-validation", "host-tls"],
     platformLibraries: ["ws2_32"],
-    optionalBackendRequirements: []
+    optionalBackendRequirements: ["tls-validation is always available for option-shape checks", "host-tls is a generated client HTTPS adapter hook; it reports a normalized unavailable-backend diagnostic until a project links or registers a host TLS implementation"],
+    compiledAdaptersByPlatform: {
+      windows: ["winsock-http", "tls-validation", "host-tls"],
+      macos: ["posix-http", "tls-validation", "host-tls"],
+      linux: ["posix-http", "tls-validation", "host-tls"]
+    }
   }],
   ["net", {
     feature: "net",
@@ -74,6 +79,7 @@ const featureAdapters = new Map([
     adapters: ["win32", "cocoa", "x11", "wayland"],
     platformLibraries: ["gdi32", "user32", "wayland-client", "x11"],
     optionalBackendRequirements: ["Wayland runtime depends on a host compositor that exposes the xdg-shell client protocol"],
+    eventFamilies: ["close", "resize", "key", "text-input", "pointer", "mouse-button"],
     compiledAdaptersByPlatform: {
       windows: ["win32"],
       macos: ["cocoa"],
@@ -111,6 +117,9 @@ export function runtimeRequirementsForFeatures(runtimeFeatures) {
     };
     if (adapter.compiledAdaptersByPlatform != null) {
       requirement.compiledAdaptersByPlatform = adapter.compiledAdaptersByPlatform;
+    }
+    if (adapter.eventFamilies != null) {
+      requirement.eventFamilies = adapter.eventFamilies;
     }
     if (adapter.adapterSelection != null) {
       requirement.adapterSelection = adapter.adapterSelection;

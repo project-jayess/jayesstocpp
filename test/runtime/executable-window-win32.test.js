@@ -96,6 +96,17 @@ bool has_key_event(const std::vector<jayess::value>& events, const std::string& 
   return false;
 }
 
+bool has_text_input_event(const std::vector<jayess::value>& events, const std::string& text) {
+  for (const auto& item : events) {
+    const auto event = std::get<jayess::object_ptr>(item);
+    if (std::get<std::string>(event->fields.at("type")) == "textInput"
+        && std::get<std::string>(event->fields.at("text")) == text) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool has_mouse_move_event(const std::vector<jayess::value>& events, double x, double y) {
   for (const auto& item : events) {
     const auto event = std::get<jayess::object_ptr>(item);
@@ -175,6 +186,7 @@ int main() {
       collected.insert(collected.end(), items.begin(), items.end());
       if (has_resize_event(collected, 120.0, 70.0)
           && has_key_event(collected, "keyDown", "a", "KeyA")
+          && has_text_input_event(collected, "a")
           && has_key_event(collected, "keyUp", "Escape", "Escape")
           && has_mouse_move_event(collected, 11.0, 13.0)
           && has_mouse_button_event(collected, "mouseDown", "left", true)
@@ -187,6 +199,7 @@ int main() {
 
     require(has_resize_event(collected, 120.0, 70.0), "win32 resize event normalized");
     require(has_key_event(collected, "keyDown", "a", "KeyA"), "win32 keyDown event normalized");
+    require(has_text_input_event(collected, "a"), "win32 textInput event normalized");
     require(has_key_event(collected, "keyUp", "Escape", "Escape"), "win32 keyUp event normalized");
     require(has_mouse_move_event(collected, 11.0, 13.0), "win32 mouseMove event normalized");
     require(has_mouse_button_event(collected, "mouseDown", "left", true), "win32 mouseDown event normalized");

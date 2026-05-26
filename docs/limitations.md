@@ -38,9 +38,11 @@ Unsupported forms currently fail explicitly for:
 - tagged template literals
 
 The items above are not all equal. `let`, dynamic `import()`, `eval(...)`, `Function(...)`, and `with` are intentionally unsupported by language design, not just waiting for implementation work. Jayess uses block-scoped `var`, closed compile-time module resolution, and no runtime source-evaluation model. See [../Jayess.md](../Jayess.md).
+
+Unsupported generator lowering forms, unsupported `super` member forms, unsupported destructuring targets, and unsupported operator shapes should fail during semantic analysis before C++ emission. Current generator limitations include nested function or class declarations inside generator bodies and yield shapes outside the focused lowering paths.
 Those permanently unsupported-by-design forms now also fail with focused diagnostics instead of being left to ordinary undefined-name or malformed-import errors.
 
-The current runtime treats `null` as a distinct Jayess value via `std::monostate`. Jayess does not currently aim to add a separate JavaScript-style `undefined` value; `null` is the intended built-in missing-value sentinel. See [semantics.md](./semantics.md).
+The current runtime treats `null` as a distinct Jayess value via `std::monostate`. Jayess does not currently aim to add a separate JavaScript-style `undefined` value; `null` is the intended built-in missing-value sentinel. Direct `undefined` usage fails during semantic analysis with `JY_SEMANTIC_UNDEFINED_UNSUPPORTED` instead of falling through as an ordinary missing binding. See [semantics.md](./semantics.md).
 
 Unary operator support is intentionally narrow. `!expr`, `+expr`, and `-expr` are supported, while broader JavaScript-style unary operator coverage is outside the current language surface.
 

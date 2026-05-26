@@ -176,7 +176,35 @@ test("semantic diagnostics explain unsupported operator targets", () => {
     () => analyzeModule(ast, sourceText),
     (error) => error instanceof JayessError
       && /Invalid update target for '\+\+'/.test(error.diagnostics[0].message)
+      && error.diagnostics[0].code === "JY_SEMANTIC_OPERATOR_UNSUPPORTED"
       && error.diagnostics[0].filename === "bad-update.js"
+  );
+});
+
+test("semantic diagnostics include stable hardening codes", () => {
+  const generatorSource = createSourceText("function* run(value) { function nested() { return value; } yield value; }", "bad-generator.js");
+  const superSource = createSourceText("class Base {} class Child extends Base { method() { super.value = 1; } }", "bad-super.js");
+  const destructuringSource = createSourceText("var values = [1]; [value] = values;", "bad-destructuring.js");
+  const destructuringAst = parse(destructuringSource);
+  destructuringAst.body[1].expression.left.elements[0] = destructuringAst.body[0].declarations[0].init.elements[0];
+
+  assert.throws(
+    () => analyzeModule(parse(generatorSource), generatorSource),
+    (error) => error instanceof JayessError
+      && error.diagnostics[0].code === "JY_SEMANTIC_GENERATOR_UNSUPPORTED"
+      && error.diagnostics[0].category === "semantic"
+  );
+  assert.throws(
+    () => analyzeModule(parse(superSource), superSource),
+    (error) => error instanceof JayessError
+      && error.diagnostics[0].code === "JY_SEMANTIC_SUPER_UNSUPPORTED"
+      && error.diagnostics[0].category === "semantic"
+  );
+  assert.throws(
+    () => analyzeModule(destructuringAst, destructuringSource),
+    (error) => error instanceof JayessError
+      && error.diagnostics[0].code === "JY_SEMANTIC_DESTRUCTURING_UNSUPPORTED"
+      && error.diagnostics[0].category === "semantic"
   );
 });
 

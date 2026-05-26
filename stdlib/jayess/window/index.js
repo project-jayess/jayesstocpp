@@ -49,6 +49,29 @@ export function cancelFrame(handle) {
   return clearTimeout(handle);
 }
 
+export function runFrame(window, state, callback, args) {
+  if (shouldClose(window)) {
+    return {
+      scheduled: false,
+      done: null,
+      handle: null,
+      state: state
+    };
+  }
+  var handle = requestFrame(window, function (currentWindow, currentState, currentCallback, currentArgs) {
+    if (shouldClose(currentWindow)) {
+      return null;
+    }
+    return currentCallback(currentWindow, currentState, ...currentArgs);
+  }, [state, callback, args == null ? [] : args]);
+  return {
+    scheduled: true,
+    done: handle.done,
+    handle: handle,
+    state: state
+  };
+}
+
 export function present(window, canvas) {
   return jayessWindowPresent(window, canvas);
 }

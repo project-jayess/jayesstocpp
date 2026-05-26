@@ -86,16 +86,36 @@ function isInsidePackageRoot(packageDirectory, candidate) {
 function selectConditionalExportTarget(value) {
   const conditionTrace = [];
   const rejectedConditions = [];
+  const conditionDecisions = [];
   for (const condition of ["jayess", "import", "default"]) {
     conditionTrace.push(condition);
     if (typeof value[condition] === "string") {
-      return { target: value[condition], condition, conditionTrace, rejectedConditions };
+      conditionDecisions.push({
+        condition,
+        present: true,
+        selected: true,
+        reason: "selected-string-target"
+      });
+      return { target: value[condition], condition, conditionTrace, rejectedConditions, conditionDecisions };
     }
     if (Object.prototype.hasOwnProperty.call(value, condition)) {
       rejectedConditions.push(condition);
+      conditionDecisions.push({
+        condition,
+        present: true,
+        selected: false,
+        reason: `unsupported-target-type:${Array.isArray(value[condition]) ? "array" : typeof value[condition]}`
+      });
+    } else {
+      conditionDecisions.push({
+        condition,
+        present: false,
+        selected: false,
+        reason: "missing"
+      });
     }
   }
-  return { target: null, condition: null, conditionTrace, rejectedConditions };
+  return { target: null, condition: null, conditionTrace, rejectedConditions, conditionDecisions };
 }
 
 function matchExportPattern(exportsMap, key) {
@@ -163,12 +183,12 @@ function resolvePackageTargetValue(packageDirectory, value, patternMatch = null,
     return resolvePackageTargetArray(packageDirectory, value, patternMatch);
   }
   if (value != null && typeof value === "object") {
-    const { target, condition, conditionTrace, rejectedConditions } = selectConditionalExportTarget(value);
+    const { target, condition, conditionTrace, rejectedConditions, conditionDecisions } = selectConditionalExportTarget(value);
     const expanded = expandExportPatternTarget(target, patternMatch);
     if (expanded != null) {
-      return { resolved: path.resolve(packageDirectory, expanded), unsupported: false, condition, conditionTrace, rejectedConditions };
+      return { resolved: path.resolve(packageDirectory, expanded), unsupported: false, condition, conditionTrace, rejectedConditions, conditionDecisions };
     }
-    return { resolved: null, unsupported: true, conditionTrace, rejectedConditions, unsupportedReason: "unsupported-conditions" };
+    return { resolved: null, unsupported: true, conditionTrace, rejectedConditions, conditionDecisions, unsupportedReason: "unsupported-conditions" };
   }
   if (value != null) {
     return { resolved: null, unsupported: true, unsupportedReason: `invalid-target-value-type:${typeof value}` };
@@ -186,6 +206,7 @@ function resolvePackageTargetArray(packageDirectory, values, patternMatch) {
       condition: result.condition ?? null,
       conditionTrace: result.conditionTrace ?? [],
       rejectedConditions: result.rejectedConditions ?? [],
+      conditionDecisions: result.conditionDecisions ?? [],
       resolved: result.resolved ?? null,
       selected: false,
       reason: null
@@ -198,7 +219,12 @@ function resolvePackageTargetArray(packageDirectory, values, patternMatch) {
 
     const skipReason = targetSkipReason(packageDirectory, result.resolved);
     if (skipReason != null) {
-      arrayTrace.push({ ...traceEntry, reason: skipReason });
+      arrayTrace.push({
+        ...traceEntry,
+        reason: skipReason,
+        attemptedPath: result.resolved,
+        attemptedExtension: path.extname(result.resolved)
+      });
       continue;
     }
 
@@ -288,6 +314,7 @@ export function resolvePackageImportsDetailed(fromFilename, source) {
     importCondition: resolvedFromImports.condition ?? null,
     importConditionTrace: resolvedFromImports.conditionTrace ?? [],
     importRejectedConditions: resolvedFromImports.rejectedConditions ?? [],
+    importConditionDecisions: resolvedFromImports.conditionDecisions ?? [],
     importArrayTrace: resolvedFromImports.arrayTrace ?? [],
     requestedSubpath: source,
     allowedExtensions: getSupportedJayessSourceExtensions()
@@ -359,6 +386,7 @@ export function resolvePackageImportDetailed(fromFilename, source) {
         exportCondition: resolvedFromExports.condition ?? null,
         exportConditionTrace: resolvedFromExports.conditionTrace ?? [],
         exportRejectedConditions: resolvedFromExports.rejectedConditions ?? [],
+        exportConditionDecisions: resolvedFromExports.conditionDecisions ?? [],
         exportArrayTrace: resolvedFromExports.arrayTrace ?? [],
         attemptedPath: resolvedFromExports.resolved
       };
@@ -374,6 +402,7 @@ export function resolvePackageImportDetailed(fromFilename, source) {
         exportCondition: resolvedFromExports.condition ?? null,
         exportConditionTrace: resolvedFromExports.conditionTrace ?? [],
         exportRejectedConditions: resolvedFromExports.rejectedConditions ?? [],
+        exportConditionDecisions: resolvedFromExports.conditionDecisions ?? [],
         exportArrayTrace: resolvedFromExports.arrayTrace ?? []
       };
     }
@@ -387,6 +416,7 @@ export function resolvePackageImportDetailed(fromFilename, source) {
       exportCondition: resolvedFromExports.condition ?? null,
       exportConditionTrace: resolvedFromExports.conditionTrace ?? [],
       exportRejectedConditions: resolvedFromExports.rejectedConditions ?? [],
+      exportConditionDecisions: resolvedFromExports.conditionDecisions ?? [],
       attemptedPath: resolvedFromExports.resolved
     };
   }
@@ -400,6 +430,7 @@ export function resolvePackageImportDetailed(fromFilename, source) {
       exportPatternMatch: resolvedFromExports.patternMatch ?? null,
       exportConditionTrace: resolvedFromExports.conditionTrace ?? [],
       exportRejectedConditions: resolvedFromExports.rejectedConditions ?? [],
+      exportConditionDecisions: resolvedFromExports.conditionDecisions ?? [],
       exportArrayTrace: resolvedFromExports.arrayTrace ?? [],
       packageUnsupportedReason: resolvedFromExports.unsupportedReason ?? null
     };

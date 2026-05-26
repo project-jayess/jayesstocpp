@@ -11,6 +11,14 @@ inline std::string jayessProcessString(const jayess::value& input, const std::st
   return std::get<std::string>(input);
 }
 
+inline std::string jayessProcessEnvKey(const jayess::value& input, const std::string& message) {
+  auto key = jayessProcessString(input, message);
+  if (key.empty()) {
+    throw std::runtime_error(message);
+  }
+  return key;
+}
+
 inline int jayessProcessInteger(const jayess::value& input, const std::string& message) {
   if (!std::holds_alternative<double>(input)) {
     throw std::runtime_error(message);
@@ -28,12 +36,12 @@ inline jayess::value jayessProcessCwd(const std::vector<jayess::value>&) {
 
 inline jayess::value jayessProcessGetEnv(const std::vector<jayess::value>& jayessArgs) {
   const auto key = jayess::argument_at(jayessArgs, 0);
-  return jayess::process_get_env(jayessProcessString(key, "Jayess process getEnv expects a string key"));
+  return jayess::process_get_env(jayessProcessEnvKey(key, "Jayess process getEnv expects a non-empty string key"));
 }
 
 inline jayess::value jayessProcessHasEnv(const std::vector<jayess::value>& jayessArgs) {
   const auto key = jayess::argument_at(jayessArgs, 0);
-  return jayess::process_has_env(jayessProcessString(key, "Jayess process hasEnv expects a string key"));
+  return jayess::process_has_env(jayessProcessEnvKey(key, "Jayess process hasEnv expects a non-empty string key"));
 }
 
 inline jayess::value jayessProcessEnvKeys(const std::vector<jayess::value>&) {

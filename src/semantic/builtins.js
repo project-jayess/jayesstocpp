@@ -13,6 +13,8 @@ const supportedPrimitiveLiteralProperties = new Set(["toString"]);
 
 export function unsupportedBuiltinIdentifierMessage(name) {
   switch (name) {
+    case "undefined":
+      return "Jayess does not support JavaScript-style 'undefined'; use 'null' as the built-in missing-value sentinel";
     case "parseInt":
       return "Jayess does not expose ambient global 'parseInt'; import { parseInt } from 'jayess:number' instead";
     case "parseFloat":

@@ -11,6 +11,36 @@ const supportedGeneratorYieldExpressionTypes = new Set([
   "ObjectExpression"
 ]);
 
+const supportedBinaryOperators = new Set([
+  "&&",
+  "||",
+  "??",
+  "+",
+  "-",
+  "*",
+  "/",
+  "%",
+  "**",
+  ">",
+  "<",
+  ">=",
+  "<=",
+  "==",
+  "!=",
+  "===",
+  "!=="
+]);
+
+const supportedAssignmentOperators = new Set([
+  "=",
+  "+=",
+  "-=",
+  "*=",
+  "/=",
+  "%=",
+  "**="
+]);
+
 export function validateGeneratorExpressionYieldShape(node, inGeneratorFunction, diagnostics, sourceText) {
   if (!inGeneratorFunction || !containsYieldExpression(node)) {
     return;
@@ -37,6 +67,15 @@ export function validateGeneratorExpressionYieldShape(node, inGeneratorFunction,
 }
 
 export function validateAssignmentExpressionShape(node, inGeneratorFunction, diagnostics, sourceText) {
+  if (!supportedAssignmentOperators.has(node.operator)) {
+    diagnostics.push(
+      createSemanticDiagnostic(
+        sourceText,
+        node,
+        `Unsupported assignment operator '${node.operator}'`
+      )
+    );
+  }
   if (node.left.type === "MemberExpression" && node.left.object.type === "SuperExpression") {
     diagnostics.push(
       createSemanticDiagnostic(
@@ -83,6 +122,15 @@ export function validateUpdateExpressionShape(node, diagnostics, sourceText) {
 }
 
 export function validateBinaryExpressionShape(node, inGeneratorFunction, diagnostics, sourceText) {
+  if (!supportedBinaryOperators.has(node.operator)) {
+    diagnostics.push(
+      createSemanticDiagnostic(
+        sourceText,
+        node,
+        `Unsupported binary operator '${node.operator}'`
+      )
+    );
+  }
   validateGeneratorExpressionYieldShape(node, inGeneratorFunction, diagnostics, sourceText);
 }
 

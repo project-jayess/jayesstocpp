@@ -22,6 +22,7 @@ This scope is intentionally narrower than full application-level end-to-end test
 The current executable-runtime harness lives under `test/support/`:
 
 - `generated-executable.js` transpiles one fixture into a managed temp project and derives the generated module header/namespace
+- `generated-executable.js` also owns shared host-unavailable skip message helpers so window, dialog, GPU, network, and TLS probes report the module, adapter, capability, and local host consistently
 - `compiler.js` discovers a local C++ compiler, writes the runtime support files, compiles the generated project plus one tiny `main`, and runs the executable
 
 Executable runtime tests themselves live under `test/runtime/` and should keep using this harness instead of introducing parallel ad hoc runners.
@@ -81,12 +82,12 @@ The covered surfaces include:
 - `jayess:workqueue` worker helper layer
 - `jayess:subprocess` result helpers, output stream helpers, convenience runners, and pipeline helpers
 - `jayess:net` loopback exchange and host-adapter diagnostics
-- `jayess:http` request/response exchange, real chunked response streaming, malformed and oversized request rejection, explicit idle/header/body read timeout behavior, request/response body size guardrails, multi-request server lifecycle, close diagnostics, route params, and static file serving through the current Unix/POSIX and Windows/Winsock server paths; focused graceful-shutdown and concurrent-request lifecycle probes currently run on Unix-like hosts, while the broader request/response, limits, timeout, streaming, and static-serving parity probes run on both Unix/POSIX and Windows/Winsock hosts
+- `jayess:http` request/response exchange, real chunked response streaming, malformed and oversized request rejection, configurable header/body guardrails, configurable idle/header/body read timeout behavior, server-state lifecycle inspection, multi-request server lifecycle, close diagnostics, route params, static file serving, and HTTPS/TLS option validation diagnostics through the current Unix/POSIX and Windows/Winsock server paths; focused graceful-shutdown and concurrent-request lifecycle probes currently run on Unix-like hosts, while the broader request/response, limits, timeout, streaming, static-serving, and TLS-unavailable parity probes run on both Unix/POSIX and Windows/Winsock hosts
 - `jayess:image` deterministic PPM/PGM/BMP/TGA round-trips, bytes encode/decode helpers, crop/resize/rotate/flip behavior, clipped blit behavior, transparent blit edge cases, and pixel-buffer helpers
 - `jayess:canvas` software drawing and deterministic text helpers, including executable golden-image verification for clipping, overlap ordering, source-over alpha blending, curves, polygons, and text-box layout
 - `jayess:gui` first-toolkit layout, hover/click dispatch, explicit action draining, explicit invalidation, and redraw-flag clearing through the software canvas path
-- `jayess:window` normalized unavailable diagnostics, platform-neutral event/lifecycle behavior, the shared `requestFrame` / `cancelFrame` helper layer over `jayess:timers`, host-conditional Win32 and Linux/X11 runtime probes for real lifecycle, presentation, resize, keyboard, and mouse event normalization, a host-conditional Cocoa runtime probe for lifecycle/title/present/poll behavior, and a host-conditional Wayland runtime probe for lifecycle plus software-buffer presentation
-- `jayess:dialog` invalid-option diagnostics on every host, deterministic Win32 and Cocoa result normalization/cancellation verification through the focused adapter test hook path, and Linux portal-family normalization/unavailable verification through the same focused runtime probe
+- `jayess:window` normalized unavailable diagnostics, platform-neutral event/lifecycle behavior, the shared `requestFrame` / `cancelFrame` helper layer over `jayess:timers`, host-conditional Win32 and Linux/X11 runtime probes for real lifecycle, presentation, resize, keyboard, and mouse event normalization, a host-conditional Cocoa runtime probe for lifecycle/title/present/poll behavior plus emitted keyboard/mouse bridge verification, and a host-conditional Wayland runtime probe for lifecycle plus software-buffer presentation with emitted registry, `wl_seat`, keyboard, pointer, and shared-memory buffer helper verification
+- `jayess:dialog` invalid-option diagnostics on every host, deterministic single-select and multi-select picker result normalization, save cancellation, message result verification, Win32 and Cocoa adapter test hook coverage, and Linux portal-family normalization/unavailable verification through the same focused runtime probe
 - `jayess:gpu` validation-backend command execution, runtime handle behavior, narrow image-to-texture upload behavior, backend-unavailable diagnostics, and focused Win32/Cocoa host-backed clear/draw/present verification when those host adapters and local executable-test toolchains are available
 - `jayess:crypto` digest correctness for SHA-256, SHA-512, and legacy SHA-1, HMAC correctness, HKDF-SHA-256 correctness, PEM certificate/private-key/trust-anchor container normalization, streaming-hash correctness, random-byte length, and focused random variability checks
 - higher-level module families such as config, cookie, compress, html, kv, validate, terminal, web-data helpers, and text-file helpers
@@ -98,6 +99,8 @@ The covered surfaces include:
 Network and window runtime tests accept focused host-adapter unavailable diagnostics as clean local skips so unsupported local hosts do not look like compiler or runtime regressions.
 
 GPU host-backed runtime probes follow the same rule and may also skip for a host-specific local executable-test toolchain when that toolchain is not stable for the selected backend family. Those skips should stay explicit and narrow rather than surfacing as raw process-abort failures.
+
+When a runtime probe reports an expected host-unavailable marker such as `skip:wayland-unavailable` or `skip:vulkan-unavailable`, tests should translate that marker through the shared skip helper instead of hardcoding one-off prose. The helper is intentionally only a reporting helper; C++ probes still own their concrete unavailable marker strings and still fail normally for unexpected output.
 
 Workflow fixtures are kept in `test/fixtures/runtime/` and should model compact user flows rather than exhaustive API matrices:
 

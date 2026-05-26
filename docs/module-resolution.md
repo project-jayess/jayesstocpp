@@ -26,13 +26,15 @@ When a conditional export object is used, Jayess selects conditions in this orde
 2. `"import"`
 3. `"default"`
 
-The selected condition is recorded in `jayess_dependency_plan.json` as `packageExportCondition`. The deterministic condition order checked for that branch is recorded as `packageExportConditionTrace`, and self-reference imports record `packageResolutionMode: "self-reference"`.
+The selected condition is recorded in `jayess_dependency_plan.json` as `packageExportCondition`. The deterministic condition order checked for that branch is recorded as `packageExportConditionTrace`, and `packageExportConditionDecisions` records why each checked condition was selected or skipped. Self-reference imports record `packageResolutionMode: "self-reference"`.
 
 Dependency-plan entries also record `packageRequestedSubpath` and `packageAllowedExtensions` so generated project metadata can explain which source subpath was requested and which Jayess source extensions were accepted.
 
 When a package export pattern is used, the selected pattern key is recorded as `packageExportKey`, and the wildcard replacement text is recorded as `packageExportPatternMatch`.
 
-When a package export array is used, Jayess checks entries in source order and selects the first entry that resolves to a supported Jayess source file inside the package root. Skipped entries are recorded in `packageExportArrayTrace` with the entry index, entry kind, selected condition metadata when available, attempted path, and skip reason.
+When a package export array is used, Jayess checks entries in source order and selects the first entry that resolves to a supported Jayess source file inside the package root. Skipped entries are recorded in `packageExportArrayTrace` with the entry index, entry kind, selected condition metadata when available, per-condition decisions for conditional entries, attempted path, attempted extension when a path was reached, and skip reason. If no array entry is usable, the diagnostic names the failed entries so the package author can see whether the blocker was an unsupported value, unsupported condition map, missing target, outside-root target, or unsupported file type such as `.cjs` or browser-only JavaScript before a transpileable Jayess target.
+
+Self-reference package imports use the same array and condition tracing. A nested file inside a package can import its own package name, resolve through an `exports` array, skip a missing first target, select a later transpileable Jayess target, and record the same `packageResolutionMode: "self-reference"` and `packageExportArrayTrace` metadata in the dependency plan. Unsupported self-reference condition maps fail with the same checked-condition diagnostic as ordinary installed package imports.
 
 For `transpileFile()` output layout, package and scoped-package modules do not create nested `node_modules/` directories in the generated target. Their resolved source identity is instead encoded into stable root-level generated filenames such as `_node_modules_jayess_lib_index_js.cpp` or `_node_modules__scope_math_src_index_js.hpp`.
 
@@ -47,9 +49,9 @@ The supported `"imports"` surface matches the focused package export surface:
 - conditional objects using `"jayess"`, `"import"`, or `"default"`
 - arrays whose entries are direct string targets or supported conditional objects
 
-Package-private imports are recorded in `jayess_dependency_plan.json` with `kind: "package-import"`, `packageField: "imports"`, `packageImportKey`, `packageImportPatternMatch`, `packageImportCondition`, and `packageImportConditionTrace`.
+Package-private imports are recorded in `jayess_dependency_plan.json` with `kind: "package-import"`, `packageField: "imports"`, `packageImportKey`, `packageImportPatternMatch`, `packageImportCondition`, `packageImportConditionTrace`, and `packageImportConditionDecisions`.
 
-Package-private import entries also record `packageRequestedSubpath`, `packageAllowedExtensions`, rejected conditional-branch metadata where a conditional map is inspected, and `packageImportArrayTrace` when an array mapping is used.
+Package-private import entries also record `packageRequestedSubpath`, `packageAllowedExtensions`, rejected conditional-branch metadata where a conditional map is inspected, and `packageImportArrayTrace` when an array mapping is used. Array trace entries use the same per-entry and per-condition decision shape as package exports.
 
 Jayess still rejects dynamic `import()` and runtime-computed package specifiers. Module specifiers must be static import declaration strings so the generated C++ project keeps a closed module graph.
 
@@ -64,7 +66,9 @@ When an installed package exists but resolves to non-Jayess targets such as JSON
 Unsupported package export-map diagnostics also explain why the mapping is unsupported when that information is available, such as:
 
 - which conditions were checked for a conditional export object
+- why each checked condition was selected, missing, or skipped as an unsupported target shape
 - whether an export array had no supported transpileable target
+- which array entries were skipped and why
 - whether a target used an unsupported value type
 
 Failure diagnostics and detailed resolver payloads include the package root, requested subpath, attempted path when a target was selected, supported Jayess source extensions, condition trace, pattern key, and wildcard match where those values are available. Dynamic import and runtime source-module loading remain rejected by the parser and semantic checks because Jayess keeps module closure static.

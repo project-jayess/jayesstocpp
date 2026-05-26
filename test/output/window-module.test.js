@@ -21,6 +21,7 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   const cppSource = fs.readFileSync(path.join(targetDir, "runtime", "jayess_runtime.cpp"), "utf8");
   const windowSource = fs.readFileSync(windowPath, "utf8");
   const plan = fs.readFileSync(path.join(targetDir, "jayess_dependency_plan.json"), "utf8");
+  const buildHints = JSON.parse(fs.readFileSync(path.join(targetDir, "jayess_build_hints.json"), "utf8"));
 
   assert.ok(result.files.includes(windowPath));
   assert.ok(fs.existsSync(primitivePath));
@@ -68,6 +69,7 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   assert.match(cppSource, /window_push_close_event/);
   assert.match(cppSource, /window_push_resize_event/);
   assert.match(cppSource, /window_push_key_event/);
+  assert.match(cppSource, /window_push_text_input_event/);
   assert.match(cppSource, /window_push_mouse_move_event/);
   assert.match(cppSource, /window_push_mouse_button_event/);
   assert.match(cppSource, /window_mark_shown/);
@@ -90,11 +92,55 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   assert.match(cppSource, /macOS Cocoa adapter is not available on this host/);
   assert.match(cppSource, /throw_window_adapter_unavailable\("X11"/);
   assert.match(cppSource, /throw_window_adapter_unavailable\("Wayland"/);
+  assert.match(cppSource, /window_wayland_add_registry_listener/);
+  assert.match(cppSource, /window_wayland_require_registry_globals/);
+  assert.match(cppSource, /window_wayland_require_input_capabilities/);
+  assert.match(cppSource, /window_wayland_add_shell_listeners/);
+  assert.match(cppSource, /wl_compositor global was not advertised/);
+  assert.match(cppSource, /wl_shm global was not advertised/);
+  assert.match(cppSource, /xdg_wm_base global was not advertised/);
   assert.match(cppSource, /Linux window support requires a usable X11 or Wayland adapter on this host/);
   assert.match(cppSource, /"pressed"/);
+  assert.match(cppSource, /"textInput"/);
+  assert.match(cppSource, /"text"/);
   assert.match(windowSource, /requestFrame/);
+  assert.match(windowSource, /runFrame/);
   assert.match(windowSource, /cancelFrame/);
   assert.match(windowSource, /jayess_module_stdlib_jayess_timers_index_js::setTimeout/);
   assert.match(windowSource, /jayess_module_stdlib_jayess_timers_index_js::clearTimeout/);
   assert.match(plan, /"source": "jayess:window"/);
+  assert.deepEqual(
+    buildHints.platformAdapters.filter((adapter) => adapter.feature === "window").map((adapter) => adapter.adapters),
+    [["win32", "cocoa", "x11", "wayland"]]
+  );
+  assert.deepEqual(buildHints.runtimeRequirements.window.eventFamilies, ["close", "resize", "key", "text-input", "pointer", "mouse-button"]);
+  assert.deepEqual(
+    buildHints.platformAdapters.filter((adapter) => adapter.feature === "window").map((adapter) => adapter.eventFamilies),
+    [["close", "resize", "key", "text-input", "pointer", "mouse-button"]]
+  );
+});
+
+test("transpileFile emits window plus GUI frame-loop helper output", (t) => {
+  const targetDir = createManagedTempDir(t, "window-gui-frame-output");
+  const fixture = path.resolve("test/fixtures/modules/window-frame-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const windowPath = generatedStdlibCppPath(targetDir, "window");
+  const guiPath = generatedStdlibCppPath(targetDir, "gui");
+  const guiFramePath = path.join(targetDir, "generated-stdlib", "jayess", "gui", "stdlib_jayess_gui_window_frame_js.cpp");
+  const windowSource = fs.readFileSync(windowPath, "utf8");
+  const guiSource = fs.readFileSync(guiPath, "utf8");
+  const guiFrameSource = fs.readFileSync(guiFramePath, "utf8");
+
+  assert.ok(result.files.includes(windowPath));
+  assert.ok(result.files.includes(guiPath));
+  assert.ok(result.files.includes(guiFramePath));
+  assert.match(windowSource, /runFrame/);
+  assert.match(guiSource, /runGuiFrame/);
+  assert.match(guiFrameSource, /pollEvents/);
+  assert.match(guiFrameSource, /present/);
+  assert.match(guiFrameSource, /queuedActions/);
+  assert.match(guiFrameSource, /rendered/);
+  assert.match(guiFrameSource, /presented/);
+  assert.match(guiFrameSource, /closed/);
 });

@@ -252,6 +252,7 @@ test("transpileFile records stdlib runtime reasons and platform adapter metadata
   assert.deepEqual(windowDependency.runtimeRequirements.window.adapters, ["win32", "cocoa", "x11", "wayland"]);
   assert.deepEqual(windowDependency.runtimeRequirements.window.platformLibraries, ["gdi32", "user32", "wayland-client", "x11"]);
   assert.deepEqual(windowDependency.runtimeRequirements.window.optionalBackendRequirements, ["Wayland runtime depends on a host compositor that exposes the xdg-shell client protocol"]);
+  assert.deepEqual(windowDependency.runtimeRequirements.window.eventFamilies, ["close", "resize", "key", "text-input", "pointer", "mouse-button"]);
   assert.deepEqual(windowDependency.runtimeRequirements.window.compiledAdaptersByPlatform, {
     windows: ["win32"],
     macos: ["cocoa"],
@@ -278,10 +279,11 @@ test("transpileFile records stdlib runtime reasons and platform adapter metadata
     windowSurface: {
       windows: "Prefer direct3d for createSurface(window) when the Win32 window adapter is available; otherwise fall back to validation.",
       macos: "Prefer metal for createSurface(window) when the Cocoa window adapter is available; otherwise fall back to validation.",
-      linux: "Current createSurface(window) still falls back to validation until the Linux host-backed backend slice lands."
+      linux: "Prefer vulkan for createSurface(window) when a compatible X11 or Wayland window surface and guarded libvulkan path are available; otherwise prefer opengl for X11 when guarded libGL is available, then fall back to validation."
     }
   });
   const windowPlatformAdapter = hints.platformAdapters.find((adapter) => adapter.feature === "window");
+  assert.deepEqual(windowPlatformAdapter.eventFamilies, ["close", "resize", "key", "text-input", "pointer", "mouse-button"]);
   assert.deepEqual(windowPlatformAdapter.compiledAdaptersByPlatform, {
     windows: ["win32"],
     macos: ["cocoa"],
@@ -295,6 +297,8 @@ test("transpileFile records stdlib runtime reasons and platform adapter metadata
   });
   assert.deepEqual(hints.runtimeRequirements.gpu.optionalBackendRequirements, [
     "validation backend is always available for deterministic command execution",
+    "Linux Vulkan backend dynamically loads libvulkan.so.1 and probes vkCreateInstance before selecting compatible X11 or Wayland window surfaces",
+    "Linux OpenGL backend dynamically loads libGL.so.1 and uses X11-backed window surfaces when available",
     "host GPU driver",
     "selected GPU SDK headers"
   ]);
@@ -307,7 +311,7 @@ test("transpileFile records stdlib runtime reasons and platform adapter metadata
     windowSurface: {
       windows: "Prefer direct3d for createSurface(window) when the Win32 window adapter is available; otherwise fall back to validation.",
       macos: "Prefer metal for createSurface(window) when the Cocoa window adapter is available; otherwise fall back to validation.",
-      linux: "Current createSurface(window) still falls back to validation until the Linux host-backed backend slice lands."
+      linux: "Prefer vulkan for createSurface(window) when a compatible X11 or Wayland window surface and guarded libvulkan path are available; otherwise prefer opengl for X11 when guarded libGL is available, then fall back to validation."
     }
   });
   assert.deepEqual(hints.runtimeRequirements.window.compiledAdaptersByPlatform, {
@@ -315,6 +319,7 @@ test("transpileFile records stdlib runtime reasons and platform adapter metadata
     macos: ["cocoa"],
     linux: ["x11", "wayland"]
   });
+  assert.deepEqual(hints.runtimeRequirements.window.eventFamilies, ["close", "resize", "key", "text-input", "pointer", "mouse-button"]);
   assert.deepEqual(hints.runtimeRequirements.window.adapterSelection, {
     linux: {
       preferredOrder: ["wayland", "x11"],
@@ -348,8 +353,13 @@ test("transpileFile records platform metadata for native system modules", (t) =>
     {
       fixture: "test/fixtures/modules/http-main.js",
       feature: "http",
-      adapters: ["posix-http", "winsock-http"],
-      libraries: ["ws2_32"]
+      adapters: ["posix-http", "winsock-http", "tls-validation", "host-tls"],
+      libraries: ["ws2_32"],
+      compiledAdaptersByPlatform: {
+        windows: ["winsock-http", "tls-validation", "host-tls"],
+        macos: ["posix-http", "tls-validation", "host-tls"],
+        linux: ["posix-http", "tls-validation", "host-tls"]
+      }
     },
     {
       fixture: "test/fixtures/modules/net-main.js",
@@ -409,11 +419,24 @@ test("transpileFile records selected package export conditions", (t) => {
       source: dependency.source,
       key: dependency.packageExportKey,
       condition: dependency.packageExportCondition,
-      trace: dependency.packageExportConditionTrace
+      trace: dependency.packageExportConditionTrace,
+      decisions: dependency.packageExportConditionDecisions
     })),
     [
-      { source: "jayess-condition-lib", key: ".", condition: "jayess", trace: ["jayess"] },
-      { source: "jayess-condition-lib/feature", key: "./feature", condition: "jayess", trace: ["jayess"] }
+      {
+        source: "jayess-condition-lib",
+        key: ".",
+        condition: "jayess",
+        trace: ["jayess"],
+        decisions: [{ condition: "jayess", present: true, selected: true, reason: "selected-string-target" }]
+      },
+      {
+        source: "jayess-condition-lib/feature",
+        key: "./feature",
+        condition: "jayess",
+        trace: ["jayess"],
+        decisions: [{ condition: "jayess", present: true, selected: true, reason: "selected-string-target" }]
+      }
     ]
   );
 });
@@ -430,6 +453,11 @@ test("transpileFile records default package export condition fallback", (t) => {
   assert.equal(entry.dependencies[0].packageExportCondition, "default");
   assert.deepEqual(entry.dependencies[0].packageExportConditionTrace, ["jayess", "import", "default"]);
   assert.deepEqual(entry.dependencies[0].packageExportRejectedConditions, []);
+  assert.deepEqual(entry.dependencies[0].packageExportConditionDecisions, [
+    { condition: "jayess", present: false, selected: false, reason: "missing" },
+    { condition: "import", present: false, selected: false, reason: "missing" },
+    { condition: "default", present: true, selected: true, reason: "selected-string-target" }
+  ]);
   assert.equal(entry.dependencies[0].packageRequestedSubpath, "");
   assert.deepEqual(entry.dependencies[0].packageAllowedExtensions, [".js", ".mjs"]);
 });
@@ -449,12 +477,35 @@ test("transpileFile records package export array trace metadata", (t) => {
       kind: trace.kind,
       selected: trace.selected,
       reason: trace.reason,
-      condition: trace.condition
+      condition: trace.condition,
+      decisions: trace.conditionDecisions
     })),
     [
-      { index: 0, kind: "number", selected: false, reason: "unsupported", condition: null },
-      { index: 1, kind: "conditions", selected: false, reason: "unsupported", condition: null },
-      { index: 2, kind: "conditions", selected: true, reason: null, condition: "default" }
+      { index: 0, kind: "number", selected: false, reason: "unsupported", condition: null, decisions: [] },
+      {
+        index: 1,
+        kind: "conditions",
+        selected: false,
+        reason: "unsupported",
+        condition: null,
+        decisions: [
+          { condition: "jayess", present: false, selected: false, reason: "missing" },
+          { condition: "import", present: false, selected: false, reason: "missing" },
+          { condition: "default", present: false, selected: false, reason: "missing" }
+        ]
+      },
+      {
+        index: 2,
+        kind: "conditions",
+        selected: true,
+        reason: null,
+        condition: "default",
+        decisions: [
+          { condition: "jayess", present: false, selected: false, reason: "missing" },
+          { condition: "import", present: false, selected: false, reason: "missing" },
+          { condition: "default", present: true, selected: true, reason: "selected-string-target" }
+        ]
+      }
     ]
   );
 });
@@ -485,6 +536,47 @@ test("transpileFile records package self-reference resolution metadata", (t) => 
       }
     ]
   );
+});
+
+test("transpileFile records package self-reference export array fallback metadata", (t) => {
+  const targetDir = createManagedTempDir(t, "dependency-plan-self-reference-array-output");
+  const fixture = path.resolve("test/fixtures/package-project/src/nested/self-reference-array-main.js");
+  transpileFile(fixture, targetDir);
+
+  const plan = JSON.parse(fs.readFileSync(path.join(targetDir, "jayess_dependency_plan.json"), "utf8"));
+  const entry = plan.modules.find((module) => module.sourceFilename === path.resolve(fixture));
+  assert.ok(entry);
+  assert.equal(entry.dependencies[0].packageResolutionMode, "self-reference");
+  assert.equal(entry.dependencies[0].packageExportKey, "./array");
+  assert.deepEqual(
+    entry.dependencies[0].packageExportArrayTrace.map((trace) => ({
+      index: trace.index,
+      kind: trace.kind,
+      selected: trace.selected,
+      reason: trace.reason,
+      attemptedPath: trace.attemptedPath == null ? null : trace.attemptedPath.endsWith("self-missing.js")
+    })),
+    [
+      { index: 0, kind: "string", selected: false, reason: "missing", attemptedPath: true },
+      { index: 1, kind: "string", selected: true, reason: null, attemptedPath: false }
+    ]
+  );
+});
+
+test("transpileFile records unsupported package export entries before supported Jayess targets", (t) => {
+  const targetDir = createManagedTempDir(t, "dependency-plan-mixed-target-output");
+  const fixture = path.resolve("test/fixtures/package-project/src/mixed-target-main.js");
+  transpileFile(fixture, targetDir);
+
+  const plan = JSON.parse(fs.readFileSync(path.join(targetDir, "jayess_dependency_plan.json"), "utf8"));
+  const entry = plan.modules.find((module) => module.sourceFilename === path.resolve(fixture));
+  assert.ok(entry);
+  const trace = entry.dependencies[0].packageExportArrayTrace;
+  assert.equal(trace[0].reason, "unsupported-file-type");
+  assert.equal(trace[0].attemptedExtension, ".cjs");
+  assert.ok(trace[0].attemptedPath.endsWith("mixed-target-lib/src/browser.cjs"));
+  assert.equal(trace[1].selected, true);
+  assert.equal(trace[1].reason, null);
 });
 
 test("transpileFile records hoisted workspace package resolution metadata", (t) => {
@@ -539,13 +631,25 @@ test("transpileFile records package imports resolution metadata", (t) => {
       match: dependency.packageImportPatternMatch,
       condition: dependency.packageImportCondition,
       trace: dependency.packageImportConditionTrace,
+      decisions: dependency.packageImportConditionDecisions,
       requested: dependency.packageRequestedSubpath,
       extensions: dependency.packageAllowedExtensions
     })),
     [
-      { source: "#tools", kind: "package-import", field: "imports", key: "#tools", match: null, condition: null, trace: [], requested: "#tools", extensions: [".js", ".mjs"] },
-      { source: "#condition", kind: "package-import", field: "imports", key: "#condition", match: null, condition: "jayess", trace: ["jayess"], requested: "#condition", extensions: [".js", ".mjs"] },
-      { source: "#features/tools", kind: "package-import", field: "imports", key: "#features/*", match: "tools", condition: null, trace: [], requested: "#features/tools", extensions: [".js", ".mjs"] }
+      { source: "#tools", kind: "package-import", field: "imports", key: "#tools", match: null, condition: null, trace: [], decisions: [], requested: "#tools", extensions: [".js", ".mjs"] },
+      {
+        source: "#condition",
+        kind: "package-import",
+        field: "imports",
+        key: "#condition",
+        match: null,
+        condition: "jayess",
+        trace: ["jayess"],
+        decisions: [{ condition: "jayess", present: true, selected: true, reason: "selected-string-target" }],
+        requested: "#condition",
+        extensions: [".js", ".mjs"]
+      },
+      { source: "#features/tools", kind: "package-import", field: "imports", key: "#features/*", match: "tools", condition: null, trace: [], decisions: [], requested: "#features/tools", extensions: [".js", ".mjs"] }
     ]
   );
 });

@@ -32,6 +32,9 @@ int main() {
   require(contains(std::get<std::string>(items[3]), ">Read &lt;docs&gt;</a>"), "link child");
   require(contains(std::get<std::string>(items[4]), "<section id=\\"intro\\">"), "section open");
   require(contains(std::get<std::string>(items[4]), "<h1>Jayess</h1>"), "heading child");
+  require(contains(std::get<std::string>(items[5]), "&lt;script&gt;bad()&lt;/script&gt;"), "unsafe tag escaped");
+  require(contains(std::get<std::string>(items[5]), "&lt;a href=\\"javascript:bad\\"&gt;bad</a>"), "unsafe href escaped");
+  require(contains(std::get<std::string>(items[5]), "<a href=\\"/ok\\">ok</a>"), "safe href preserved");
 
   try {
     ${namespace}::invalidTag(std::vector<jayess::value>{});

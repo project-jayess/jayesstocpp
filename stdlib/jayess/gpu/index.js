@@ -7,6 +7,7 @@ import {
   jayessGpuCreateShader,
   jayessGpuCreateSurface,
   jayessGpuCreateTexture,
+  jayessGpuUploadBuffer,
   jayessGpuUploadImage,
   jayessGpuDraw,
   jayessGpuEndFrame
@@ -27,6 +28,10 @@ export function createSurface(window) {
 
 export function createBuffer(device, options) {
   return jayessGpuCreateBuffer(device, options);
+}
+
+export function uploadBuffer(buffer, data) {
+  return jayessGpuUploadBuffer(buffer, data);
 }
 
 export function createTexture(device, options) {

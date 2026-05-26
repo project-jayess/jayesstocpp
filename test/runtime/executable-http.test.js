@@ -20,6 +20,30 @@ void require(bool condition, const char* message) {
   }
 }
 
+bool host_tls_callback(
+    const jayess::http_tls_client_request_data& request,
+    jayess::http_tls_client_response_data& response,
+    std::string& error,
+    void* userData) {
+  (void)userData;
+  if (request.method != "GET" || request.host != "example.test" || request.port != 443 || request.path != "/") {
+    error = "unexpected request shape";
+    return false;
+  }
+  if (request.raw_request.find("Host: example.test") == std::string::npos) {
+    error = "missing host header";
+    return false;
+  }
+  if (!request.tls_options_provided) {
+    error = "missing tls options";
+    return false;
+  }
+  response.status_code = 207;
+  response.headers["Content-Type"] = "text/plain";
+  response.body = "secure callback";
+  return true;
+}
+
 int main() {
   ${namespace}::jayess_module_init();
   const int port = 45679;
@@ -34,6 +58,66 @@ int main() {
     jayess::http_end_response(response, jayess::value(std::string("hello ") + std::get<std::string>(jayess::http_request_body(request))));
     return jayess::value(std::monostate{});
   });
+  auto optionProbe = [&](const std::string& name, jayess::value stored, const std::string& expected) {
+    try {
+      jayess::http_create_server(handler, jayess::make_object({
+        {"host", std::string("127.0.0.1")},
+        {"port", 0.0},
+        {name, stored}
+      }));
+      throw std::runtime_error("expected http server option diagnostic");
+    } catch (const std::exception& error) {
+      require(std::string(error.what()).find(expected) != std::string::npos, "http server option diagnostic");
+    }
+  };
+  optionProbe("maxHeaderBytes", 0.0, "maxHeaderBytes");
+  optionProbe("maxBodyBytes", -1.0, "maxBodyBytes");
+  optionProbe("idleTimeoutMillis", std::string("bad"), "idleTimeoutMillis");
+  optionProbe("headerTimeoutMillis", 0.0, "headerTimeoutMillis");
+  optionProbe("bodyTimeoutMillis", -1.0, "bodyTimeoutMillis");
+  optionProbe("unexpected", 1.0, "Unsupported option");
+
+  try {
+    ${namespace}::invalidHttpsServerCertificate(std::vector<jayess::value>{45690.0});
+    throw std::runtime_error("expected https server certificate diagnostic");
+  } catch (const std::exception& error) {
+    require(std::string(error.what()).find("tls.certificate") != std::string::npos, "https server certificate diagnostic");
+  }
+
+  try {
+    ${namespace}::httpsServerUnavailable(std::vector<jayess::value>{45691.0});
+    throw std::runtime_error("expected https server unavailable diagnostic");
+  } catch (const std::exception& error) {
+    require(std::string(error.what()).find("HTTPS transport backend is not available") != std::string::npos, "https server unavailable diagnostic");
+  }
+
+  try {
+    jayess::await_sync(${namespace}::invalidHttpsRequestTrustAnchors(std::vector<jayess::value>{}));
+    throw std::runtime_error("expected https request trust anchor diagnostic");
+  } catch (const jayess::thrown_value& error) {
+    require(std::get<std::string>(jayess::exception_to_value(error)).find("trustAnchors") != std::string::npos, "https request trust anchor diagnostic");
+  }
+
+  try {
+    jayess::await_sync(${namespace}::httpsRequestUnavailable(std::vector<jayess::value>{}));
+    throw std::runtime_error("expected https request unavailable diagnostic");
+  } catch (const jayess::thrown_value& error) {
+    require(std::get<std::string>(jayess::exception_to_value(error)).find("HTTPS transport backend is not available") != std::string::npos, "https request unavailable diagnostic");
+  }
+  require(!jayess::http_tls_client_backend_available(), "http tls backend starts unavailable");
+  jayess::http_tls_register_client_backend(host_tls_callback, nullptr);
+  require(jayess::http_tls_client_backend_available(), "http tls backend becomes available");
+  auto tlsResponse = jayess::await_sync(${namespace}::httpsRequestUnavailable(std::vector<jayess::value>{}));
+  const auto& tlsFields = std::get<jayess::object_ptr>(tlsResponse)->fields;
+  require(std::get<double>(tlsFields.at("statusCode")) == 207.0, "https callback status");
+  require(std::get<std::string>(jayess::http_response_text(tlsResponse)) == "secure callback", "https callback body");
+
+  try {
+    jayess::await_sync(${namespace}::unsupportedHttpsAlpn(std::vector<jayess::value>{}));
+    throw std::runtime_error("expected https ALPN unsupported diagnostic");
+  } catch (const jayess::thrown_value& error) {
+    require(std::get<std::string>(jayess::exception_to_value(error)).find("TLS ALPN is unsupported") != std::string::npos, "https ALPN unsupported diagnostic");
+  }
 
   jayess::http_create_server(handler, jayess::make_object({
     {"host", std::string("127.0.0.1")},

@@ -25,6 +25,19 @@ export function invalidMessageButtons() {
   });
 }
 
+export function invalidOpenFileMultiple() {
+  return openFile({
+    multiple: "yes"
+  });
+}
+
+export function invalidOpenFileOption() {
+  return openFile({
+    title: "Open",
+    unknown: true
+  });
+}
+
 export function unavailableOpenFile() {
   return openFile({
     title: "Open",
@@ -53,10 +66,22 @@ export function selectOpenFile() {
   });
 }
 
+export function selectOpenFiles() {
+  return openFile({
+    title: "Open Many",
+    defaultPath: "C:/temp",
+    multiple: true,
+    filters: [
+      { name: "Text", extensions: ["txt", "md"] }
+    ]
+  });
+}
+
 export function selectSaveFile() {
   return saveFile({
     title: "Save",
     defaultPath: "C:/temp/output.txt",
+    defaultName: "export.txt",
     filters: [
       { name: "Text", extensions: ["txt"] }
     ]
@@ -74,6 +99,7 @@ export function askMessage() {
   return message({
     title: "Question",
     message: "Continue?",
+    detail: "This action can be cancelled.",
     kind: "question",
     buttons: "yesNoCancel"
   });

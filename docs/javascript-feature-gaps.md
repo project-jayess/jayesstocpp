@@ -47,7 +47,7 @@ Jayess is JavaScript-like, but it is not JavaScript:
 - `var` is block-scoped, not JavaScript-style function-scoped.
 - JavaScript-style `var` hoisting is not supported.
 - `let` is not supported because Jayess `var` already fills that role.
-- Jayess does not add a separate JavaScript-style `undefined` value; the language direction keeps `null` as the only built-in missing-value sentinel.
+- Jayess does not add a separate JavaScript-style `undefined` value; the language direction keeps `null` as the only built-in missing-value sentinel, and direct `undefined` usage is rejected with `JY_SEMANTIC_UNDEFINED_UNSUPPORTED`.
 - Jayess does not adopt JavaScript `Promise` as a language/runtime surface; async behavior is Jayess-owned.
 - Jayess is transpiled to C++, so runtime semantics are intentionally stricter and more explicit.
 - Jayess does not provide the Node.js runtime by default.
@@ -76,6 +76,8 @@ The following familiar JavaScript syntax is not currently documented as supporte
 - `export default` expressions beyond the currently supported forms already documented
 
 Unsupported-by-design features such as `let`, dynamic `import()`, `eval(...)`, `Function(...)`, and `with` now fail with focused diagnostics. Remaining unimplemented forms may still fail with narrower generic unsupported diagnostics until their own slices are defined and shipped.
+
+Recent semantic hardening moves several reachable C++ emission failures earlier into semantic diagnostics. Generator bodies now reject nested function and class declarations before emission, unsupported operator shapes are reported before the C++ operator renderer runs, and unsupported `super` / destructuring shapes keep stable semantic diagnostic families.
 
 Destructuring now supports nested patterns, array elisions, pattern defaults, assignment destructuring into existing identifiers and public member targets, destructuring declarations in `for` initializers, and destructured parameters.
 

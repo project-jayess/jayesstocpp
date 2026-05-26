@@ -1,4 +1,4 @@
-import { body, close as closeServer, createServer, sendText } from "jayess:http";
+import { body, close as closeServer, createServer, sendText, state as serverState } from "jayess:http";
 import { sleep } from "jayess:timers";
 
 export function serveBodyEcho(port) {
@@ -24,4 +24,8 @@ export function serveSlowEcho(port, milliseconds) {
 
 export function stop(server) {
   return closeServer(server);
+}
+
+export function inspect(server) {
+  return serverState(server);
 }
