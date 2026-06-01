@@ -87,9 +87,9 @@ dist
 temp/
 
 # Manual Jayess feature probe generated output
-custom-test/*/cpp/
-custom-test/*/dist/
-custom-test/*/temp/
+custom-test/**/cpp/
+custom-test/**/dist/
+custom-test/**/temp/
 
 # Gatsby files
 .cache/
