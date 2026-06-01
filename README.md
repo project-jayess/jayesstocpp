@@ -52,4 +52,16 @@ Current implemented slice:
 - native source side-effect imports
 - `cpp:<header>` imports for C++ standard library headers
 
+Manual feature probes live under `custom-test/`. These are separated from the automated `test/` suite and are intended for hands-on Jayess programs that exercise a language feature end to end.
+
+Recommended layout for each probe:
+
+```text
+custom-test/<feature>/src/   # Jayess source files
+custom-test/<feature>/cpp/   # transpileFile output
+custom-test/<feature>/dist/  # locally compiled binaries or run artifacts
+```
+
+For example, console manual testing can use `custom-test/console/src/console.js`, transpile into `custom-test/console/cpp/`, and compile/run from `custom-test/console/dist/`. Keep generated `cpp/` and `dist/` outputs out of commits unless a task explicitly asks for checked-in artifacts.
+
 See [Jayess.md](./Jayess.md), [docs/overview.md](docs/overview.md), [docs/stdlib-and-core-model.md](docs/stdlib-and-core-model.md), [docs/jayess-native-gui.md](docs/jayess-native-gui.md), [docs/testing.md](docs/testing.md), [docs/shared-library.md](docs/shared-library.md), [docs/limitations.md](docs/limitations.md), [docs/workflow.md](docs/workflow.md), and [docs/review-discipline.md](docs/review-discipline.md).

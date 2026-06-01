@@ -14,6 +14,12 @@
   "author": "Victor Chanil Park",
   "type": "module",
   "main": "src/index.js",
+  "files": [
+    "src/",
+    "stdlib/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "node --test test/**/*.test.js",
     "test:unit": "node --test test/api/*.test.js test/diagnostics.test.js test/source-text.test.js test/lexer/*.test.js test/parser/*.test.js test/semantic/*.test.js test/lifetime/*.test.js test/modules/*.test.js test/output/*.test.js",
