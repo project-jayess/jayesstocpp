@@ -161,7 +161,7 @@ Exports: `rgb`, `rgba`, `parse`, `toHex`, `mix`, `lighten`, `darken`, `withAlpha
 
 ### `jayess:console`
 
-Exports: `log`, `error`, `write`, `writeLine`.
+Exports: `log`, `error`, `write`, `writeLine`, `readLine`, `readStdin`, `prompt`.
 
 ### `jayess:cookie`
 

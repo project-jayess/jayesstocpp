@@ -21,4 +21,8 @@ Each active slice should:
 
 ## Active Items
 
-No active unchecked items.
+## 379. Console Standard Input Helpers
+
+- [x] Add focused `jayess:console` stdin helpers for one-line input, whole-stdin input, and prompt-style input.
+- [x] Add output, compile, and executable runtime coverage for the console input helpers.
+- [x] Update console, overview, brief, and standard-library docs after the input helper slice lands.

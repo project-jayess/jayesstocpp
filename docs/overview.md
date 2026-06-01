@@ -288,7 +288,7 @@ Current system-module note:
 - the next active host-module implementation slice is `jayess:timers`
 - `jayess:stream` currently exports `openRead`, `openWrite`, `openReadSync`, `openWriteSync`, `readChunk`, `writeChunk`, `close`, `pipe`, `pipeAll`, `pipeWithCancellation`, `copy`, `tee`, `chunks`, `readText`, `readAllBytes`, `readAllText`, `toBytes`, `toText`, `collectBytes`, `collectText`, `readLines`, `writeText`, `writeLine`, and `pipeText`
 - `jayess:assert` currently exports `ok`, `equal`, `notEqual`, `fail`, and `throws`
-- `jayess:console` currently exports `log`, `error`, `write`, and `writeLine`
+- `jayess:console` currently exports `log`, `error`, `write`, `writeLine`, `readLine`, `readStdin`, and `prompt`
 - `jayess:bytes` currently exports `fromUtf8`, `fromArray`, `toArray`, `toUtf8`, `length`, `get`, `set`, `fill`, `slice`, `concat`, `equals`, `secureEquals`, `compare`, `startsWith`, `endsWith`, and `isBytes`
 - `jayess:buffer` currently exports `create`, `fromBytes`, `toBytes`, `length`, `read`, `write`, and `concat`
 - `jayess:encoding` currently exports `base64Encode`, `base64Decode`, `hexEncode`, `hexDecode`, `asciiEncode`, `asciiDecode`, `utf16Encode`, `utf16Decode`, `uriEncode`, and `uriDecode`

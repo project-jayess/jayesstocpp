@@ -16,7 +16,7 @@ This is the authoritative quick standard-library/module matrix for shipped `jaye
 | `jayess:compress` | stored DEFLATE and minimal gzip helpers | compress, bytes |
 | `jayess:cli` | command-line argument parsing | process/system |
 | `jayess:color` | color parsing, conversion, and blending | math, number, string |
-| `jayess:console` | output helpers | console |
+| `jayess:console` | standard input and output helpers | console |
 | `jayess:cookie` | HTTP cookie parsing and Set-Cookie formatting | http, string |
 | `jayess:config` | config file loading and shallow overlay helpers | fs, json, ini, toml, dotenv, path |
 | `jayess:crypto` | hashes, HMAC, HKDF, and PEM container helpers | crypto, bytes |

@@ -335,6 +335,9 @@ test("transpileFile writes runtime console helpers into the generated runtime", 
   assert.match(headerSource, /value console_error_value\(const value& input\);/);
   assert.match(headerSource, /value console_write_text\(const std::string& text\);/);
   assert.match(headerSource, /value console_write_line_text\(const std::string& text\);/);
+  assert.match(headerSource, /value console_read_line_text\(\);/);
+  assert.match(headerSource, /value console_read_stdin_text\(\);/);
+  assert.match(headerSource, /value console_prompt_text\(const std::string& text\);/);
   assert.match(cppSource, /#include <iostream>/);
   assert.match(cppSource, /value console_log_value\(const value& input\)/);
   assert.match(cppSource, /std::cout << stringify_value\(input\) << std::endl;/);
@@ -342,6 +345,10 @@ test("transpileFile writes runtime console helpers into the generated runtime", 
   assert.match(cppSource, /std::cerr << stringify_value\(input\) << std::endl;/);
   assert.match(cppSource, /value console_write_text\(const std::string& text\)/);
   assert.match(cppSource, /value console_write_line_text\(const std::string& text\)/);
+  assert.match(cppSource, /value console_read_line_text\(\)/);
+  assert.match(cppSource, /std::getline\(std::cin, line\)/);
+  assert.match(cppSource, /value console_read_stdin_text\(\)/);
+  assert.match(cppSource, /value console_prompt_text\(const std::string& text\)/);
 });
 
 test("transpileFile writes runtime bytes helpers into the generated runtime", (t) => {

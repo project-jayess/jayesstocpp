@@ -1,11 +1,11 @@
 # Jayess `jayess:console` Module
 
-`jayess:console` is a small Jayess-owned standard module for terminal output.
+`jayess:console` is a small Jayess-owned standard module for terminal input and output.
 
 It does not expose ambient JavaScript `console` or Node.js globals. Jayess source imports the helpers explicitly:
 
 ```js
-import { error, log, write, writeLine } from "jayess:console";
+import { error, log, prompt, readLine, readStdin, write, writeLine } from "jayess:console";
 ```
 
 ## Exports
@@ -14,6 +14,9 @@ import { error, log, write, writeLine } from "jayess:console";
 - `error(value)`
 - `write(text)`
 - `writeLine(text)`
+- `readLine()`
+- `readStdin()`
+- `prompt(text)`
 
 ## Semantics
 
@@ -22,7 +25,11 @@ import { error, log, write, writeLine } from "jayess:console";
 - `write(text)` writes a string to standard output without appending a newline.
 - `writeLine(text)` writes a string to standard output and appends a newline.
 - `write(text)` and `writeLine(text)` require string input.
-- all helpers return Jayess `null`.
+- `readLine()` reads one line from standard input. It returns the line without the trailing newline, or `null` at EOF.
+- `readStdin()` reads all remaining standard input and returns it as a string.
+- `prompt(text)` writes `text` to standard output, flushes it, then reads one line with the same EOF behavior as `readLine()`.
+- `prompt(text)` requires string input.
+- output helpers return Jayess `null`; input helpers return strings or `null` for EOF on line-based reads.
 
 The value formatting used by `log(value)` and `error(value)` follows the current Jayess runtime string conversion rules. Primitive strings, numbers, booleans, and `null` are supported by that conversion.
 

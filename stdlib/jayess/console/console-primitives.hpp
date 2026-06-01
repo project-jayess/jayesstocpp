@@ -29,3 +29,17 @@ inline jayess::value jayessConsoleWriteLine(const std::vector<jayess::value>& ja
     jayessConsoleStringArgument(jayessArgs, 0, "Jayess console writeLine expects a string text value")
   );
 }
+
+inline jayess::value jayessConsoleReadLine(const std::vector<jayess::value>&) {
+  return jayess::console_read_line_text();
+}
+
+inline jayess::value jayessConsoleReadStdin(const std::vector<jayess::value>&) {
+  return jayess::console_read_stdin_text();
+}
+
+inline jayess::value jayessConsolePrompt(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::console_prompt_text(
+    jayessConsoleStringArgument(jayessArgs, 0, "Jayess console prompt expects a string text value")
+  );
+}

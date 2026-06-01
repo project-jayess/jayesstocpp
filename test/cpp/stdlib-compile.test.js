@@ -43,6 +43,7 @@ const stdlibCompileCases = [
   ["transpileFile built-in timers module project compiles with the available C++ compiler", "builtin-timers-project-compile", "test/fixtures/modules/timers-main.js"],
   ["transpileFile built-in timers interval project compiles with the available C++ compiler", "builtin-timers-interval-project-compile", "test/fixtures/modules/timers-interval-main.js"],
   ["transpileFile console module project compiles with the available C++ compiler", "console-project-compile", "test/fixtures/modules/console-main.js"],
+  ["transpileFile console input module project compiles with the available C++ compiler", "console-input-project-compile", "test/fixtures/modules/console-input-main.js"],
   ["transpileFile bytes module project compiles with the available C++ compiler", "bytes-project-compile", "test/fixtures/modules/bytes-main.js"],
   ["transpileFile buffer module project compiles with the available C++ compiler", "buffer-project-compile", "test/fixtures/modules/buffer-main.js"],
   ["transpileFile encoding module project compiles with the available C++ compiler", "encoding-project-compile", "test/fixtures/modules/encoding-main.js"],
