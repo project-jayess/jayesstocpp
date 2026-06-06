@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { transpile } from "../../src/api/transpile.js";
@@ -8,6 +9,28 @@ import { compileCppFiles, findAvailableCompiler, writeRuntime } from "../support
 import { createManagedTempDir } from "../support/temp-dir.js";
 
 const compileTest = findAvailableCompiler() == null ? test.skip : test;
+
+function compileGeneratedExecutable(files, includeDir, executableName) {
+  const compiler = findAvailableCompiler();
+  const executablePath = path.join(includeDir, process.platform === "win32" ? `${executableName}.exe` : executableName);
+
+  execFileSync(compiler, [
+    "-std=c++17",
+    "-pthread",
+    ...files,
+    "-I",
+    includeDir,
+    "-o",
+    executablePath
+  ], {
+    stdio: "pipe",
+    encoding: "utf8",
+    cwd: includeDir,
+    env: { ...process.env, TMPDIR: includeDir, TEMP: includeDir, TMP: includeDir }
+  });
+
+  return executablePath;
+}
 
 compileTest("transpileFile trailing comma project compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "trailing-comma-project-compile");
@@ -120,6 +143,22 @@ compileTest("transpileFile shared-library layout compiles with the available C++
 
   compileCppFiles(cppFiles, targetDir);
   assert.ok(true);
+});
+
+compileTest("transpileFile executable layout links and uses top-level main exit code", (t) => {
+  const targetDir = createManagedTempDir(t, "executable-layout-compile");
+  const fixture = path.resolve("test/fixtures/modules/native-entry-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+  const executablePath = compileGeneratedExecutable(cppFiles, targetDir, "jayess-native-entry-main");
+  const run = spawnSync(executablePath, [], {
+    cwd: targetDir,
+    encoding: "utf8",
+    env: { ...process.env, TMPDIR: targetDir, TEMP: targetDir, TMP: targetDir }
+  });
+
+  assert.equal(run.status, 7);
+  assert.equal(run.stderr, "");
 });
 
 compileTest("transpileFile namespace import project compiles with the available C++ compiler", (t) => {

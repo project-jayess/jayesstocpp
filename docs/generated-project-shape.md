@@ -144,6 +144,8 @@ The file is emitted under `targetDirname` and is deterministic for the same inpu
 
 Repository-owned standard-library modules copied into `generated-stdlib/jayess/...` are also identified in the module manifest with `sourceKind: "repository-stdlib"` and a `standardLibrarySpecifier` such as `jayess:image` or `jayess:collections/map`. The manifest also includes `copiedStandardLibraryModules` as a compact sorted index for build and packaging tools.
 
+The intended next shape is reachable symbol emission for ordinary named imports. Generated metadata should expose requested import names, retained declarations, pruned declarations where practical, retained native artifacts, and fallback reasons when a full module must still be emitted. See [reachable-symbol-emission.md](./reachable-symbol-emission.md).
+
 ## Shared-Library-Oriented Layout
 
 When `transpileFile(..., { projectKind: "shared-library" })` is used, the generated target also includes:
@@ -154,6 +156,15 @@ When `transpileFile(..., { projectKind: "shared-library" })` is used, the genera
 - `shared-library/jayess_shared_library.json`
 
 The JSON file is intentionally small and acts as the only current manifest-like output for this mode.
+
+## Executable Entrypoint Layout
+
+When the entry Jayess file defines a top-level `function main()`, executable-oriented output also includes:
+
+- `executable/jayess_main.cpp`
+- `executable/jayess_executable.json`
+
+The generated native `int main()` initializes the entry module, calls the generated Jayess `main()` function, and converts a numeric return value to the process exit code. Null and non-numeric returns exit with `0`. Uncaught Jayess or C++ exceptions are reported on stderr and exit with `1`.
 
 ## Current Non-Goals
 

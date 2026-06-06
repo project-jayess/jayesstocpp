@@ -12,6 +12,8 @@ Options:
 - --library-name <name>: set the shared library name
 - --runtime-fragments auto|all: choose runtime fragment emission mode
 
+For executable output, a top-level Jayess `function main()` in the entry file is the native program starting point. `transpileFile()` emits `executable/jayess_main.cpp`, calls the generated module initializer, calls the generated Jayess `main()`, and maps a numeric return value to the process exit code.
+
 Jayess is compiled, not interpreted. It aims to feel familiar to JavaScript developers without inheriting every highly dynamic JavaScript runtime feature.
 
 The intended architecture is:
@@ -21,6 +23,8 @@ The intended architecture is:
 - user Jayess code transpiled together with those modules into the final C++ project
 
 That means future standard-library and core-language support does not have to be hardcoded entirely in C++. When a feature can be expressed safely in Jayess, the preferred direction is to implement it in Jayess source and let `transpileFile()` bring it into the generated output through normal module resolution.
+
+Named imports should drive generated output at export/declaration granularity. For example, importing `{ readTextSync, writeTextSync }` from `jayess:fs` should eventually emit only those functions, their local helpers, their native bridge calls, and their required runtime fragments. Whole-module emission is a conservative fallback for side-effect imports, namespace imports, ambiguous re-exports, cycles, or unsupported analysis shapes; it should not be the long-term default for ordinary named imports.
 
 The preferred future built-in-module direction is a reserved Jayess-owned namespace such as `jayess:*`, distinct from both `node:*` and `cpp:*`.
 
@@ -74,4 +78,4 @@ custom-test/<feature>/dist/  # locally compiled binaries or run artifacts
 
 For example, console manual testing can use `custom-test/console/src/console.js`, transpile into `custom-test/console/cpp/`, and compile/run from `custom-test/console/dist/`. Keep generated `cpp/` and `dist/` outputs out of commits unless a task explicitly asks for checked-in artifacts.
 
-See [Jayess.md](./Jayess.md), [docs/overview.md](docs/overview.md), [docs/stdlib-and-core-model.md](docs/stdlib-and-core-model.md), [docs/jayess-native-gui.md](docs/jayess-native-gui.md), [docs/testing.md](docs/testing.md), [docs/shared-library.md](docs/shared-library.md), [docs/limitations.md](docs/limitations.md), [docs/workflow.md](docs/workflow.md), and [docs/review-discipline.md](docs/review-discipline.md).
+See [Jayess.md](./Jayess.md), [docs/overview.md](docs/overview.md), [docs/stdlib-and-core-model.md](docs/stdlib-and-core-model.md), [docs/reachable-symbol-emission.md](docs/reachable-symbol-emission.md), [docs/jayess-native-gui.md](docs/jayess-native-gui.md), [docs/testing.md](docs/testing.md), [docs/shared-library.md](docs/shared-library.md), [docs/limitations.md](docs/limitations.md), [docs/workflow.md](docs/workflow.md), and [docs/review-discipline.md](docs/review-discipline.md).

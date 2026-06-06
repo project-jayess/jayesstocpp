@@ -102,6 +102,48 @@ test("transpileFile writes shared-library manifest with stable content", (t) => 
   });
 });
 
+test("transpileFile writes executable entry layout for top-level main function", (t) => {
+  const targetDir = createManagedTempDir(t, "executable-layout-output");
+  const fixture = path.resolve("test/fixtures/modules/native-entry-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  assert.ok(result.files.some((file) => path.relative(targetDir, file).split(path.sep).join("/") === "executable/jayess_main.cpp"));
+  assert.ok(result.files.some((file) => path.relative(targetDir, file).split(path.sep).join("/") === "executable/jayess_executable.json"));
+  assert.ok(fs.existsSync(path.join(targetDir, "executable", "jayess_main.cpp")));
+  assert.ok(fs.existsSync(path.join(targetDir, "executable", "jayess_executable.json")));
+});
+
+test("transpileFile writes executable manifest with stable content", (t) => {
+  const targetDir = createManagedTempDir(t, "executable-layout-manifest-output");
+  const fixture = path.resolve("test/fixtures/modules/native-entry-main.js");
+  transpileFile(fixture, targetDir);
+
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(targetDir, "executable", "jayess_executable.json"), "utf8")
+  );
+
+  assert.deepEqual(manifest, {
+    kind: "executable-project",
+    entryHeader: "native_entry_main_js.hpp",
+    entryNamespace: "jayess_module_native_entry_main_js",
+    entryFunction: "main",
+    nativeEntrypoint: "executable/jayess_main.cpp",
+    awaitsResult: false
+  });
+});
+
+test("transpileFile includes executable entry source in build hints", (t) => {
+  const targetDir = createManagedTempDir(t, "executable-layout-build-hints-output");
+  const fixture = path.resolve("test/fixtures/modules/native-entry-main.js");
+  transpileFile(fixture, targetDir);
+
+  const hints = JSON.parse(
+    fs.readFileSync(path.join(targetDir, "jayess_build_hints.json"), "utf8")
+  );
+
+  assert.ok(hints.sourceFiles.includes("executable/jayess_main.cpp"));
+});
+
 test("transpileFile emits multi-module headers with module init declarations", (t) => {
   const targetDir = createManagedTempDir(t, "multi-module-shape");
   const fixture = path.resolve("test/fixtures/modules/main.js");

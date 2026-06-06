@@ -17,10 +17,15 @@ function readNumber(label) {
   return value;
 }
 
-var first = readNumber("First number: ");
-var second = readNumber("Second number: ");
-var result = first * second;
+function main ()
+{
+  var first = readNumber("First number: ");
+  var second = readNumber("Second number: ");
+  var result = first * second;
 
-write("Result: ");
-log(result);
-prompt("Press Enter to exit...");
+  write("Result: ");
+  log(result);
+  prompt("Press Enter to exit...");
+
+  return 0;
+}

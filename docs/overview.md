@@ -162,6 +162,8 @@ Jayess is intended to grow through a mix of:
 
 When practical, standard-library and core-library behavior should be written in Jayess and transpiled together with user code as part of the generated C++ project.
 
+Named imports should drive export-level reachable symbol emission when the compiler can prove the smaller surface is safe. Importing two helpers from `jayess:fs` should not force unrelated FS temp, JSON, stream, UUID, or crypto helpers into the generated project. See [reachable-symbol-emission.md](./reachable-symbol-emission.md).
+
 The remaining larger language/runtime gaps are treated as active implementation work. Until a slice is actually shipped, the transpiler should keep explicit diagnostics rather than implying partial support.
 
 Jayess's default GUI direction is now explicit too: a Jayess-owned toolkit over `jayess:layout`, `jayess:canvas`, and `jayess:window`, not browser DOM compatibility and not Node.js GUI-package compatibility.
@@ -181,6 +183,7 @@ The current semantics direction is also explicit on truthiness and coercion:
 See [../Jayess.md](../Jayess.md) for the current language-direction rules and explicit permanently unsupported JavaScript features.
 See [javascript-feature-gaps.md](./javascript-feature-gaps.md) for a broader list of unsupported or intentionally different JavaScript features.
 See [stdlib-and-core-model.md](./stdlib-and-core-model.md) for the intended split between low-level C++ runtime support and Jayess-written standard-library/core modules.
+See [reachable-symbol-emission.md](./reachable-symbol-emission.md) for the intended named-import pruning and conservative fallback model.
 See [feature-matrix.md](./feature-matrix.md) for the authoritative quick syntax-support matrix.
 See [standard-library.md](./standard-library.md) for the authoritative `jayess:*` export index.
 See [standard-library-matrix.md](./standard-library-matrix.md) for the authoritative quick standard-library/module matrix.

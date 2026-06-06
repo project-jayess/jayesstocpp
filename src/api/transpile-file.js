@@ -9,6 +9,7 @@ import { ensureInsideTarget, planModulePaths } from "../output/path-plan.js";
 import { analyzeRuntimeFeatures } from "../output/runtime-feature-analysis.js";
 import { writeBuildHints } from "../output/write-build-hints.js";
 import { writeDependencyPlan } from "../output/write-dependency-plan.js";
+import { entryMainFunction, writeExecutableLayout } from "../output/write-executable-layout.js";
 import { writeProjectManifests } from "../output/write-project-manifests.js";
 import { writeSharedLibraryLayout } from "../output/write-shared-library-layout.js";
 import { writeRuntime } from "../output/write-runtime.js";
@@ -146,6 +147,18 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
       entryNamespace: entryMetadata.namespace
     });
     outputs.push(...sharedLayoutFiles);
+  } else {
+    const entryModule = graph.modules.find((moduleRecord) => moduleRecord.filename === graph.entryFilename);
+    const mainFunction = entryModule == null ? null : entryMainFunction(entryModule.ast);
+    if (mainFunction != null) {
+      const entryPaths = planModulePaths(graph.entryFilename, graph.projectRoot, resolvedTargetDir);
+      const entryMetadata = metadata.get(graph.entryFilename);
+      outputs.push(...writeExecutableLayout(resolvedTargetDir, {
+        entryHeader: entryPaths.headerIncludePath,
+        entryNamespace: entryMetadata.namespace,
+        mainFunction
+      }));
+    }
   }
 
   outputs.push(writeBuildHints(resolvedTargetDir, outputs, { runtimeFeatures: runtimeFragmentKeys }));
