@@ -5,6 +5,21 @@ import { buildModuleGraph } from "../../src/modules/module-graph.js";
 import { JayessError } from "../../src/diagnostics.js";
 import { resolvePackageImportDetailed, resolvePackageImportsDetailed } from "../../src/modules/resolve-package-import.js";
 
+function normalizePathText(value) {
+  return value.replace(/\\/g, "/");
+}
+
+function assertPathEndsWith(filename, expectedSuffix) {
+  assert.ok(
+    normalizePathText(filename).endsWith(expectedSuffix),
+    `Expected path '${filename}' to end with '${expectedSuffix}'`
+  );
+}
+
+function hasPathEnding(modules, expectedSuffix) {
+  return modules.some((moduleRecord) => normalizePathText(moduleRecord.filename).endsWith(expectedSuffix));
+}
+
 test("module graph resolves relative imports", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/main.js"));
   assert.equal(graph.modules.length, 2);
@@ -52,7 +67,7 @@ test("module graph resolves scoped package subpath imports", () => {
 
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].packageName, "@scope/math");
-  assert.ok(graph.modules[1].filename.endsWith("node_modules/@scope/math/feature/index.js"));
+  assertPathEndsWith(graph.modules[1].filename, "node_modules/@scope/math/feature/index.js");
 });
 
 test("module graph resolves package self-reference imports", () => {
@@ -79,22 +94,22 @@ test("module graph prefers jayess package export conditions", () => {
     graph.modules[0].dependencies.map((dependency) => dependency.packageExportCondition),
     ["jayess", "jayess"]
   );
-  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("jayess-condition-lib/src/jayess.js")));
-  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("jayess-condition-lib/src/feature-jayess.js")));
+  assert.ok(hasPathEnding(graph.modules, "jayess-condition-lib/src/jayess.js"));
+  assert.ok(hasPathEnding(graph.modules, "jayess-condition-lib/src/feature-jayess.js"));
 });
 
 test("module graph falls back to default package export conditions", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/default-condition-main.js"));
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].packageExportCondition, "default");
-  assert.ok(graph.modules[1].filename.endsWith("default-condition-lib/src/default.js"));
+  assertPathEndsWith(graph.modules[1].filename, "default-condition-lib/src/default.js");
 });
 
 test("module graph preserves direct subpath package resolution without exports", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/package-project/src/direct-subpath-main.js"));
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].packageField, undefined);
-  assert.ok(graph.modules[1].filename.endsWith("direct-subpath-lib/feature/index.js"));
+  assertPathEndsWith(graph.modules[1].filename, "direct-subpath-lib/feature/index.js");
 });
 
 test("module graph reports direct subpath fallback trace when package subpaths are missing", () => {
@@ -102,9 +117,9 @@ test("module graph reports direct subpath fallback trace when package subpaths a
     () => buildModuleGraph(path.resolve("test/fixtures/package-project/src/direct-subpath-missing-main.js")),
     (error) =>
       error instanceof JayessError
-      && /package subpath '.\/missing' was not found/.test(error.diagnostics[0].message)
-      && /missing\.js/.test(error.diagnostics[0].message)
-      && /missing\/index\.js/.test(error.diagnostics[0].message)
+      && /package subpath '.\/missing' was not found/.test(normalizePathText(error.diagnostics[0].message))
+      && /missing\.js/.test(normalizePathText(error.diagnostics[0].message))
+      && /missing\/index\.js/.test(normalizePathText(error.diagnostics[0].message))
   );
 });
 
@@ -117,7 +132,7 @@ test("package resolver reports failure trace metadata for missing subpaths", () 
   assert.equal(result.reason, "package-subpath-not-found");
   assert.equal(result.requestedSubpath, "missing");
   assert.deepEqual(result.allowedExtensions, [".js", ".mjs"]);
-  assert.ok(result.packageResolutionTrace.some((candidate) => candidate.endsWith("missing.js")));
+  assert.ok(result.packageResolutionTrace.some((candidate) => normalizePathText(candidate).endsWith("missing.js")));
 });
 
 test("module graph resolves package export patterns", () => {
@@ -127,7 +142,7 @@ test("module graph resolves package export patterns", () => {
   assert.equal(graph.modules[0].dependencies[0].packageExportKey, "./features/*");
   assert.equal(graph.modules[0].dependencies[0].packageExportPatternMatch, "math");
   assert.equal(graph.modules[0].dependencies[0].packageExportCondition, "jayess");
-  assert.ok(graph.modules[1].filename.endsWith("pattern-lib/src/features/math.js"));
+  assertPathEndsWith(graph.modules[1].filename, "pattern-lib/src/features/math.js");
 });
 
 test("module graph resolves package self-reference export patterns", () => {
@@ -137,7 +152,7 @@ test("module graph resolves package self-reference export patterns", () => {
   assert.equal(graph.modules[0].dependencies[0].packageResolutionMode, "self-reference");
   assert.equal(graph.modules[0].dependencies[0].packageExportKey, "./features/*");
   assert.equal(graph.modules[0].dependencies[0].packageExportPatternMatch, "tools");
-  assert.ok(graph.modules[1].filename.endsWith("package-project/src/self-tools.js"));
+  assertPathEndsWith(graph.modules[1].filename, "package-project/src/self-tools.js");
 });
 
 test("module graph resolves package self-reference imports from nested package files", () => {
@@ -146,7 +161,7 @@ test("module graph resolves package self-reference imports from nested package f
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].packageResolutionMode, "self-reference");
   assert.equal(graph.modules[0].dependencies[0].packageExportKey, "./feature");
-  assert.ok(graph.modules[1].filename.endsWith("package-project/src/self-feature.js"));
+  assertPathEndsWith(graph.modules[1].filename, "package-project/src/self-feature.js");
 });
 
 test("module graph resolves package self-reference export arrays with fallback entries", () => {
@@ -167,7 +182,7 @@ test("module graph resolves package self-reference export arrays with fallback e
       { index: 1, kind: "string", selected: true, reason: null }
     ]
   );
-  assert.ok(graph.modules[1].filename.endsWith("package-project/src/self-tools.js"));
+  assertPathEndsWith(graph.modules[1].filename, "package-project/src/self-tools.js");
 });
 
 test("module graph rejects unsupported package self-reference condition maps clearly", () => {
@@ -189,7 +204,7 @@ test("module graph resolves package imports mappings from nested package files",
   assert.equal(graph.modules[0].dependencies[0].kind, "package-import");
   assert.equal(graph.modules[0].dependencies[0].packageImportKey, "#condition");
   assert.equal(graph.modules[0].dependencies[0].packageImportCondition, "jayess");
-  assert.ok(graph.modules[1].filename.endsWith("package-project/src/self-import.js"));
+  assertPathEndsWith(graph.modules[1].filename, "package-project/src/self-import.js");
 });
 
 test("module graph rejects missing package self-reference pattern targets clearly", () => {
@@ -272,8 +287,8 @@ test("module graph resolves package imports mappings", () => {
       { source: "#features/tools", kind: "package-import", mode: "package-import", key: "#features/*", match: "tools", condition: null }
     ]
   );
-  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("package-project/src/self-tools.js")));
-  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.filename.endsWith("package-project/src/self-import.js")));
+  assert.ok(hasPathEnding(graph.modules, "package-project/src/self-tools.js"));
+  assert.ok(hasPathEnding(graph.modules, "package-project/src/self-import.js"));
 });
 
 test("module graph rejects package imports outside the package root", () => {
@@ -304,7 +319,7 @@ test("package resolver reports failed imports pattern metadata", () => {
   assert.equal(result.packageField, "imports");
   assert.equal(result.requestedSubpath, "#missing");
   assert.deepEqual(result.allowedExtensions, [".js", ".mjs"]);
-  assert.ok(result.attemptedPath.endsWith("missing.js"));
+  assertPathEndsWith(result.attemptedPath, "missing.js");
 });
 
 test("module graph rejects package export patterns outside the package root", () => {
@@ -472,7 +487,7 @@ test("module graph resolves package export target arrays", () => {
   assert.equal(graph.modules.length, 2);
   assert.equal(graph.modules[0].dependencies[0].packageExportKey, ".");
   assert.equal(graph.modules[0].dependencies[0].packageExportArrayTrace[0].selected, true);
-  assert.ok(graph.modules[1].filename.endsWith("array-target-lib/index.js"));
+  assertPathEndsWith(graph.modules[1].filename, "array-target-lib/index.js");
 });
 
 test("module graph resolves package export arrays with condition objects", () => {
@@ -494,7 +509,7 @@ test("module graph resolves package export arrays with condition objects", () =>
       { index: 2, kind: "conditions", selected: true, reason: null, condition: "default" }
     ]
   );
-  assert.ok(graph.modules[1].filename.endsWith("array-condition-lib/src/default.js"));
+  assertPathEndsWith(graph.modules[1].filename, "array-condition-lib/src/default.js");
 });
 
 test("module graph rejects package export arrays without supported transpileable targets", () => {

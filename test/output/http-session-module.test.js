@@ -25,9 +25,11 @@ test("transpileFile emits http signed-session helper dependencies", (t) => {
   assert.ok(result.files.includes(generatedStdlibCppPath(targetDir, "encoding")));
 
   const httpSource = fs.readFileSync(httpPath, "utf8");
+  const httpHeader = fs.readFileSync(path.join(targetDir, "generated-stdlib", "jayess", "http", "stdlib_jayess_http_index_js.hpp"), "utf8");
   const sessionSource = fs.readFileSync(sessionPath, "utf8");
-  assert.match(httpSource, /signSession/);
-  assert.match(httpSource, /verifySession/);
+  assert.match(httpHeader, /signSession/);
+  assert.match(httpHeader, /verifySession/);
+  assert.match(httpSource, /stdlib_jayess_http_session_js\.hpp/);
   assert.match(sessionSource, /sessionSignature/);
   assert.match(sessionSource, /hmacSha256/);
   assert.match(sessionSource, /hexEncode/);

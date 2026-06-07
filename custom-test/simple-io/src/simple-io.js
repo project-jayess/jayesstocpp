@@ -1,9 +1,11 @@
 import { prompt, writeLine } from "jayess:console";
 import { readTextSync, writeTextSync } from "jayess:fs";
 
-function main() {
+function main()
+{
   var text = prompt("Text to save: ");
-  if (text === null) {
+  if (text === null)
+  {
     writeLine("No input received.");
     return 1;
   }
@@ -14,5 +16,7 @@ function main() {
   var saved = readTextSync(path);
   writeLine("Saved text:");
   writeLine(saved);
+
+  prompt("Press Enter to exit...");
   return 0;
 }

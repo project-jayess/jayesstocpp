@@ -7,9 +7,9 @@ function paintNode(canvas, node, operations) {
   if (style["background-color"] !== null) {
     operations.fillRect(canvas, node.layout.x, node.layout.y, node.layout.width, node.layout.height, style["background-color"]);
   }
-  if (style["border-width"] > 0 && style["border-color"] !== null) {
+  if (node.layout.borderWidth > 0 && style["border-color"] !== null) {
     operations.strokeRect(canvas, node.layout.x, node.layout.y, node.layout.width, node.layout.height, style["border-color"], {
-      strokeWidth: style["border-width"]
+      strokeWidth: node.layout.borderWidth
     });
   }
 
@@ -27,8 +27,9 @@ function paintNode(canvas, node, operations) {
       for (var lineIndex = 0; lineIndex < lines.length; lineIndex = lineIndex + 1) {
         operations.text(canvas, lines[lineIndex], node.layout.contentX, node.layout.contentY + lineIndex * node.layout.lineHeight, {
           color: style.color,
-          charWidth: style["font-size"] / 2,
-          charHeight: style["font-size"]
+          charHeight: node.layout.fontSize,
+          lineHeight: node.layout.lineHeight,
+          fontFamily: style["font-family"]
         });
       }
     }

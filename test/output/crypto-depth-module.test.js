@@ -21,6 +21,7 @@ test("transpileFile emits crypto hmac, hkdf, pem, and streaming hash helpers", (
   assert.ok(result.files.includes(cryptoCpp));
   assert.ok(result.files.includes(fingerprintCpp));
   const source = fs.readFileSync(cryptoCpp, "utf8");
+  const header = fs.readFileSync(path.join(targetDir, "generated-stdlib", "jayess", "crypto", "stdlib_jayess_crypto_index_js.hpp"), "utf8");
   assert.match(source, /hmacSha256/);
   assert.match(source, /hmacSha512/);
   assert.match(source, /hmacSha1/);
@@ -33,8 +34,8 @@ test("transpileFile emits crypto hmac, hkdf, pem, and streaming hash helpers", (
   assert.match(source, /privateKeyFromPem/);
   assert.match(source, /trustAnchorsFromPem/);
   assert.match(source, /certificateMetadata/);
-  assert.match(source, /certificateFingerprint/);
-  assert.match(source, /certificateVerificationMetadata/);
+  assert.match(header, /certificateFingerprint/);
+  assert.match(header, /certificateVerificationMetadata/);
   assert.match(source, /certificateSubject/);
   assert.match(source, /certificateIssuer/);
   assert.match(source, /certificateSerialNumber/);

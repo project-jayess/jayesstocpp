@@ -54,6 +54,16 @@ function platformLibraryHints(runtimeFeatures) {
     .filter((hint) => hint.libraries.length > 0);
 }
 
+function systemFontDiscoveryMetadata(runtimeFeatures) {
+  const retained = (runtimeFeatures ?? []).includes("font");
+  return {
+    enabledByRuntimeFragment: retained,
+    runtimeFragment: retained ? "font" : null,
+    fallbackFont: "jayess-default-5x7",
+    mayUseFallbackAtRuntime: retained
+  };
+}
+
 export function writeBuildHints(targetDirname, outputs, options = {}) {
   const relativeOutputs = outputs.map((file) => toRelative(targetDirname, file)).sort();
   const sourceFiles = relativeOutputs.filter((file) => file.endsWith(".cpp"));
@@ -69,6 +79,8 @@ export function writeBuildHints(targetDirname, outputs, options = {}) {
     includeDirectoryDetails: includeDirectoryDetails(includeDirectories),
     runtimeFiles: relativeOutputs.filter((file) => file.startsWith("runtime/")),
     nativeArtifacts: collectFiles(targetDirname, "native"),
+    fontArtifacts: collectFiles(targetDirname, "assets/fonts"),
+    systemFontDiscovery: systemFontDiscoveryMetadata(options.runtimeFeatures ?? []),
     libraryArtifacts: collectFiles(targetDirname, "libraries"),
     platformAdapters: platformAdapterMetadataForFeatures(options.runtimeFeatures ?? []),
     platformLibraryHints: platformLibraryHints(options.runtimeFeatures ?? []),

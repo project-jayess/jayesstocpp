@@ -78,7 +78,7 @@ This module provides higher-level drawing over `jayess:image` buffers. It owns c
 
 Live native window presentation is exposed through the focused `jayess:window` module instead of being mixed into this module.
 
-Bitmap text measurement and rendering belong to `jayess:font` for full bitmap glyph data. The `text` and `measureText` canvas helpers provide a small deterministic block-glyph convenience surface without importing `jayess:font`, so the standard library keeps a one-way dependency from font to canvas.
+Text measurement and rendering use the license-safe glyph fallback and font registry owned by `jayess:font`. The `text`, `measureText`, and `drawTextBox` canvas helpers preserve their existing signatures and accept optional `font` or `fontFamily` fields for selecting a registered bitmap font, file-backed vector-font handle, or registered system default font handle. `fontSize` is accepted as an alias for the existing `textSize` option, and `charHeight`, `charWidth`, `advance`, and `lineHeight` can still override the deterministic metrics for focused layout cases. The HTML/CSS renderer maps CSS `line-height` to that same wrapped-line vertical step.
 
 `drawTextBox(canvas, text, rect, options)` wraps text inside `{ x, y, width, height }` and supports `horizontal` values `left`, `center`, and `right`, plus `vertical` values `top`, `middle`, and `bottom`.
 
@@ -92,8 +92,8 @@ Bitmap text measurement and rendering belong to `jayess:font` for full bitmap gl
 - `fillRectClipped(...)` uses the active clip stack only through the resolved clip region it computes for that call.
 - `fillRect(...)`, image placement, shape fills, shape strokes, curves, polygons, and text route their pixel writes through the active clip stack and active translate/scale state.
 - Partially transparent colors use deterministic source-over blending against the current destination pixel; fully opaque colors overwrite directly.
-- `text(...)` and `drawTextBox(...)` use deterministic block-glyph drawing with no kerning, shaping, font fallback, or platform text APIs.
-- `drawTextBox(...)` wraps by fixed character-cell width derived from `charWidth`, `spacing`, and the target rectangle width; it does not do word-aware wrapping.
+- `text(...)` and `drawTextBox(...)` use deterministic font drawing with no kerning, shaping, or platform text APIs. File-backed TTF/OTF/WOFF/WOFF2 handles and discovered system font handles currently provide deterministic metrics and registry selection while glyph pixels use grayscale coverage over repository-owned fallback glyphs. If system discovery fails, registered system font aliases render with `jayess-default-5x7`.
+- `drawTextBox(...)` wraps by fixed bitmap-font advance derived from the selected font, optional `charWidth` / `spacing`, and the target rectangle width; it does not do word-aware wrapping.
 - `savePpm(...)` and `saveImage(...)` keep deterministic software-rendered output and do not depend on live windows or GPU presentation.
 
 ## Current Boundary
@@ -155,7 +155,7 @@ The current canvas state slice includes a clip stack, saved drawing state, style
 - `setStrokeColor(canvas, color)` updates the active stroke default
 - `setStrokeWidth(canvas, width)` updates the active stroke width and requires a value of at least `1`
 - `setTextColor(canvas, color)` updates the active text default
-- `setTextSize(canvas, size)` updates the active block-glyph text size and requires a value of at least `1`
+- `setTextSize(canvas, size)` updates the active bitmap text size and requires a value of at least `1`
 - `translate(canvas, x, y)` offsets later drawing commands
 - `scale(canvas, x, y)` scales later drawing commands and rejects zero scale values
 
@@ -163,7 +163,7 @@ The first transform behavior is deliberately simple: draw coordinates are mapped
 
 ## HTML And CSS Rendering Direction
 
-`jayess:canvas` should own the first Jayess HTML/CSS renderer. This renderer is not a browser engine and does not expose a DOM, JavaScript execution in HTML, network loading, CSS animations, or full web compatibility.
+`jayess:canvas` should own the first Jayess HTML/CSS renderer. This renderer is not a browser engine and does not expose a DOM, JavaScript execution in HTML, network loading, CSS animations, or full web compatibility. The current renderer supports deterministic percentage sizing for the focused native-canvas layout path, including `width: 100%` and `height: 100%` against definite containing bounds.
 
 The shipped first surface is documented in [jayess-canvas-html-css.md](./jayess-canvas-html-css.md).
 

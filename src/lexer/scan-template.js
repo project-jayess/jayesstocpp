@@ -1,5 +1,6 @@
 import { createDiagnostic, throwDiagnostics } from "../diagnostics.js";
 import { offsetToLineColumn } from "../source/source-text.js";
+import { decodeEscape } from "./escapes.js";
 import { tokenTypes } from "./tokens.js";
 
 function syntaxError(sourceText, start, message) {
@@ -117,7 +118,7 @@ export function scanTemplateLiteral(sourceText, start) {
       if (escaped == null) {
         syntaxError(sourceText, start, "Unterminated template literal");
       }
-      currentSegment += escaped;
+      currentSegment += decodeEscape(escaped);
       index += 2;
       continue;
     }

@@ -1,10 +1,17 @@
 import { abs, round } from "jayess:math";
 import { rgb, rgba } from "jayess:color";
+import {
+  bitmapFontByName,
+  defaultBitmapFont,
+  glyphRowsForFont
+} from "../font/glyphs.js";
 import { slice as sliceString } from "jayess:string";
 import {
   copy as copyImage,
   create as createImage,
   fill as fillImage,
+  fillRect as fillImageRect,
+  fillRectAlpha as fillImageRectAlpha,
   getPixel as getImagePixel,
   height as imageHeight,
   savePpm as saveImagePpm,
@@ -160,42 +167,39 @@ function textColorValue(canvas, options) {
 }
 
 function textSizeValue(canvas, options) {
+  var explicitFontSize = optionValue(options, "fontSize", null);
+  if (explicitFontSize !== null) {
+    return explicitFontSize;
+  }
   if (canvas === null) {
     return optionValue(options, "textSize", defaultTextSize());
   }
   return optionValue(options, "textSize", currentState(canvas).textSize);
 }
 
-function drawPixel(canvas, x, y, color) {
-  var checkedCanvas = requireCanvas(canvas);
-  var point = transformPoint(checkedCanvas, x, y);
-  var image = checkedCanvas.image;
-  var clip = currentClipRegion(checkedCanvas);
-  if (point.x < clip.x || point.y < clip.y || point.x >= clip.x + clip.width || point.y >= clip.y + clip.height) {
-    return canvas;
+function textFontValue(options) {
+  var explicit = optionValue(options, "font", null);
+  if (explicit !== null) {
+    return explicit;
   }
-  if (point.x < 0 || point.y < 0 || point.x >= imageWidth(image) || point.y >= imageHeight(image)) {
-    return canvas;
-  }
-  if (color.alpha <= 0) {
-    return canvas;
-  }
-  if (color.alpha >= 1) {
-    setPixel(image, point.x, point.y, color);
-    return canvas;
-  }
-  setPixel(image, point.x, point.y, blendColor(getImagePixel(image, point.x, point.y), color));
-  return canvas;
+  return bitmapFontByName(optionValue(options, "fontFamily", null));
 }
 
-function drawStrokePixel(canvas, x, y, color, strokeWidth) {
-  var radius = round((strokeWidth - 1) / 2);
-  for (var row = y - radius; row <= y + radius; row = row + 1) {
-    for (var column = x - radius; column <= x + radius; column = column + 1) {
-      drawPixel(canvas, column, row, color);
-    }
-  }
-  return canvas;
+function scaledFontMetrics(font, options) {
+  var charHeight = optionValue(options, "charHeight", optionValue(options, "textSize", font.charHeight));
+  var scale = charHeight / font.charHeight;
+  var explicitCharWidth = optionValue(options, "charWidth", null);
+  var charWidth = explicitCharWidth === null ? font.charWidth * scale : explicitCharWidth;
+  var defaultAdvance = explicitCharWidth === null ? font.advance * scale : explicitCharWidth + optionValue(options, "spacing", 1);
+  var advance = optionValue(options, "advance", defaultAdvance);
+  var lineHeight = optionValue(options, "lineHeight", font.lineHeight * scale);
+  return {
+    charWidth: charWidth,
+    charHeight: charHeight,
+    scale: scale,
+    advance: advance,
+    lineHeight: lineHeight
+  };
 }
 
 function normalizeClip(canvas, clip) {
@@ -234,6 +238,38 @@ function currentClipRegion(canvas) {
   return checkedCanvas.clipStack[checkedCanvas.clipStack.length - 1];
 }
 
+function drawPixel(canvas, x, y, color) {
+  var checkedCanvas = requireCanvas(canvas);
+  var point = transformPoint(checkedCanvas, x, y);
+  var image = checkedCanvas.image;
+  var clip = currentClipRegion(checkedCanvas);
+  if (point.x < clip.x || point.y < clip.y || point.x >= clip.x + clip.width || point.y >= clip.y + clip.height) {
+    return canvas;
+  }
+  if (point.x < 0 || point.y < 0 || point.x >= imageWidth(image) || point.y >= imageHeight(image)) {
+    return canvas;
+  }
+  if (color.alpha <= 0) {
+    return canvas;
+  }
+  if (color.alpha >= 1) {
+    setPixel(image, point.x, point.y, color);
+    return canvas;
+  }
+  setPixel(image, point.x, point.y, blendColor(getImagePixel(image, point.x, point.y), color));
+  return canvas;
+}
+
+function drawStrokePixel(canvas, x, y, color, strokeWidth) {
+  var radius = round((strokeWidth - 1) / 2);
+  for (var row = y - radius; row <= y + radius; row = row + 1) {
+    for (var column = x - radius; column <= x + radius; column = column + 1) {
+      drawPixel(canvas, column, row, color);
+    }
+  }
+  return canvas;
+}
+
 function resolveClipRegion(canvas, clip) {
   var stackClip = currentClipRegion(canvas);
   if (clip === null) {
@@ -248,6 +284,28 @@ function drawPixelClipped(canvas, x, y, color, clip) {
     return canvas;
   }
   return drawPixel(canvas, x, y, color);
+}
+
+function clippedRect(canvas, x, y, width, height, clip) {
+  var region = resolveClipRegion(canvas, clip);
+  var left = maxValue(x, region.x);
+  var top = maxValue(y, region.y);
+  var right = minValue(x + width, region.x + region.width);
+  var bottom = minValue(y + height, region.y + region.height);
+  if (right <= left || bottom <= top) {
+    return { x: left, y: top, width: 0, height: 0 };
+  }
+  return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+function fillImageRectByAlpha(image, x, y, width, height, color) {
+  if (color.alpha <= 0) {
+    return image;
+  }
+  if (color.alpha < 1) {
+    return fillImageRectAlpha(image, x, y, width, height, color);
+  }
+  return fillImageRect(image, x, y, width, height, color);
 }
 
 function strokeWidthValue(canvas, options) {
@@ -337,12 +395,6 @@ export function scale(canvas, x, y) {
   return canvas;
 }
 
-export function fillRect(canvas, x, y, width, height, color) {
-  var resolvedColor = fillColorValue(canvas, color);
-  fillRectClipped(canvas, x, y, width, height, resolvedColor, null);
-  return canvas;
-}
-
 export function clipRect(canvas, x, y, width, height) {
   return resolveClipRegion(canvas, { x: x, y: y, width: width, height: height });
 }
@@ -367,20 +419,27 @@ export function popClip(canvas) {
 }
 
 export function fillRectClipped(canvas, x, y, width, height, color, clip) {
-  var region = resolveClipRegion(canvas, clip);
   var resolvedColor = fillColorValue(canvas, color);
-  for (var row = y; row < y + height; row = row + 1) {
-    for (var column = x; column < x + width; column = column + 1) {
-      if (column >= region.x && row >= region.y && column < region.x + region.width && row < region.y + region.height) {
-        drawPixel(canvas, column, row, resolvedColor);
-      }
-    }
+  var rect = clippedRect(canvas, x, y, width, height, clip);
+  if (rect.width <= 0 || rect.height <= 0) {
+    return canvas;
   }
+  fillImageRectByAlpha(requireCanvas(canvas).image, rect.x, rect.y, rect.width, rect.height, resolvedColor);
+  return canvas;
+}
+
+export function fillRect(canvas, x, y, width, height, color) {
+  var resolvedColor = fillColorValue(canvas, color);
+  fillRectClipped(canvas, x, y, width, height, resolvedColor, null);
   return canvas;
 }
 
 export function fillRectAlpha(canvas, x, y, rectWidth, rectHeight, color) {
-  fillRectClipped(canvas, x, y, rectWidth, rectHeight, fillColorValue(canvas, color), null);
+  var rect = clippedRect(canvas, x, y, rectWidth, rectHeight, null);
+  if (rect.width <= 0 || rect.height <= 0) {
+    return canvas;
+  }
+  fillImageRectAlpha(requireCanvas(canvas).image, rect.x, rect.y, rect.width, rect.height, fillColorValue(canvas, color));
   return canvas;
 }
 
@@ -390,14 +449,23 @@ export function strokeRect(canvas, x, y, width, height, color, options) {
   }
   var strokeWidth = strokeWidthValue(canvas, options);
   var resolvedColor = strokeColorValue(canvas, color);
+  var horizontalStroke = minValue(strokeWidth, height);
+  var verticalStroke = minValue(strokeWidth, width);
+  var bottomY = y + height - horizontalStroke;
+  var rightX = x + width - verticalStroke;
 
-  for (var column = x; column < x + width; column = column + 1) {
-    drawStrokePixel(canvas, column, y, resolvedColor, strokeWidth);
-    drawStrokePixel(canvas, column, y + height - 1, resolvedColor, strokeWidth);
+  fillRect(canvas, x, y, width, horizontalStroke, resolvedColor);
+  if (bottomY > y) {
+    fillRect(canvas, x, bottomY, width, horizontalStroke, resolvedColor);
   }
-  for (var row = y + 1; row < y + height - 1; row = row + 1) {
-    drawStrokePixel(canvas, x, row, resolvedColor, strokeWidth);
-    drawStrokePixel(canvas, x + width - 1, row, resolvedColor, strokeWidth);
+
+  var sideY = y + horizontalStroke;
+  var sideHeight = height - horizontalStroke * 2;
+  if (sideHeight > 0) {
+    fillRect(canvas, x, sideY, verticalStroke, sideHeight, resolvedColor);
+    if (rightX > x) {
+      fillRect(canvas, rightX, sideY, verticalStroke, sideHeight, resolvedColor);
+    }
   }
   return canvas;
 }
@@ -623,11 +691,14 @@ export function bezierCurve(canvas, x1, y1, c1x, c1y, c2x, c2y, x2, y2, color, o
 }
 
 export function measureText(canvas, textValue, options) {
-  var textSize = textSizeValue(canvas, options);
-  var charWidth = optionValue(options, "charWidth", round(textSize * 5 / 7));
-  var charHeight = optionValue(options, "charHeight", textSize);
-  var spacing = optionValue(options, "spacing", 1);
-  var lineSpacing = optionValue(options, "lineSpacing", 1);
+  var font = textFontValue(options);
+  var metrics = scaledFontMetrics(font, {
+    charHeight: optionValue(options, "charHeight", textSizeValue(canvas, options)),
+    charWidth: optionValue(options, "charWidth", null),
+    advance: optionValue(options, "advance", null),
+    lineHeight: optionValue(options, "lineHeight", null),
+    textSize: optionValue(options, "textSize", textSizeValue(canvas, options))
+  });
   var maxWidth = 0;
   var currentWidth = 0;
   var lines = 1;
@@ -637,35 +708,91 @@ export function measureText(canvas, textValue, options) {
       currentWidth = 0;
       lines = lines + 1;
     } else {
-      if (currentWidth > 0) {
-        currentWidth = currentWidth + spacing;
-      }
-      currentWidth = currentWidth + charWidth;
+      currentWidth = currentWidth + metrics.advance;
     }
   }
   maxWidth = maxValue(maxWidth, currentWidth);
   return {
     width: maxWidth,
-    height: charHeight * lines + lineSpacing * (lines - 1)
+    height: metrics.lineHeight * lines
   };
 }
 
-function drawBlockGlyph(canvas, x, y, charWidth, charHeight, color) {
-  for (var row = 0; row < charHeight; row = row + 1) {
-    for (var column = 0; column < charWidth; column = column + 1) {
-      if (row === 0 || row === charHeight - 1 || column === 0 || column === charWidth - 1) {
-        drawPixel(canvas, x + column, y + row, color);
+function drawBitmapGlyph(canvas, font, char, x, y, metrics, color) {
+  var rows = glyphRowsForFont(font, char);
+  var pixelSize = round(metrics.scale);
+  if (pixelSize < 1) {
+    pixelSize = 1;
+  }
+  for (var row = 0; row < rows.length; row = row + 1) {
+    var pixels = rows[row];
+    var runStart = null;
+    for (var column = 0; column <= pixels.length; column = column + 1) {
+      var enabled = column < pixels.length && pixels[column] === "1";
+      if (enabled && runStart === null) {
+        runStart = column;
+      }
+      if ((!enabled || column === pixels.length) && runStart !== null) {
+        fillRect(canvas, x + runStart * pixelSize, y + row * pixelSize, (column - runStart) * pixelSize, pixelSize, color);
+        runStart = null;
       }
     }
   }
 }
 
+function coverageColor(color, coverage) {
+  return rgba(color.red, color.green, color.blue, color.alpha * coverage);
+}
+
+function vectorCoverageForPixel(pixels, column) {
+  var left = column === 0 ? "0" : pixels[column - 1];
+  var right = column + 1 >= pixels.length ? "0" : pixels[column + 1];
+  if (left === "1" && right === "1") {
+    return 0.95;
+  }
+  return 0.7;
+}
+
+function drawVectorGlyph(canvas, font, char, x, y, metrics, color) {
+  var rows = glyphRowsForFont(font, char);
+  var pixelSize = round(metrics.scale);
+  if (pixelSize < 1) {
+    pixelSize = 1;
+  }
+  for (var row = 0; row < rows.length; row = row + 1) {
+    var pixels = rows[row];
+    for (var column = 0; column < pixels.length; column = column + 1) {
+      if (pixels[column] === "1") {
+        fillRectAlpha(
+          canvas,
+          x + column * pixelSize,
+          y + row * pixelSize,
+          pixelSize,
+          pixelSize,
+          coverageColor(color, vectorCoverageForPixel(pixels, column))
+        );
+      }
+    }
+  }
+}
+
+function drawFontGlyph(canvas, font, char, x, y, metrics, color) {
+  if (font.kind === "vector-font" && font.systemFont !== true) {
+    drawVectorGlyph(canvas, font, char, x, y, metrics, color);
+  } else {
+    drawBitmapGlyph(canvas, font, char, x, y, metrics, color);
+  }
+}
+
 export function text(canvas, textValue, x, y, options) {
-  var textSize = textSizeValue(canvas, options);
-  var charWidth = optionValue(options, "charWidth", round(textSize * 5 / 7));
-  var charHeight = optionValue(options, "charHeight", textSize);
-  var spacing = optionValue(options, "spacing", 1);
-  var lineSpacing = optionValue(options, "lineSpacing", 1);
+  var font = textFontValue(options);
+  var metrics = scaledFontMetrics(font, {
+    charHeight: optionValue(options, "charHeight", textSizeValue(canvas, options)),
+    charWidth: optionValue(options, "charWidth", null),
+    advance: optionValue(options, "advance", null),
+    lineHeight: optionValue(options, "lineHeight", null),
+    textSize: optionValue(options, "textSize", textSizeValue(canvas, options))
+  });
   var color = textColorValue(canvas, options);
   var cursorX = x;
   var cursorY = y;
@@ -673,12 +800,12 @@ export function text(canvas, textValue, x, y, options) {
     var char = textValue[index];
     if (char === "\n") {
       cursorX = x;
-      cursorY = cursorY + charHeight + lineSpacing;
+      cursorY = cursorY + metrics.lineHeight;
     } else {
       if (char !== " ") {
-        drawBlockGlyph(canvas, cursorX, cursorY, charWidth, charHeight, color);
+        drawFontGlyph(canvas, font, char, cursorX, cursorY, metrics, color);
       }
-      cursorX = cursorX + charWidth + spacing;
+      cursorX = cursorX + metrics.advance;
     }
   }
   return canvas;
@@ -743,23 +870,26 @@ function alignedTextY(rect, contentHeight, align) {
 export function drawTextBox(canvas, textValue, rectValue, options) {
   var target = requireCanvas(canvas);
   var rect = requireRect(rectValue);
-  var textSize = textSizeValue(target, options);
-  var charWidth = optionValue(options, "charWidth", round(textSize * 5 / 7));
-  var charHeight = optionValue(options, "charHeight", textSize);
-  var spacing = optionValue(options, "spacing", 1);
-  var lineSpacing = optionValue(options, "lineSpacing", 1);
+  var font = textFontValue(options);
+  var metrics = scaledFontMetrics(font, {
+    charHeight: optionValue(options, "charHeight", textSizeValue(target, options)),
+    charWidth: optionValue(options, "charWidth", null),
+    advance: optionValue(options, "advance", null),
+    lineHeight: optionValue(options, "lineHeight", null),
+    textSize: optionValue(options, "textSize", textSizeValue(target, options))
+  });
   var horizontal = optionValue(options, "horizontal", "left");
   var vertical = optionValue(options, "vertical", "top");
-  var columns = round((rect.width + spacing) / (charWidth + spacing));
+  var columns = round(rect.width / metrics.advance);
   var lines = wrappedTextLines(textValue, columns);
-  var contentHeight = lines.length * charHeight + (lines.length - 1) * lineSpacing;
+  var contentHeight = lines.length * metrics.lineHeight;
   var cursorY = alignedTextY(rect, contentHeight, vertical);
   for (var index = 0; index < lines.length; index = index + 1) {
     var lineText = lines[index];
     var lineSize = measureText(target, lineText, options);
     var cursorX = alignedTextX(rect, lineSize.width, horizontal);
     text(target, lineText, cursorX, cursorY, options);
-    cursorY = cursorY + charHeight + lineSpacing;
+    cursorY = cursorY + metrics.lineHeight;
   }
   return target;
 }
@@ -811,7 +941,7 @@ export function drawHtml(canvas, document) {
   return paintHtmlDocument(canvas, document, {
     fillRect: fillRect,
     strokeRect: strokeRect,
-    clipRect: clipRect,
+    clipRect: pushClip,
     popClip: popClip,
     text: text,
     drawImage: drawImage

@@ -64,14 +64,14 @@ test("module graph resolves repository-owned built-in os modules", () => {
 
 test("module graph resolves repository-owned built-in filesystem modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/fs-main.js"));
-  assert.equal(graph.modules.length, 13);
+  assert.equal(graph.modules.length, 17);
   assert.equal(graph.modules[0].dependencies[0].kind, "builtin-module");
   assert.equal(graph.modules[0].dependencies[0].source, "jayess:fs");
 });
 
 test("module graph resolves repository-owned filesystem binary helper modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/fs-binary-main.js"));
-  assert.equal(graph.modules.length, 13);
+  assert.equal(graph.modules.length, 17);
   assert.deepEqual(
     graph.modules[0].dependencies.map((dependency) => dependency.source),
     ["jayess:bytes", "jayess:fs"]
@@ -126,7 +126,7 @@ test("module graph resolves repository-owned built-in regex modules", () => {
 
 test("module graph resolves repository-owned system modules", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/system-modules-main.js"));
-  assert.equal(graph.modules.length, 14);
+  assert.equal(graph.modules.length, 18);
   assert.deepEqual(
     graph.modules[0].dependencies.map((dependency) => dependency.kind),
     ["builtin-module", "builtin-module", "builtin-module"]
@@ -173,7 +173,7 @@ test("module graph resolves repository-owned built-in encoding module", () => {
 
 test("module graph resolves repository-owned built-in crypto module", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/crypto-main.js"));
-  assert.equal(graph.modules.length, 4);
+  assert.equal(graph.modules.length, 9);
   assert.deepEqual(
     graph.modules[0].dependencies.map((dependency) => dependency.source),
     ["jayess:bytes", "jayess:encoding", "jayess:crypto"]

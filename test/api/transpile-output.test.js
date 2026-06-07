@@ -8,6 +8,21 @@ test("transpile emits runtime call helper for function invocation", () => {
   assert.match(cpp, /jayess::call\(add, jayess::value\(static_cast<double>\(1\)\), jayess::value\(static_cast<double>\(2\)\)\)/);
 });
 
+test("transpile emits nested function declarations as callable local values", () => {
+  const cpp = transpile("function run() { var total = 0; function add(value) { total = total + value; return total; } return add; }", { moduleName: "nested_function_value_case" });
+
+  assert.match(cpp, /jayess::value add = jayess::make_callable\(\[total\]\(const std::vector<jayess::value>& jayess_args\) mutable -> jayess::value \{/);
+  assert.match(cpp, /return add;/);
+});
+
+test("transpile sanitizes macro-prone C++ identifiers", () => {
+  const cpp = transpile("function stdout() { return 1; } function run() { return stdout(); }", { moduleName: "macro_safe_identifier_case" });
+
+  assert.match(cpp, /jayess::value jayess_ident_stdout\(const std::vector<jayess::value>& jayess_args\)/);
+  assert.match(cpp, /jayess::call\(jayess_ident_stdout\)/);
+  assert.doesNotMatch(cpp, /jayess::value stdout\(/);
+});
+
 test("transpile emits composite value helpers for arrays and objects", () => {
   const cpp = transpile('var data = { name: "jayess", items: [1, 2] }; data.items[0];', { moduleName: "composite_case" });
   assert.match(cpp, /jayess::make_object/);
@@ -173,7 +188,7 @@ test("transpile emits async function expressions and async arrows through the sh
     "function build(step) { var declared = async function run(value) { return await value + step; }; var arrow = async (value = step) => await value + step; return [declared, arrow]; }",
     { moduleName: "async_expression_case" }
   );
-  assert.match(cpp, /jayess::make_callable\(\[step\]\(const std::vector<jayess::value>& jayess_args\) -> jayess::value \{/);
+  assert.match(cpp, /jayess::make_callable\(\[step\]\(const std::vector<jayess::value>& jayess_args\) mutable -> jayess::value \{/);
   assert.match(cpp, /jayess::value jayess_async_result = jayess::make_pending_async\(\);/);
   assert.match(cpp, /jayess::value jayess_async_input = value;/);
   assert.match(cpp, /return jayess::await_sync\(jayess_async_input\);/);

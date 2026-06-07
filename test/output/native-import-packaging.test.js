@@ -18,11 +18,13 @@ test("transpileFile packages mixed native header, source, and library imports in
   const headerModulePath = path.join(targetDir, "native_packaging_user_js.hpp");
   const planPath = path.join(targetDir, "jayess_dependency_plan.json");
   const hintsPath = path.join(targetDir, "jayess_build_hints.json");
+  const reachabilityPath = path.join(targetDir, "jayess_reachability.json");
 
   assert.ok(result.files.includes(modulePath));
   assert.ok(result.files.includes(headerModulePath));
   assert.ok(result.files.includes(planPath));
   assert.ok(result.files.includes(hintsPath));
+  assert.ok(result.files.includes(reachabilityPath));
   assert.ok(fs.existsSync(headerPath));
   assert.ok(fs.existsSync(sourcePath));
   assert.ok(fs.existsSync(dllPath));
@@ -71,4 +73,45 @@ test("transpileFile packages mixed native header, source, and library imports in
   assert.ok(hints.nativeArtifacts.includes("native/math.cpp"));
   assert.ok(hints.libraryArtifacts.includes("libraries/math.dll"));
   assert.ok(hints.libraryArtifacts.includes("libraries/math.lib"));
+
+  const reachability = JSON.parse(fs.readFileSync(reachabilityPath, "utf8"));
+  assert.ok(reachability.retainedRuntimeFragments.includes("array"));
+  assert.ok(reachability.retainedRuntimeFragments.includes("class"));
+  assert.deepEqual(
+    reachability.retainedNativeArtifacts.map((artifact) => ({
+      source: artifact.source,
+      kind: artifact.kind,
+      outputPath: artifact.outputPath
+    })),
+    [
+      { source: "./native/math.cpp", kind: "native-source", outputPath: "native/math.cpp" },
+      { source: "./native/math.dll", kind: "shared-library", outputPath: "libraries/math.dll" },
+      { source: "./native/math.hpp", kind: "native-header", outputPath: "native/math.hpp" },
+      { source: "./native/math.lib", kind: "static-library", outputPath: "libraries/math.lib" }
+    ]
+  );
+});
+
+test("transpileFile prunes native headers used only by unreachable declarations", (t) => {
+  const targetDir = createManagedTempDir(t, "native-header-pruning-output");
+  const fixture = path.resolve("test/fixtures/modules/reachable-native-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const nativeHeaderPath = path.join(targetDir, "native", "math.hpp");
+  const libHeaderPath = path.join(targetDir, "reachable_native_lib_js.hpp");
+  const reachabilityPath = path.join(targetDir, "jayess_reachability.json");
+
+  assert.equal(fs.existsSync(nativeHeaderPath), false);
+  assert.ok(result.files.includes(reachabilityPath));
+
+  const libHeader = fs.readFileSync(libHeaderPath, "utf8");
+  assert.doesNotMatch(libHeader, /native\/math\.hpp/);
+
+  const reachability = JSON.parse(fs.readFileSync(reachabilityPath, "utf8"));
+  assert.deepEqual(reachability.retainedNativeArtifacts, []);
+  const libModule = reachability.modules.find((module) => module.sourceFilename === path.resolve("test/fixtures/modules/reachable-native-lib.js"));
+  assert.ok(libModule);
+  assert.deepEqual(libModule.retainedExports, ["used"]);
+  assert.deepEqual(libModule.prunedExports, ["unused"]);
+  assert.deepEqual(libModule.retainedImportLocals, []);
 });

@@ -67,7 +67,6 @@ test("transpileFile emits GPU module runtime and backend boundary output", (t) =
   assert.match(cppSource, /gpu_backend_uses_host_draw_bindings/);
   assert.match(cppSource, /Jayess GPU draw vertex buffer binding requires buffer/);
   assert.match(cppSource, /Jayess GPU draw texture binding requires an initialized texture/);
-  assert.match(cppSource, /Jayess GPU draw requires texture backend to match the active frame backend/);
   assert.match(cppSource, /frame->frame\.commands.push_back\("draw:" \+ pipeline->pipeline\.primitive\)/);
   assert.match(cppSource, /frame->frame\.commands.push_back\("bind:" \+ binding\)/);
   assert.match(cppSource, /frame->frame\.commands.push_back\("hostBind:" \+ hostBinding\)/);

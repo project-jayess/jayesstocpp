@@ -16,10 +16,10 @@ function isDisabled(node) {
 }
 
 function targetType(node) {
-  if (node === null || node.attributes === null || node.attributes.type === null) {
+  if (node === null || node.attributes === null || node.attributes["type"] === null) {
     return "";
   }
-  return node.attributes.type;
+  return node.attributes["type"];
 }
 
 function findFormIdByTarget(node, targetId, activeFormId) {

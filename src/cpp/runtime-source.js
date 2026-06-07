@@ -153,13 +153,13 @@ inline value call_with_args(Callable&& callable, std::vector<value> args) {
 
 template <typename Callable, typename... Args, typename = std::enable_if_t<!std::is_same_v<std::decay_t<Callable>, value>>>
 inline value call(Callable&& callable, Args&&... args) {
-  return std::forward<Callable>(callable)({std::forward<Args>(args)...});
+  return std::forward<Callable>(callable)(std::vector<value>{std::forward<Args>(args)...});
 }
 
 template <typename... Args>
 inline value call(const value& callable, Args&&... args) {
   const auto& wrapper = std::get<callable_ptr>(callable);
-  return wrapper->fn({std::forward<Args>(args)...});
+  return wrapper->fn(std::vector<value>{std::forward<Args>(args)...});
 }
 } // namespace jayess
 `;
@@ -399,6 +399,9 @@ value get_property(const value& input, const std::string& key) {
   if (std::holds_alternative<callable_ptr>(input)) {
     return find_static_class_member(input, key);
   }
+  if (!std::holds_alternative<object_ptr>(input)) {
+    return value(std::monostate{});
+  }
   const auto& object = std::get<object_ptr>(input);
   const auto iterator = object->fields.find(key);
   if (iterator != object->fields.end()) {
@@ -419,6 +422,15 @@ value get_index(const value& input, const value& key) {
       return value(std::monostate{});
     }
     return array->items[index];
+  }
+
+  if (std::holds_alternative<std::string>(input)) {
+    const auto& text = std::get<std::string>(input);
+    const auto index = static_cast<std::size_t>(std::get<double>(key));
+    if (index >= text.size()) {
+      return value(std::monostate{});
+    }
+    return std::string(1, text[index]);
   }
 
   if (std::holds_alternative<object_ptr>(input) || std::holds_alternative<callable_ptr>(input)) {

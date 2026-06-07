@@ -46,7 +46,7 @@ test("transpile lowers generator array, object, and conditional expression-yield
   );
 
   assert.match(cpp, /jayess::make_array\(\{jayess_yield_expr_\d+, jayess_yield_expr_\d+\}\)/);
-  assert.match(cpp, /jayess::make_object\(\{\{"first", jayess_yield_expr_\d+\}, \{"second", jayess_yield_expr_\d+\}\}\)/);
+  assert.match(cpp, /jayess::make_object\(std::vector<std::pair<std::string, jayess::value>>\{\{"first", jayess_yield_expr_\d+\}, \{"second", jayess_yield_expr_\d+\}\}\)/);
   assert.match(cpp, /if \(jayess::truthy\(jayess_yield_expr_\d+\)\) \{/);
   assert.match(cpp, /jayess::generator_yield\(jayess_generator, \d+, first\);/);
   assert.match(cpp, /jayess::generator_yield\(jayess_generator, \d+, second\);/);
@@ -65,7 +65,7 @@ test("transpile emits generator class methods through Jayess generator handles",
 
 test("transpile emits generator function expressions through the shared generator handle path", () => {
   const cpp = transpile("function build(step) { var make = function* named(value) { yield value; return step; }; return make; }", { moduleName: "generator_expression_case" });
-  assert.match(cpp, /jayess::make_callable\(\[step\]\(const std::vector<jayess::value>& jayess_args\) -> jayess::value \{/);
+  assert.match(cpp, /jayess::make_callable\(\[step\]\(const std::vector<jayess::value>& jayess_args\) mutable -> jayess::value \{/);
   assert.match(cpp, /jayess::value jayess_generator = jayess::make_generator_handle\(\);/);
   assert.match(cpp, /jayess::generator_set_resume\(jayess_generator,/);
   assert.match(cpp, /jayess::generator_yield\(jayess_generator, 1, value\);/);

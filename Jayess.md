@@ -54,6 +54,12 @@ Jayess also keeps `async` / `await` as Jayess-owned language/runtime behavior ra
 
 Jayess does not currently ship a repository-owned database surface. `jayess:db`, `jayess:sqlite`, bundled SQLite adapters, and database runtime fragments are out of scope for the current standard-library direction.
 
+Jayess does ship a repository-owned rendering font surface. `jayess:font` owns an original license-safe default 5x7 bitmap font, custom in-memory bitmap font construction, JSON font loading, a small font registry, and deterministic measurement/drawing helpers used by `jayess:canvas` text and focused HTML/CSS rendering.
+
+Jayess uses a closed compile-time import/export graph to keep generated native artifacts focused. Named import lists should retain only the imported exported declarations, the local helpers they reference, the transitive imports those declarations require, native bridge artifacts used by that reachable code, and the runtime fragments needed by that reachable code. Importing `{ readTextSync, writeTextSync }` from `jayess:fs` must not package every unrelated filesystem, stream, JSON, UUID, crypto, or temporary-file helper when those declarations are not reachable.
+
+Whole-module packaging remains the default for non-named import forms for now, including default imports, namespace imports, and side-effect imports. It is also the conservative fallback for ambiguous re-export chains, import cycles, inseparable top-level side effects, or unsupported reachability-analysis shapes. Whole-module decisions must stay explicit and reviewable in generated metadata.
+
 Jayess also keeps truthiness, equality, and numeric operators explicit rather than coercive:
 
 - empty arrays, empty objects, empty maps, and empty sets are falsey

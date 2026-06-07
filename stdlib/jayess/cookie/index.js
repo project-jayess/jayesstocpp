@@ -1,4 +1,3 @@
-import { header as httpHeader, setHeader } from "jayess:http";
 import { split, trim } from "jayess:string";
 
 function fail(message) {
@@ -88,10 +87,16 @@ export function serialize(name, value, options) {
 }
 
 export function get(request, name) {
-  return parse(httpHeader(request, "cookie"))[name];
+  if (request === null || request.headers === null) {
+    return null;
+  }
+  return parse(request.headers.cookie)[name];
 }
 
 export function set(response, name, value, options) {
-  setHeader(response, "Set-Cookie", serialize(name, value, options));
+  if (response.headers === null) {
+    response.headers = {};
+  }
+  response.headers["Set-Cookie"] = serialize(name, value, options);
   return response;
 }

@@ -1,23 +1,8 @@
-import { parseFloat } from "jayess:number";
-import { slice, split, trim } from "jayess:string";
+import { split, trim } from "jayess:string";
+import { parseCssSize } from "./css-values.js";
 
 function fail(message) {
   throw message;
-}
-
-function parseSize(value) {
-  var text = trim(value);
-  if (text === "auto") {
-    return null;
-  }
-  if (text.length > 2 && slice(text, text.length - 2, text.length) === "px") {
-    text = slice(text, 0, text.length - 2);
-  }
-  var parsed = parseFloat(text);
-  if (parsed === null) {
-    fail("jayess:canvas css expected a numeric size");
-  }
-  return parsed;
 }
 
 function splitBoxParts(value) {
@@ -37,21 +22,21 @@ function splitBoxParts(value) {
 
 export function parseBoxValue(value) {
   var parts = splitBoxParts(value);
-  var top = parseSize(parts[0]);
+  var top = parseCssSize(parts[0]);
   var right = top;
   var bottom = top;
   var left = top;
   if (parts.length === 2) {
-    right = parseSize(parts[1]);
+    right = parseCssSize(parts[1]);
     left = right;
   } else if (parts.length === 3) {
-    right = parseSize(parts[1]);
-    bottom = parseSize(parts[2]);
+    right = parseCssSize(parts[1]);
+    bottom = parseCssSize(parts[2]);
     left = right;
   } else if (parts.length === 4) {
-    right = parseSize(parts[1]);
-    bottom = parseSize(parts[2]);
-    left = parseSize(parts[3]);
+    right = parseCssSize(parts[1]);
+    bottom = parseCssSize(parts[2]);
+    left = parseCssSize(parts[3]);
   }
   return {
     top: top,

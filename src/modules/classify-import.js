@@ -2,6 +2,7 @@ const nativeHeaderExtensions = [".h", ".hpp", ".hh", ".hxx"];
 const nativeSourceExtensions = [".c", ".cc", ".cpp", ".cxx"];
 const sharedLibraryExtensions = [".so", ".dylib", ".dll"];
 const staticLibraryExtensions = [".a", ".lib"];
+const fontAssetExtensions = [".ttf", ".otf", ".woff", ".woff2"];
 
 export function classifyImport(source) {
   if (source.startsWith("cpp:")) {
@@ -30,6 +31,10 @@ export function classifyImport(source) {
 
   if (staticLibraryExtensions.some((extension) => source.endsWith(extension))) {
     return { kind: "static-library", source };
+  }
+
+  if (fontAssetExtensions.some((extension) => source.endsWith(extension))) {
+    return { kind: "font-asset", source };
   }
 
   if (source.startsWith("./") || source.startsWith("../")) {

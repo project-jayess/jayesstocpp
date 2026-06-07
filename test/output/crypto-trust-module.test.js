@@ -22,10 +22,11 @@ test("transpileFile emits crypto certificate trust helper output", (t) => {
   assert.ok(result.files.includes(trustPath));
 
   const cryptoSource = fs.readFileSync(cryptoPath, "utf8");
+  const cryptoHeader = fs.readFileSync(path.join(targetDir, "generated-stdlib", "jayess", "crypto", "stdlib_jayess_crypto_index_js.hpp"), "utf8");
   const trustSource = fs.readFileSync(trustPath, "utf8");
-  assert.match(cryptoSource, /findTrustAnchorByFingerprint/);
-  assert.match(cryptoSource, /certificateValidityAt/);
-  assert.match(cryptoSource, /certificateChainMetadata/);
+  assert.match(cryptoHeader, /findTrustAnchorByFingerprint/);
+  assert.match(cryptoHeader, /certificateValidityAt/);
+  assert.match(cryptoHeader, /certificateChainMetadata/);
   assert.match(trustSource, /metadata-only/);
   assert.match(trustSource, /missing-validity/);
   assert.match(trustSource, /certificateFingerprint/);

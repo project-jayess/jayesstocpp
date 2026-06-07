@@ -28,7 +28,7 @@ The current implemented rendering path is off-screen plus a guarded window prese
 
 `jayess:image` owns raster image buffers. It supports pixel access, dimensions, simple transformations, metadata reads, deterministic file output such as PPM/PGM/BMP/TGA, and PPM byte encode/decode before more complex encoders are added.
 
-`jayess:canvas` owns higher-level drawing. The current slice supports dimensions, pixel reads, deep copies, clipped image/canvas blits, a focused clip-stack state layer for clip-aware helpers, rectangles, alpha rectangle blending, circles, lines, polylines, polygons, text boxes, and image output over `jayess:image` buffers. Bitmap text alignment is provided by `jayess:font` over the same canvas surface. The focused HTML/CSS renderer also belongs here: parsing, style resolution, min/max constrained layout, overflow clipping, and painting should be implemented as canvas rendering responsibilities over image/font/layout primitives.
+`jayess:canvas` owns higher-level drawing. The current slice supports dimensions, pixel reads, deep copies, clipped image/canvas blits, a focused clip-stack state layer for clip-aware helpers, rectangles, alpha rectangle blending, circles, lines, polylines, polygons, text boxes, and image output over `jayess:image` buffers. Bitmap text alignment, file-backed font handles, and optional system default font discovery are provided by `jayess:font` over the same canvas surface. System font discovery falls back to `jayess-default-5x7` when no usable host font is available. The focused HTML/CSS renderer also belongs here: parsing, style resolution, deterministic percentage sizing against containing canvas bounds, min/max constrained layout, overflow clipping, and painting should be implemented as canvas rendering responsibilities over image/font/layout primitives.
 
 `jayess:image` still owns image-buffer manipulation as data: deterministic file formats, bytes helpers, crop/subimage/resize/flip/rotate, and image-level bulk rectangle/blit operations. `jayess:canvas` should sit above that layer rather than duplicate it.
 
@@ -54,6 +54,7 @@ The preferred implementation is:
 
 - Jayess wrappers in `stdlib/jayess/color/`, `stdlib/jayess/image/`, and `stdlib/jayess/canvas/`.
 - Focused canvas HTML/CSS helpers split under `stdlib/jayess/canvas/` by parsing, style resolution, layout, and paint.
+- Focused font helpers under `stdlib/jayess/font/`, with system font discovery kept behind the font runtime fragment instead of canvas, GUI, or window runtime files.
 - Focused C++ runtime fragments where native storage or platform behavior is needed, such as `runtime-image-source.js`.
 - A focused `stdlib/jayess/window/` module and `runtime-window-source.js` when live window support is implemented.
 - A focused `stdlib/jayess/gpu/` module and `runtime-gpu-source.js` when GPU support is implemented.

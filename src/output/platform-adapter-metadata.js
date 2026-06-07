@@ -1,6 +1,7 @@
 const sourceRuntimeFeatures = new Map([
   ["jayess:clipboard", ["clipboard"]],
   ["jayess:dialog", ["dialog"]],
+  ["jayess:font", ["font"]],
   ["jayess:gpu", ["gpu"]],
   ["jayess:http", ["http"]],
   ["jayess:net", ["net"]],
@@ -25,6 +26,20 @@ const featureAdapters = new Map([
       windows: ["win32-dialog"],
       macos: ["cocoa-dialog"],
       linux: ["linux-portal-dialog"]
+    }
+  }],
+  ["font", {
+    feature: "font",
+    adapters: ["system-font-discovery", "bitmap-font-fallback"],
+    platformLibraries: [],
+    optionalBackendRequirements: [
+      "System font discovery probes common platform font paths at runtime when requested.",
+      "If no usable host font is found, Jayess falls back to jayess-default-5x7 without throwing during ordinary text rendering."
+    ],
+    compiledAdaptersByPlatform: {
+      windows: ["system-font-discovery", "bitmap-font-fallback"],
+      macos: ["system-font-discovery", "bitmap-font-fallback"],
+      linux: ["system-font-discovery", "bitmap-font-fallback"]
     }
   }],
   ["gpu", {

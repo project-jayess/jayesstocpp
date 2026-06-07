@@ -114,7 +114,64 @@ export function inspectCssConstraints() {
     visiblePixel.blue,
     clippedPixel.blue,
     edgePixel.red,
-    document.stylesheet.rules[0].style["min-width"]
+    document.stylesheet.rules[0].style["min-width"].value
+  ];
+}
+
+export function inspectPercentageLayout() {
+  var document = createHtmlDocument(
+    "<div id=\"root\"><p id=\"half\">Half</p></div>",
+    "div { background-color: #112233; width: 100%; height: 100%; padding: 4; border-width: 2; border-color: #ffffff; } p { background-color: #ff0000; color: #ffffff; width: 50%; height: 50%; }",
+    null
+  );
+  var canvas = create(100, 60, { background: rgb(0, 0, 0) });
+  layoutHtml(document, { x: 0, y: 0, width: 100, height: 60 });
+  drawHtml(canvas, document);
+  var root = document.tree.children[0];
+  var child = root.children[0];
+  var rootPixel = getPixel(canvas, 99, 59);
+  var childPixel = getPixel(canvas, 8, 12);
+  var childHit = hitTestHtml(document, 8, 12);
+  return [
+    root.layout.width,
+    root.layout.height,
+    root.layout.contentWidth,
+    child.layout.width,
+    child.layout.height,
+    rootPixel.blue,
+    childPixel.red,
+    childHit.targetId
+  ];
+}
+
+export function inspectCssCompatibility() {
+  var document = createHtmlDocument(
+    "<div id=root><button id=save disabled>Save</button><p id=child kind=note>Child</p></div>",
+    "/* ordinary comment */ div { width: 100%; height: 100%; } button, p { color: #ffffff; } div > p { background-color: #ff0000; width: 50%; height: 50%; box-sizing: content-box; padding: 2; border-width: 1; border-color: #00ff00; }",
+    null
+  );
+  var canvas = create(100, 60, { background: rgb(0, 0, 0) });
+  layoutHtml(document, { x: 0, y: 0, width: 100, height: 60 });
+  drawHtml(canvas, document);
+  var root = document.tree.children[0];
+  var button = root.children[0];
+  var child = root.children[1];
+  var childPixel = getPixel(canvas, 3, 18);
+  var childHit = hitTestHtml(document, 3, 18);
+  return [
+    document.stylesheet.rules.length,
+    document.stylesheet.rules[3].kind,
+    button.attributes.disabled,
+    child.attributes.id,
+    child.style.color.red,
+    root.layout.width,
+    root.layout.height,
+    child.layout.width,
+    child.layout.height,
+    child.layout.padding,
+    child.layout.borderWidth,
+    childPixel.red,
+    childHit.targetId
   ];
 }
 

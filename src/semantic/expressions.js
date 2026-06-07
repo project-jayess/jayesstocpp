@@ -172,6 +172,14 @@ export function validateCallExpressionShape(node, inGeneratorFunction, currentCl
   }
 
   if (node.callee.type === "MemberExpression" && node.callee.object.type === "SuperExpression") {
+    const validStaticSuperContext = (
+      currentClass?.base != null
+      && (
+        (currentMethod?.kind === "method" && currentMethod?.static === true)
+        || (currentMethod?.type === "ClassFieldDefinition" && currentMethod?.static === true)
+        || currentMethod?.type === "StaticInitializationBlock"
+      )
+    );
     const validInstanceSuperCall = (
       currentClass?.base != null
       && currentMethod?.kind === "method"
@@ -181,12 +189,7 @@ export function validateCallExpressionShape(node, inGeneratorFunction, currentCl
       node.callee.jayessInstanceSuperCall = true;
     }
 
-    const validStaticSuperCall = (
-      currentClass?.base != null
-      && currentMethod?.kind === "method"
-      && currentMethod?.static === true
-    );
-    if (validStaticSuperCall) {
+    if (validStaticSuperContext) {
       node.callee.jayessStaticSuperCall = true;
     }
   }
@@ -198,18 +201,21 @@ export function validateCallExpressionShape(node, inGeneratorFunction, currentCl
 
 export function validateMemberExpressionShape(node, currentClass, currentMethod, diagnostics, sourceText) {
   if (node.object.type === "SuperExpression") {
+    const validStaticSuperContext = (
+      currentClass?.base != null
+      && (
+        (currentMethod?.kind === "method" && currentMethod?.static === true)
+        || (currentMethod?.type === "ClassFieldDefinition" && currentMethod?.static === true)
+        || currentMethod?.type === "StaticInitializationBlock"
+      )
+    );
     const validComputedInstanceSuperLookup = (
       node.computed
       && currentClass?.base != null
       && currentMethod?.kind === "method"
       && currentMethod?.static !== true
     );
-    const validComputedStaticSuperLookup = (
-      node.computed
-      && currentClass?.base != null
-      && currentMethod?.kind === "method"
-      && currentMethod?.static === true
-    );
+    const validComputedStaticSuperLookup = node.computed && validStaticSuperContext;
     if (node.computed && !validComputedInstanceSuperLookup && !validComputedStaticSuperLookup) {
       diagnostics.push(
         createSemanticDiagnostic(
@@ -220,11 +226,7 @@ export function validateMemberExpressionShape(node, currentClass, currentMethod,
       );
     }
     const validSuperMemberLookup = node.jayessStaticSuperCall === true
-      || (
-        currentClass?.base != null
-        && currentMethod?.kind === "method"
-        && currentMethod?.static === true
-      )
+      || validStaticSuperContext
       || validComputedInstanceSuperLookup
       || (
         currentClass?.base != null

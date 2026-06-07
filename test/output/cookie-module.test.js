@@ -15,5 +15,5 @@ test("transpileFile emits cookie standard-library module", (t) => {
   assert.ok(result.files.includes(modulePath));
   assert.ok(fs.existsSync(modulePath));
   assert.match(plan, /"source": "jayess:cookie"/);
-  assert.match(plan, /"source": "jayess:http"/);
+  assert.doesNotMatch(plan, /"source": "jayess:http"/);
 });

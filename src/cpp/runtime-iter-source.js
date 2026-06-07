@@ -58,9 +58,6 @@ value iter_next(const value& generator, const value& sent) {
     return value(std::monostate{});
   }
   const auto current = generator_resume_with(generator, sent);
-  if (generator_is_completed(generator)) {
-    return value(std::monostate{});
-  }
   return current;
 }
 

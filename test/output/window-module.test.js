@@ -130,13 +130,15 @@ test("transpileFile emits window plus GUI frame-loop helper output", (t) => {
   const guiFramePath = path.join(targetDir, "generated-stdlib", "jayess", "gui", "stdlib_jayess_gui_window_frame_js.cpp");
   const windowSource = fs.readFileSync(windowPath, "utf8");
   const guiSource = fs.readFileSync(guiPath, "utf8");
+  const guiHeader = fs.readFileSync(path.join(targetDir, "generated-stdlib", "jayess", "gui", "stdlib_jayess_gui_index_js.hpp"), "utf8");
   const guiFrameSource = fs.readFileSync(guiFramePath, "utf8");
 
   assert.ok(result.files.includes(windowPath));
   assert.ok(result.files.includes(guiPath));
   assert.ok(result.files.includes(guiFramePath));
   assert.match(windowSource, /runFrame/);
-  assert.match(guiSource, /runGuiFrame/);
+  assert.match(guiHeader, /runGuiFrame/);
+  assert.match(guiSource, /stdlib_jayess_gui_window_frame_js\.hpp/);
   assert.match(guiFrameSource, /pollEvents/);
   assert.match(guiFrameSource, /present/);
   assert.match(guiFrameSource, /queuedActions/);

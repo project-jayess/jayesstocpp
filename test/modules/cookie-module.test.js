@@ -8,6 +8,5 @@ test("module graph resolves cookie standard-library dependencies", () => {
   const sources = graph.modules.map((moduleRecord) => moduleRecord.source).filter((source) => source?.startsWith("jayess:"));
 
   assert.ok(sources.includes("jayess:cookie"));
-  assert.ok(sources.includes("jayess:http"));
   assert.ok(sources.includes("jayess:string"));
 });

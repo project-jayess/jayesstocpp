@@ -11,7 +11,8 @@ function hasObjectSpreadProperty(properties) {
 
 export function renderObjectExpression(node, context, renderExpression) {
   if (!hasObjectSpreadProperty(node.properties)) {
-    return `jayess::make_object({${node.properties.map((property) => `{${renderObjectKey(property.key)}, ${renderExpression(property.value, context)}}`).join(", ")}})`;
+    const fields = node.properties.map((property) => `{${renderObjectKey(property.key)}, ${renderExpression(property.value, context)}}`).join(", ");
+    return `jayess::make_object(std::vector<std::pair<std::string, jayess::value>>{${fields}})`;
   }
 
   const lines = ["([&]() -> jayess::value {"];

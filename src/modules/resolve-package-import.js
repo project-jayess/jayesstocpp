@@ -228,7 +228,7 @@ function resolvePackageTargetArray(packageDirectory, values, patternMatch) {
       continue;
     }
 
-    arrayTrace.push({ ...traceEntry, selected: true });
+    arrayTrace.push({ ...traceEntry, selected: true, attemptedPath: result.resolved });
     return { ...result, arrayTrace, unsupported: false };
   }
 

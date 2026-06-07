@@ -10,9 +10,13 @@ test("transpileFile emits canvas text-box helper calls", (t) => {
   const fixture = path.resolve("test/fixtures/modules/canvas-text-main.js");
   const result = transpileFile(fixture, targetDir);
   const canvasPath = path.join(targetDir, "generated-stdlib", "jayess", "canvas", "stdlib_jayess_canvas_index_js.cpp");
+  const glyphsPath = path.join(targetDir, "generated-stdlib", "jayess", "font", "stdlib_jayess_font_glyphs_js.cpp");
+  const fontIndexPath = path.join(targetDir, "generated-stdlib", "jayess", "font", "stdlib_jayess_font_index_js.cpp");
   const canvasSource = fs.readFileSync(canvasPath, "utf8");
 
   assert.ok(result.files.includes(canvasPath));
+  assert.ok(result.files.includes(glyphsPath));
+  assert.equal(result.files.includes(fontIndexPath), false);
   assert.match(canvasSource, /drawTextBox/);
   assert.match(canvasSource, /wrappedTextLines/);
   assert.match(canvasSource, /saveImage/);

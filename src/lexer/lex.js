@@ -1,5 +1,6 @@
 import { createDiagnostic, throwDiagnostics } from "../diagnostics.js";
 import { offsetToLineColumn } from "../source/source-text.js";
+import { decodeEscape } from "./escapes.js";
 import { scanTemplateLiteral } from "./scan-template.js";
 import { keywords, tokenTypes } from "./tokens.js";
 
@@ -98,7 +99,7 @@ export function lex(sourceText) {
           if (escaped == null) {
             syntaxError(sourceText, start, "Unterminated string literal");
           }
-          value += escaped;
+          value += decodeEscape(escaped);
           index += 2;
           continue;
         }

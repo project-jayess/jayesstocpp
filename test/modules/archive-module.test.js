@@ -5,10 +5,10 @@ import { buildModuleGraph } from "../../src/modules/module-graph.js";
 
 test("module graph resolves repository-owned built-in archive module", () => {
   const graph = buildModuleGraph(path.resolve("test/fixtures/modules/archive-main.js"));
-  const sources = graph.modules.map((moduleRecord) => moduleRecord.source);
+  const sources = graph.modules.map((moduleRecord) => moduleRecord.source).filter((source) => source != null);
 
   assert.ok(sources.includes("jayess:archive"));
-  assert.ok(sources.some((source) => source.endsWith("/stdlib/jayess/archive/tar-files.js")));
+  assert.ok(sources.includes("./tar-files.js"));
   assert.ok(sources.includes("jayess:bytes"));
   assert.ok(sources.includes("jayess:fs"));
 });

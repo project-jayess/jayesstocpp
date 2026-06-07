@@ -9,7 +9,7 @@ export function renderSyncCallableClosure({
   beforeParameters,
   renderExpressionReturn
 }) {
-  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) mutable -> jayess::value {`];
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
 
   beforeParameters?.(lines);

@@ -11,5 +11,4 @@ test("module graph resolves repository-owned built-in timers module and async de
     ["jayess:timers"]
   );
   assert.ok(graph.modules.some((moduleRecord) => moduleRecord.source === "jayess:timers"));
-  assert.ok(graph.modules.some((moduleRecord) => moduleRecord.source === "jayess:async"));
 });

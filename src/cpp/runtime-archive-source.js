@@ -311,5 +311,5 @@ value archive_extract_tar(const value& input) {
   }
   return make_array(std::move(entries));
 }
-}`;
+`;
 }

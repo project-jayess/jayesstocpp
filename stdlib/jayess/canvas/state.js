@@ -26,6 +26,14 @@ export function copyDrawingState(state) {
   };
 }
 
+function copyClipStack(stack) {
+  var copied = [];
+  for (var index = 0; index < stack.length; index = index + 1) {
+    copied.push(stack[index]);
+  }
+  return copied;
+}
+
 export function copyDrawingStateStack(stack) {
   var copied = [];
   for (var index = 0; index < stack.length; index = index + 1) {
@@ -33,14 +41,6 @@ export function copyDrawingStateStack(stack) {
       state: copyDrawingState(stack[index].state),
       clipStack: copyClipStack(stack[index].clipStack)
     });
-  }
-  return copied;
-}
-
-function copyClipStack(stack) {
-  var copied = [];
-  for (var index = 0; index < stack.length; index = index + 1) {
-    copied.push(stack[index]);
   }
   return copied;
 }

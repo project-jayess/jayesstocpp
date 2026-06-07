@@ -73,7 +73,7 @@ export function renderGeneratorCallableExpression(node, context, renderExpressio
   const localNames = collectLocalNames(node);
   const bodyLines = buildGeneratorBodyLines(node, context, renderExpression, loweringContext);
   const captureList = options.captureList ?? (node.captures ?? []).join(", ");
-  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) mutable -> jayess::value {`];
 
   emitGeneratorCallableBody(
     node,

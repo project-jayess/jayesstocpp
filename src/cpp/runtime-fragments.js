@@ -13,6 +13,7 @@ import { getDialogRuntimeCppFragment, getDialogRuntimeHeaderFragment } from "./r
 import { getEncodingRuntimeCppFragment, getEncodingRuntimeHeaderFragment } from "./runtime-encoding-source.js";
 import { getEventsRuntimeCppFragment, getEventsRuntimeHeaderFragment } from "./runtime-events-source.js";
 import { getFsRuntimeCppFragment, getFsRuntimeHeaderFragment } from "./runtime-fs-source.js";
+import { getFontRuntimeCppFragment, getFontRuntimeHeaderFragment } from "./runtime-font-source.js";
 import { getGeneratorRuntimeCppFragment, getGeneratorRuntimeHeaderFragment } from "./runtime-generator-source.js";
 import { getGpuRuntimeCppFragment, getGpuRuntimeHeaderFragment } from "./runtime-gpu-source.js";
 import { getHttpRuntimeCppFragment, getHttpRuntimeHeaderFragment } from "./runtime-http-source.js";
@@ -59,6 +60,7 @@ export const RUNTIME_FRAGMENT_DEFINITIONS = [
   { key: "dialog", header: getDialogRuntimeHeaderFragment, cpp: getDialogRuntimeCppFragment, requires: ["async-core"] },
   { key: "encoding", header: getEncodingRuntimeHeaderFragment, cpp: getEncodingRuntimeCppFragment },
   { key: "events", header: getEventsRuntimeHeaderFragment, cpp: getEventsRuntimeCppFragment },
+  { key: "font", header: getFontRuntimeHeaderFragment, cpp: getFontRuntimeCppFragment },
   { key: "fs", header: getFsRuntimeHeaderFragment, cpp: getFsRuntimeCppFragment },
   { key: "generator", header: getGeneratorRuntimeHeaderFragment, cpp: getGeneratorRuntimeCppFragment },
   { key: "gpu", header: getGpuRuntimeHeaderFragment, cpp: getGpuRuntimeCppFragment, requires: ["window"] },

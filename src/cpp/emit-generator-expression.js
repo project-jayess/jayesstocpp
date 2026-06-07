@@ -87,7 +87,7 @@ function emitGeneratorObjectExpression(node, context, lines, renderExpression, l
     const value = emitStableGeneratorExpressionValue(property.value, context, lines, renderExpression, loweringContext);
     return `{${renderGeneratorObjectKey(property.key)}, ${value}}`;
   });
-  return `jayess::make_object({${fields.join(", ")}})`;
+  return `jayess::make_object(std::vector<std::pair<std::string, jayess::value>>{${fields.join(", ")}})`;
 }
 
 function emitGeneratorConditionalExpression(node, context, lines, renderExpression, loweringContext) {

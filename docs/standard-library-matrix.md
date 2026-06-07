@@ -26,7 +26,7 @@ This is the authoritative quick standard-library/module matrix for shipped `jaye
 | `jayess:dotenv` | dotenv parsing and formatting | object, string |
 | `jayess:encoding` | base64, hex, URI, ASCII, UTF-16 helpers | encoding, bytes |
 | `jayess:events` | event emitter handles | events |
-| `jayess:font` | bitmap text measurement, alignment, and canvas drawing | canvas |
+| `jayess:font` | default and registered bitmap fonts, measurement, alignment, and canvas drawing | canvas |
 | `jayess:form` | URL-encoded form parsing and formatting | querystring |
 | `jayess:fs` | async-by-default filesystem helpers and `Sync` variants | fs, async, bytes |
 | `jayess:glob` | simple filesystem glob matching | fs, path, string |

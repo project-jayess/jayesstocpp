@@ -44,9 +44,9 @@ test("transpileFile resolves built-in Jayess console module into generated outpu
   assert.match(nativeHeader, /jayessConsolePrompt/);
   assert.match(moduleSource, /jayessConsoleLog/);
   assert.match(moduleSource, /jayessConsoleWriteLine/);
-  assert.match(moduleSource, /jayessConsoleReadLine/);
-  assert.match(moduleSource, /jayessConsoleReadStdin/);
-  assert.match(moduleSource, /jayessConsolePrompt/);
+  assert.doesNotMatch(moduleSource, /jayessConsoleReadLine/);
+  assert.doesNotMatch(moduleSource, /jayessConsoleReadStdin/);
+  assert.doesNotMatch(moduleSource, /jayessConsolePrompt/);
 });
 
 test("transpileFile resolves built-in Jayess bytes module into generated output", (t) => {

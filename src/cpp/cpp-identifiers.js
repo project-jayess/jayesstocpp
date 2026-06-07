@@ -12,9 +12,17 @@ const CPP_RESERVED_IDENTIFIERS = new Set([
   "virtual", "void", "volatile", "wchar_t", "while", "xor", "xor_eq"
 ]);
 
+const CPP_NATIVE_MACRO_PRONE_IDENTIFIERS = new Set([
+  "stderr",
+  "stdin",
+  "stdout"
+]);
+
 export function toCppIdentifier(name) {
   if (name === "__default_export__") {
     return name;
   }
-  return CPP_RESERVED_IDENTIFIERS.has(name) ? `jayess_ident_${name}` : name;
+  return CPP_RESERVED_IDENTIFIERS.has(name) || CPP_NATIVE_MACRO_PRONE_IDENTIFIERS.has(name)
+    ? `jayess_ident_${name}`
+    : name;
 }

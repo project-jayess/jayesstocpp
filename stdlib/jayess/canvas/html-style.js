@@ -15,18 +15,21 @@ function copyStyle(style) {
   copied.padding = style.padding;
   copied["background-color"] = style["background-color"];
   copied.color = style.color;
+  copied["font-family"] = style["font-family"];
   copied["font-size"] = style["font-size"];
+  copied["line-height"] = style["line-height"];
   copied["border-width"] = style["border-width"];
   copied["border-color"] = style["border-color"];
   copied["border-radius"] = style["border-radius"];
   copied["text-align"] = style["text-align"];
   copied.gap = style.gap;
   copied.overflow = style.overflow;
+  copied["box-sizing"] = style["box-sizing"];
   return copied;
 }
 
 function applyStyle(target, source) {
-  var keys = ["display", "width", "height", "min-width", "max-width", "min-height", "max-height", "margin", "padding", "background-color", "color", "font-size", "border-width", "border-color", "border-radius", "text-align", "gap", "overflow"];
+  var keys = ["display", "width", "height", "min-width", "max-width", "min-height", "max-height", "margin", "padding", "background-color", "color", "font-family", "font-size", "line-height", "border-width", "border-color", "border-radius", "text-align", "gap", "overflow", "box-sizing"];
   for (var index = 0; index < keys.length; index = index + 1) {
     var key = keys[index];
     if (source[key] !== null) {
@@ -93,6 +96,20 @@ function ruleMatches(node, rule, ancestors) {
   if (rule.kind === "descendant") {
     return descendantSelectorMatches(node, rule, ancestors);
   }
+  if (rule.kind === "child") {
+    var chain = rule.chain;
+    if (chain === null || chain.length === 0 || !simpleSelectorMatches(node, chain[chain.length - 1])) {
+      return false;
+    }
+    var ancestorIndex = ancestors.length - 1;
+    for (var chainIndex = chain.length - 2; chainIndex >= 0; chainIndex = chainIndex - 1) {
+      if (ancestorIndex < 0 || !simpleSelectorMatches(ancestors[ancestorIndex], chain[chainIndex])) {
+        return false;
+      }
+      ancestorIndex = ancestorIndex - 1;
+    }
+    return true;
+  }
   return simpleSelectorMatches(node, rule);
 }
 
@@ -113,13 +130,16 @@ function defaultStyle(parentStyle, node) {
     padding: { top: 0, right: 0, bottom: 0, left: 0 },
     "background-color": null,
     color: parentStyle === null ? null : parentStyle.color,
+    "font-family": parentStyle === null ? null : parentStyle["font-family"],
     "font-size": parentStyle === null ? 8 : parentStyle["font-size"],
+    "line-height": parentStyle === null ? null : parentStyle["line-height"],
     "border-width": 0,
     "border-color": null,
     "border-radius": 0,
     "text-align": "left",
     gap: 0,
-    overflow: "visible"
+    overflow: "visible",
+    "box-sizing": "border-box"
   };
 }
 

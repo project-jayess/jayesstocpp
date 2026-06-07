@@ -2,6 +2,8 @@
 
 This repository contains a working Jayess to C++ transpiler with a broad but intentionally curated language and standard-library surface.
 
+The rendering standard-library slice includes deterministic canvas text, a license-safe default bitmap font, and file-backed TTF/TrueType-style OTF/WOFF/WOFF2 font handles for metrics and font-family selection. Real outline table decoding and grayscale vector glyph rasterization remain tracked implementation work rather than hidden host-font behavior.
+
 ## Environment
 
 - Node.js: validated on Node `v24`
@@ -162,7 +164,7 @@ Jayess is intended to grow through a mix of:
 
 When practical, standard-library and core-library behavior should be written in Jayess and transpiled together with user code as part of the generated C++ project.
 
-Named imports should drive export-level reachable symbol emission when the compiler can prove the smaller surface is safe. Importing two helpers from `jayess:fs` should not force unrelated FS temp, JSON, stream, UUID, or crypto helpers into the generated project. See [reachable-symbol-emission.md](./reachable-symbol-emission.md).
+Named import lists should drive export-level reachable symbol emission when the compiler can prove the smaller surface is safe. Importing two helpers from `jayess:fs` should not force unrelated FS temp, JSON, stream, UUID, or crypto helpers into the generated project. Default imports, namespace imports, side-effect imports, and mixed import forms retain the whole resolved module for now, and whole-module output must be explicit in generated metadata. See [reachable-symbol-emission.md](./reachable-symbol-emission.md).
 
 The remaining larger language/runtime gaps are treated as active implementation work. Until a slice is actually shipped, the transpiler should keep explicit diagnostics rather than implying partial support.
 

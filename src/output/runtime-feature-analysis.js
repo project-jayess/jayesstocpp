@@ -1,3 +1,7 @@
+import { isDeclarationPruningShape } from "../modules/declaration-pruning-shape.js";
+import { canPruneModuleDeclarations } from "../modules/stdlib-pruning-policy.js";
+import { shouldRetainTopLevelStatement } from "../modules/top-level-retention.js";
+
 const builtinRuntimeFeatures = new Map([
   ["jayess:array", ["array"]],
   ["jayess:archive", ["archive"]],
@@ -15,6 +19,7 @@ const builtinRuntimeFeatures = new Map([
   ["jayess:dialog", ["dialog"]],
   ["jayess:encoding", ["encoding"]],
   ["jayess:events", ["events"]],
+  ["jayess:font", ["font"]],
   ["jayess:fs", ["fs"]],
   ["jayess:gpu", ["gpu"]],
   ["jayess:http", ["http"]],
@@ -60,8 +65,14 @@ function addFeatures(features, keys) {
   }
 }
 
-function addImportFeatures(features, moduleRecord) {
+function addImportFeatures(features, moduleRecord, retainedImportLocalNames) {
   for (const dependency of moduleRecord.dependencies) {
+    if (retainedImportLocalNames != null && dependency.specifiers.length > 0) {
+      const retained = new Set(retainedImportLocalNames);
+      if (!dependency.specifiers.some((specifier) => retained.has(specifier.local))) {
+        continue;
+      }
+    }
     const keys = builtinRuntimeFeatures.get(dependency.source);
     if (keys != null) {
       addFeatures(features, keys);
@@ -118,12 +129,27 @@ function visitAstNode(node, features, seen) {
   }
 }
 
-export function analyzeRuntimeFeatures(graph) {
+export function analyzeRuntimeFeatures(graph, options = {}) {
   const features = new Set(["async-core"]);
 
+  const reachableSymbols = options.reachableSymbols ?? null;
+  const emittedModules = options.emittedModules ?? null;
   for (const moduleRecord of graph.modules) {
-    addImportFeatures(features, moduleRecord);
-    visitAstNode(moduleRecord.ast, features, new Set());
+    if (emittedModules != null && !emittedModules.has(moduleRecord.filename)) {
+      continue;
+    }
+    const summary = reachableSymbols?.get(moduleRecord.filename);
+    const canPruneModule = summary != null
+      && summary.wholeModuleReasons.length === 0
+      && canPruneModuleDeclarations(moduleRecord)
+      && isDeclarationPruningShape(moduleRecord.ast);
+    const retainedDeclarations = canPruneModule ? new Set(summary.retainedLocalDeclarations) : null;
+    addImportFeatures(features, moduleRecord, canPruneModule ? summary.retainedImportLocals : null);
+    for (const statement of moduleRecord.ast.body) {
+      if (shouldRetainTopLevelStatement(statement, retainedDeclarations)) {
+        visitAstNode(statement, features, new Set());
+      }
+    }
   }
 
   return [...features].sort();

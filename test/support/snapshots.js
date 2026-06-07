@@ -8,7 +8,7 @@ export function getSnapshotPath(name) {
 }
 
 export function readSnapshot(name) {
-  return fs.readFileSync(getSnapshotPath(name), "utf8");
+  return fs.readFileSync(getSnapshotPath(name), "utf8").replace(/\r\n/g, "\n");
 }
 
 export function writeSnapshot(name, content) {

@@ -65,8 +65,8 @@ Current repository decision:
 - repository-provided core or standard-library modules should join the graph through the same module-resolution pipeline as other Jayess modules
 - explicit import is the default model
 - repository-defined opt-in inclusion hooks are allowed later, but implicit ambient inclusion should not be the default behavior
-- named imports should eventually retain only reachable exports, local helpers, imported symbols, native artifacts, and runtime fragments instead of forcing whole-module emission for ordinary import lists
-- whole-module emission remains a conservative fallback for side-effect imports, namespace imports, ambiguous re-exports, cycles, and unsupported reachability-analysis shapes
+- named import lists should retain only reachable exports, local helpers, imported symbols, native artifacts, and runtime fragments instead of forcing whole-module emission once the reachable-symbol emission slice is implemented
+- whole-module emission remains the rule for default imports, namespace imports, side-effect imports, mixed imports, ambiguous re-exports, cycles, and unsupported reachability-analysis shapes
 
 The repository-owned built-in module namespace is:
 

@@ -19,6 +19,14 @@ void require(bool condition, const char* message) {
   }
 }
 
+std::string thrownMessage(const jayess::thrown_value& error) {
+  auto payload = jayess::exception_to_value(error);
+  if (std::holds_alternative<std::string>(payload)) {
+    return std::get<std::string>(payload);
+  }
+  return "";
+}
+
 int main() {
   ${namespace}::jayess_module_init();
   auto result = ${namespace}::inspect(std::vector<jayess::value>{});
@@ -64,6 +72,33 @@ int main() {
   require(std::get<double>(constrainedItems[6]) == 255.0, "html constrained edge pixel");
   require(std::get<double>(constrainedItems[7]) == 50.0, "html min width style metadata");
 
+  auto percentageResult = ${namespace}::inspectPercentageLayout(std::vector<jayess::value>{});
+  const auto& percentageItems = std::get<jayess::array_ptr>(percentageResult)->items;
+  require(std::get<double>(percentageItems[0]) == 100.0, "html percentage root width");
+  require(std::get<double>(percentageItems[1]) == 60.0, "html percentage root height");
+  require(std::get<double>(percentageItems[2]) == 88.0, "html percentage content width");
+  require(std::get<double>(percentageItems[3]) == 44.0, "html percentage child width");
+  require(std::get<double>(percentageItems[4]) == 24.0, "html percentage child height");
+  require(std::get<double>(percentageItems[5]) == 255.0, "html percentage root border paint");
+  require(std::get<double>(percentageItems[6]) == 255.0, "html percentage child paint");
+  require(std::get<std::string>(percentageItems[7]) == "half", "html percentage hit target");
+
+  auto compatibilityResult = ${namespace}::inspectCssCompatibility(std::vector<jayess::value>{});
+  const auto& compatibilityItems = std::get<jayess::array_ptr>(compatibilityResult)->items;
+  require(std::get<double>(compatibilityItems[0]) == 4.0, "html css compatibility rule count");
+  require(std::get<std::string>(compatibilityItems[1]) == "child", "html child selector kind");
+  require(std::get<std::string>(compatibilityItems[2]) == "true", "html boolean attribute value");
+  require(std::get<std::string>(compatibilityItems[3]) == "child", "html unquoted id attribute value");
+  require(std::get<double>(compatibilityItems[4]) == 255.0, "html comma selector color");
+  require(std::get<double>(compatibilityItems[5]) == 100.0, "html compatibility root width");
+  require(std::get<double>(compatibilityItems[6]) == 60.0, "html compatibility root height");
+  require(std::get<double>(compatibilityItems[7]) == 56.0, "html content-box percentage width");
+  require(std::get<double>(compatibilityItems[8]) == 36.0, "html content-box percentage height");
+  require(std::get<double>(compatibilityItems[9]) == 2.0, "html content-box padding metadata");
+  require(std::get<double>(compatibilityItems[10]) == 1.0, "html content-box border metadata");
+  require(std::get<double>(compatibilityItems[11]) == 255.0, "html child selector paint");
+  require(std::get<std::string>(compatibilityItems[12]) == "child", "html child selector hit target");
+
   auto maturityResult = ${namespace}::inspectHtmlMaturity(std::vector<jayess::value>{});
   const auto& maturityItems = std::get<jayess::array_ptr>(maturityResult)->items;
   require(std::get<double>(maturityItems[0]) == 1.0, "html padding shorthand top");
@@ -87,6 +122,8 @@ int main() {
   try {
     ${namespace}::invalidHtml(std::vector<jayess::value>{});
     throw std::runtime_error("invalid html accepted");
+  } catch (const jayess::thrown_value& error) {
+    require(thrownMessage(error).find("unsupported element") != std::string::npos, "invalid html diagnostic");
   } catch (const std::runtime_error& error) {
     require(std::string(error.what()).find("unsupported element") != std::string::npos, "invalid html diagnostic");
   }
@@ -94,6 +131,8 @@ int main() {
   try {
     ${namespace}::invalidCss(std::vector<jayess::value>{});
     throw std::runtime_error("invalid css accepted");
+  } catch (const jayess::thrown_value& error) {
+    require(thrownMessage(error).find("unsupported property") != std::string::npos, "invalid css diagnostic");
   } catch (const std::runtime_error& error) {
     require(std::string(error.what()).find("unsupported property") != std::string::npos, "invalid css diagnostic");
   }

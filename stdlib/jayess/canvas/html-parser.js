@@ -8,7 +8,7 @@ function fail(message) {
 }
 
 function isWhitespace(character) {
-  return character === " " || character === "\n" || character === "\r" || character === "\t";
+  return trim(character) === "";
 }
 
 function isNameCharacter(character) {
@@ -57,7 +57,17 @@ function skipWhitespace(text, cursor) {
 function readAttributeValue(text, cursor) {
   var quote = slice(text, cursor, cursor + 1);
   if (quote !== "\"" && quote !== "'") {
-    fail("jayess:canvas html attributes must use quoted values");
+    var start = cursor;
+    while (cursor < text.length && !isWhitespace(slice(text, cursor, cursor + 1)) && slice(text, cursor, cursor + 1) !== ">" && slice(text, cursor, cursor + 1) !== "/") {
+      cursor = cursor + 1;
+    }
+    if (cursor === start) {
+      fail("jayess:canvas html attribute value is empty");
+    }
+    return {
+      value: slice(text, start, cursor),
+      cursor: cursor
+    };
   }
   cursor = cursor + 1;
   var start = cursor;
@@ -100,9 +110,11 @@ function readOpeningTag(text, cursor) {
     var attributeName = readName(text, cursor);
     cursor = skipWhitespace(text, attributeName.cursor);
     if (slice(text, cursor, cursor + 1) !== "=") {
-      fail("jayess:canvas html attributes require explicit values");
+      attributes[attributeName.name] = "true";
+      continue;
     }
-    cursor = skipWhitespace(text, cursor + 1);
+    cursor = cursor + 1;
+    cursor = skipWhitespace(text, cursor);
     var attributeValue = readAttributeValue(text, cursor);
     attributes[attributeName.name] = attributeValue.value;
     cursor = attributeValue.cursor;

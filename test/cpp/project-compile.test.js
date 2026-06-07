@@ -161,6 +161,55 @@ compileTest("transpileFile executable layout links and uses top-level main exit 
   assert.equal(run.stderr, "");
 });
 
+compileTest("transpileFile executable layout compiles pruned jayess fs named text imports", (t) => {
+  const targetDir = createManagedTempDir(t, "executable-fs-text-pruned-compile");
+  const fixture = path.resolve("test/fixtures/modules/fs-text-only-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+  const executablePath = compileGeneratedExecutable(cppFiles, targetDir, "jayess-fs-text-pruned");
+  const run = spawnSync(executablePath, [], {
+    cwd: targetDir,
+    encoding: "utf8",
+    env: { ...process.env, TMPDIR: targetDir, TEMP: targetDir, TMP: targetDir }
+  });
+
+  assert.equal(run.status, 6);
+  assert.equal(run.stderr, "");
+});
+
+compileTest("transpileFile executable layout compiles pruned jayess console named write import", (t) => {
+  const targetDir = createManagedTempDir(t, "executable-console-write-pruned-compile");
+  const fixture = path.resolve("test/fixtures/modules/console-write-only-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+  const executablePath = compileGeneratedExecutable(cppFiles, targetDir, "jayess-console-write-pruned");
+  const run = spawnSync(executablePath, [], {
+    cwd: targetDir,
+    encoding: "utf8",
+    env: { ...process.env, TMPDIR: targetDir, TEMP: targetDir, TMP: targetDir }
+  });
+
+  assert.equal(run.status, 0);
+  assert.match(run.stdout, /Jayess console/);
+  assert.equal(run.stderr, "");
+});
+
+compileTest("transpileFile lifetime metadata first slice compiles and runs", (t) => {
+  const targetDir = createManagedTempDir(t, "lifetime-first-slice-compile");
+  const fixture = path.resolve("test/fixtures/modules/lifetime-first-slice-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+  const executablePath = compileGeneratedExecutable(cppFiles, targetDir, "jayess-lifetime-first-slice");
+  const run = spawnSync(executablePath, [], {
+    cwd: targetDir,
+    encoding: "utf8",
+    env: { ...process.env, TMPDIR: targetDir, TEMP: targetDir, TMP: targetDir }
+  });
+
+  assert.equal(run.status, 6);
+  assert.equal(run.stderr, "");
+});
+
 compileTest("transpileFile namespace import project compiles with the available C++ compiler", (t) => {
   const targetDir = createManagedTempDir(t, "namespace-compile");
   const fixture = path.resolve("test/fixtures/modules/namespace-main.js");

@@ -317,7 +317,7 @@ function staticCacheControl(options) {
   return options.cacheControl;
 }
 
-function pathname(requestPath) {
+function parsedPathname(requestPath) {
   var index = requestPath.indexOf("?");
   if (index < 0) {
     return requestPath;
@@ -331,7 +331,7 @@ function encodedUnsafeStaticPath(requestPathname) {
 }
 
 function safeStaticPath(root, requestPath) {
-  var requestPathname = pathname(requestPath);
+  var requestPathname = parsedPathname(requestPath);
   if (encodedUnsafeStaticPath(requestPathname)) {
     return null;
   }
@@ -466,7 +466,7 @@ export function match(routerValue, requestValue) {
   }
 
   var requestMethod = method(requestValue);
-  var requestPath = pathname(path(requestValue));
+  var requestPath = parsedPathname(path(requestValue));
   var routes = routerValue.routes;
 
   for (var index = 0; index < routes.length; index = index + 1) {

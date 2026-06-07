@@ -81,3 +81,17 @@ Native header, native source, shared-library, and static-library imports are not
 - binding imports from native source or library artifacts are rejected semantically and must come from the matching header import instead
 
 `transpile()` stays intentionally conservative in string-only mode. Repository-owned built-in `jayess:*` modules are resolved through `transpileFile()` and the closed module graph; `transpile()` rejects those imports by default with explicit guidance to use `transpileFile()` or provide explicit resolver support.
+
+## Reachable Imports And Generated Output
+
+Module resolution must preserve enough import/export information for later stages to generate only the reachable declarations needed by named import lists. For imports shaped like `import { name } from "module"`, dependency metadata should retain the requested import names and the resolved export origins instead of treating the entire resolved module as required.
+
+For example:
+
+```js
+import { readTextSync, writeTextSync } from "jayess:fs";
+```
+
+This edge should make `readTextSync` and `writeTextSync` reachable from `jayess:fs`, then recursively retain the helpers, native bridge artifacts, and runtime fragments those declarations actually use. It should not require every other export in `jayess:fs`.
+
+Whole-module reachability remains the rule for default imports, namespace imports, side-effect imports, mixed default/named imports, mixed namespace/named imports, ambiguous re-exports, cycles, and modules whose top-level side effects cannot yet be separated safely. Resolver and generated-project metadata should record those reasons so broad output can be audited.

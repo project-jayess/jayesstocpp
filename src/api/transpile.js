@@ -2,6 +2,7 @@ import { emitModule } from "../cpp/emit-module.js";
 import { throwDiagnostics } from "../diagnostics.js";
 import { createModuleDiagnostic } from "../diagnostics/module-diagnostic.js";
 import { analyzeEscapes } from "../lifetime/analyze-escapes.js";
+import { createModuleLifetimeMetadata } from "../lifetime/module-lifetime-metadata.js";
 import { classifyImport } from "../modules/classify-import.js";
 import { parse } from "../parser/parse.js";
 import { createSourceText } from "../source/source-text.js";
@@ -34,10 +35,12 @@ export function transpile(source, options = {}) {
   }
 
   const lifetime = analyzeEscapes(ast);
+  const lifetimeMetadata = createModuleLifetimeMetadata(ast, lifetime);
   const emitted = emitModule({
     ast,
     analysis,
-    lifetime,
+    lifetimeMetadata,
+    emitLifetimeMetadataComment: options.emitLifetimeMetadataComment === true,
     moduleStem: options.moduleName ?? "anonymous_module",
     standalone: true
   });

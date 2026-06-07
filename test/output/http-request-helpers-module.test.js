@@ -22,9 +22,11 @@ test("transpileFile emits http request helper module", (t) => {
   assert.ok(result.files.includes(requestPath));
 
   const httpSource = fs.readFileSync(httpPath, "utf8");
+  const httpHeader = fs.readFileSync(path.join(targetDir, "generated-stdlib", "jayess", "http", "stdlib_jayess_http_index_js.hpp"), "utf8");
   const requestSource = fs.readFileSync(requestPath, "utf8");
-  assert.match(httpSource, /queryParam/);
+  assert.match(httpHeader, /queryParam/);
+  assert.match(httpSource, /stdlib_jayess_http_request_js\.hpp/);
   assert.match(requestSource, /jayessHttpRequestPath/);
-  assert.match(requestSource, /parseQuery/);
+  assert.match(requestSource, /jayess_module_stdlib_jayess_querystring_index_js::parse/);
   assert.match(requestSource, /pathname/);
 });

@@ -110,13 +110,21 @@ export function analyzeModule(ast, sourceText, options = {}) {
         if (node.async === true && node.generator === true) {
           diagnostics.push(createSemanticDiagnostic(sourceText, node.id, "Jayess does not support async generator functions"));
         }
+        node.captures = [];
         const nestedFunctionScope = createScope(activeScope, "function");
+        if (node.id != null) {
+          addScopedBinding(nestedFunctionScope, diagnostics, sourceText, node.id, node.id.name, {
+            name: node.id.name,
+            kind: "function",
+            node: node.id
+          });
+        }
         for (const param of node.params) {
-          walk(param.defaultValue, nestedFunctionScope, 0, 0, nestedFunctionScope, null, node.async === true, node.generator === true, currentClass, null);
-          walkBindingPattern(param.id, nestedFunctionScope, 0, 0, nestedFunctionScope, null, node.async === true, node.generator === true, currentClass, null, true);
+          walk(param.defaultValue, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null);
+          walkBindingPattern(param.id, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null, true);
           bindParameter(param, nestedFunctionScope, diagnostics, sourceText);
         }
-        walk(node.body, nestedFunctionScope, 0, 0, nestedFunctionScope, null, node.async === true, node.generator === true, currentClass, null);
+        walk(node.body, nestedFunctionScope, 0, 0, nestedFunctionScope, node, node.async === true, node.generator === true, currentClass, null);
         return;
       }
       case "ClassDeclaration": {

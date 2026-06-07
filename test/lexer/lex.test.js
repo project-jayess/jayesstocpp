@@ -47,6 +47,15 @@ test("lexer tokenizes template literals with interpolation segments", () => {
   assert.deepEqual(templateToken.value.expressions, ["name"]);
 });
 
+test("lexer decodes common string and template escapes", () => {
+  const tokens = lex(createSourceText("var line = \"a\\nb\\t\\\\\"; var message = `first\\n${name}\\tlast`;"));
+  const stringToken = tokens.find((token) => token.type === tokenTypes.string);
+  const templateToken = tokens.find((token) => token.type === tokenTypes.template);
+
+  assert.equal(stringToken.value, "a\nb\t\\");
+  assert.deepEqual(templateToken.value.segments, ["first\n", "\tlast"]);
+});
+
 test("lexer tokenizes spread punctuators without breaking dot access", () => {
   const tokens = lex(createSourceText("fn(...items); data.value;"));
   const values = tokens.map((token) => token.value);

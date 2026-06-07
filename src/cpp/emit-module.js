@@ -46,6 +46,8 @@ import { collectHeaderIncludes, collectImportBindings } from "./module-imports.j
 import { emitModuleInit, emitModuleInitAsync } from "./module-init.js";
 import { toModuleNamespace } from "./module-names.js";
 import { toCppIdentifier } from "./cpp-identifiers.js";
+import { createLifetimeEmissionPlan, renderLifetimeMetadataCommentLines } from "./emit-lifetime-metadata.js";
+import { shouldEmitRetainedTopLevelStatement } from "./retained-declarations.js";
 import {
   isPrivateMemberExpression,
   renderPrivateMemberExpression
@@ -80,7 +82,8 @@ function renderIdentifier(node, context) {
   if (context.classSelfName != null && context.classSelfAlias != null && node.name === context.classSelfName) {
     return context.classSelfAlias;
   }
-  const imported = hasLocalBinding(context, node.name) ? null : context.importBindings.get(node.name);
+  const localBinding = hasLocalBinding(context, node.name);
+  const imported = localBinding ? null : context.importBindings.get(node.name);
   if (imported != null) {
     const dependency = context.dependencies.get(imported.importSource);
     const importedName = imported.importedName === "default" ? "__default_export__" : toCppIdentifier(imported.importedName);
@@ -88,11 +91,40 @@ function renderIdentifier(node, context) {
       return toCppIdentifier(node.name);
     }
     if (dependency != null) {
+      if (dependency.exportedFunctionNames?.includes(importedName)) {
+        return renderFunctionReferenceValue(dependency.namespace, importedName);
+      }
       return `${dependency.namespace}::${importedName}`;
     }
     return importedName;
   }
+  if (!localBinding && context.moduleFunctionNames?.has(node.name)) {
+    return renderFunctionValue(node.name, context);
+  }
   return toCppIdentifier(node.name);
+}
+
+function renderCallTargetExpression(node, context) {
+  if (node.type !== "Identifier") {
+    return renderExpression(node, context);
+  }
+  if (context.classSelfName != null && context.classSelfAlias != null && node.name === context.classSelfName) {
+    return context.classSelfAlias;
+  }
+  const localBinding = hasLocalBinding(context, node.name);
+  const imported = localBinding ? null : context.importBindings.get(node.name);
+  if (imported == null && !localBinding && context.moduleFunctionNames?.has(node.name)) {
+    return toCppIdentifier(node.name);
+  }
+  if (imported != null && imported.importKind !== "namespace") {
+    const dependency = context.dependencies.get(imported.importSource);
+    const importedName = imported.importedName === "default" ? "__default_export__" : toCppIdentifier(imported.importedName);
+    if (dependency != null) {
+      return `${dependency.namespace}::${importedName}`;
+    }
+    return importedName;
+  }
+  return renderIdentifier(node, context);
 }
 
 function renderThisExpression(context) {
@@ -172,6 +204,7 @@ function renderExpression(node, context) {
       }
       return renderSharedCallLikeExpression(node.callee, node.arguments, context, {
         renderExpression,
+        renderCalleeExpression: renderCallTargetExpression,
         renderSuperConstructorCall
       });
     }
@@ -182,6 +215,7 @@ function renderExpression(node, context) {
     case "NewExpression":
       return renderSharedCallLikeExpression(node.callee, node.arguments, context, {
         renderExpression,
+        renderCalleeExpression: renderCallTargetExpression,
         renderSuperConstructorCall
       });
     case "AssignmentExpression":
@@ -263,11 +297,40 @@ function renderArrowFunctionExpression(node, context) {
 }
 
 function renderFunctionExportValue(node, context) {
+  return renderFunctionValue(node.id.name, context);
+}
+
+function renderFunctionValue(name, context) {
+  return renderFunctionReferenceValue(context.namespace, toCppIdentifier(name));
+}
+
+function renderFunctionReferenceValue(namespace, cppName) {
   const lines = ["jayess::make_callable([](const std::vector<jayess::value>& jayess_args) -> jayess::value {"];
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
-  lines.push(`  return ::${context.namespace}::${toCppIdentifier(node.id.name)}(jayess_args);`);
+  lines.push(`  return ::${namespace}::${cppName}(jayess_args);`);
   lines.push("})");
   return lines.join("\n");
+}
+
+function collectModuleFunctionNames(ast, retainedDeclarationSet) {
+  const names = new Set();
+  for (const statement of ast.body) {
+    if (!shouldEmitRetainedTopLevelStatement(statement, retainedDeclarationSet)) {
+      continue;
+    }
+    if (statement.type === "FunctionDeclaration" && statement.id != null) {
+      names.add(statement.id.name);
+      continue;
+    }
+    if (statement.type === "ExportNamedDeclaration" && statement.declaration?.type === "FunctionDeclaration") {
+      names.add(statement.declaration.id.name);
+      continue;
+    }
+    if (statement.type === "ExportDefaultDeclaration" && statement.declaration.type === "FunctionDeclaration" && statement.declaration.id != null) {
+      names.add(statement.declaration.id.name);
+    }
+  }
+  return names;
 }
 
 function nextDestructureTempName(context) {
@@ -330,6 +393,9 @@ function emitStatement(node, context, lines, depth = 0) {
   switch (node.type) {
     case "VariableDeclaration":
       emitVariableDeclarationStatement(node, context, lines, indent, !(context.topLevel === true && node.declarations.some((declaration) => isBindingPattern(declaration.id))));
+      return;
+    case "FunctionDeclaration":
+      lines.push(`${indent}jayess::value ${toCppIdentifier(node.id.name)} = ${renderClosureExpression(node, context)};`);
       return;
     case "ExpressionStatement":
       lines.push(`${indent}${renderExpression(node.expression, context)};`);
@@ -443,9 +509,24 @@ function emitFunction(node, context, lines) {
   lines.push("}");
 }
 
-export function emitModule({ ast, analysis, moduleStem, dependencies = new Map(), includeOverrides = new Map(), standalone = false }) {
+export function emitModule({
+  ast,
+  analysis,
+  moduleStem,
+  dependencies = new Map(),
+  includeOverrides = new Map(),
+  retainedDeclarationNames = null,
+  retainedImportLocalNames = null,
+  lifetimeMetadata = null,
+  emitLifetimeMetadataComment = false,
+  standalone = false
+}) {
   const namespace = toModuleNamespace(moduleStem);
+  const lifetimeEmission = createLifetimeEmissionPlan(lifetimeMetadata);
   const importBindings = collectImportBindings(analysis.imports);
+  const retainedDeclarationSet = retainedDeclarationNames == null ? null : new Set(retainedDeclarationNames);
+  const moduleFunctionNames = collectModuleFunctionNames(ast, retainedDeclarationSet);
+  const retainedImportLocalSet = retainedImportLocalNames == null ? null : new Set(retainedImportLocalNames);
   const dependencyHeaders = [...dependencies.values()]
     .map((dependency) => `#include ${JSON.stringify(dependency.header)}`)
     .sort();
@@ -453,6 +534,7 @@ export function emitModule({ ast, analysis, moduleStem, dependencies = new Map()
   const context = {
     dependencies,
     importBindings,
+    moduleFunctionNames,
     namespace,
     localBindingSets: [],
     tempState: { nextDestructureIndex: 0, nextSwitchIndex: 0 }
@@ -463,15 +545,18 @@ export function emitModule({ ast, analysis, moduleStem, dependencies = new Map()
         "#pragma once",
         '#include "runtime/jayess_runtime.hpp"',
         ...dependencyHeaders,
-        ...collectHeaderIncludes(analysis.imports, includeOverrides),
+        ...collectHeaderIncludes(analysis.imports, includeOverrides, retainedImportLocalSet),
         "",
         `namespace ${namespace} {`
       ];
   const cppLines = [
-    ...(standalone ? ['#include "runtime/jayess_runtime.hpp"', ...collectHeaderIncludes(analysis.imports, includeOverrides)] : [`#include "${moduleStem}.hpp"`]),
+    ...(standalone ? ['#include "runtime/jayess_runtime.hpp"', ...collectHeaderIncludes(analysis.imports, includeOverrides, retainedImportLocalSet)] : [`#include "${moduleStem}.hpp"`]),
     "",
     `namespace ${namespace} {`
   ];
+  if (emitLifetimeMetadataComment) {
+    cppLines.push(...renderLifetimeMetadataCommentLines(lifetimeMetadata), "");
+  }
   const globalLines = [];
   const standaloneDeclarations = [];
   const exportAliasLines = collectExportAliasLines({ ast, analysis, dependencies, standalone });
@@ -482,6 +567,10 @@ export function emitModule({ ast, analysis, moduleStem, dependencies = new Map()
   const declarationTarget = { standalone, headerLines, standaloneDeclarations, globalLines };
 
   for (const statement of ast.body) {
+    if (!shouldEmitRetainedTopLevelStatement(statement, retainedDeclarationSet)) {
+      continue;
+    }
+
     if (statement.type === "ImportDeclaration") {
       continue;
     }
@@ -610,6 +699,7 @@ export function emitModule({ ast, analysis, moduleStem, dependencies = new Map()
 
   return {
     namespace,
+    lifetimeEmission,
     headerSource: standalone ? "" : `${headerLines.join("\n")}\n`,
     cppSource: `${cppLines.join("\n")}\n`
   };

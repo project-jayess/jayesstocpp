@@ -46,6 +46,7 @@ export function renderOptionalCallExpression(node, context, options) {
 
 export function renderCallLikeExpression(calleeNode, argumentNodes, context, options) {
   const { renderExpression, renderSuperConstructorCall } = options;
+  const renderCalleeExpression = options.renderCalleeExpression ?? renderExpression;
   if (calleeNode.type === "SuperExpression") {
     return renderSuperConstructorCall(argumentNodes, context, renderExpression, hasSpreadArgument, (args, activeContext, lines, indent = "  ", argsName = "jayess_args") => {
       pushRenderedCallArguments(args, activeContext, lines, {
@@ -56,11 +57,11 @@ export function renderCallLikeExpression(calleeNode, argumentNodes, context, opt
     });
   }
   if (!hasSpreadArgument(argumentNodes)) {
-    return `jayess::call(${[renderExpression(calleeNode, context), ...argumentNodes.map((arg) => renderExpression(arg, context))].join(", ")})`;
+    return `jayess::call(${[renderCalleeExpression(calleeNode, context), ...argumentNodes.map((arg) => renderExpression(arg, context))].join(", ")})`;
   }
 
   const lines = ["([&]() -> jayess::value {"];
-  lines.push(`  auto jayess_callee = ${renderExpression(calleeNode, context)};`);
+  lines.push(`  auto jayess_callee = ${renderCalleeExpression(calleeNode, context)};`);
   lines.push("  std::vector<jayess::value> jayess_args;");
   pushRenderedCallArguments(argumentNodes, context, lines, options);
   lines.push("  return jayess::call_with_args(jayess_callee, std::move(jayess_args));");

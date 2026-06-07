@@ -1,7 +1,61 @@
 import { renderAsyncCallableClosure } from "./emit-async.js";
 import { renderSyncCallableClosure } from "./emit-callable-closure.js";
 import { renderGeneratorCallableExpression } from "./emit-generator.js";
+import { hasLocalBinding } from "./emit-local-bindings.js";
 import { isPrivateFieldKey, renderPrivateFieldInitialization, renderPrivateStaticFieldInitialization } from "./emit-private.js";
+
+function sortedUnique(values) {
+  return [...new Set(values.filter(Boolean))].sort();
+}
+
+function collectExpressionIdentifierNames(node, names) {
+  if (node == null) {
+    return;
+  }
+  if (node.type === "Identifier") {
+    names.add(node.name);
+    return;
+  }
+  if (node.type === "ThisExpression") {
+    return;
+  }
+  if (node.type === "FunctionExpression" || node.type === "ArrowFunctionExpression") {
+    for (const capture of node.captures ?? []) {
+      names.add(capture);
+    }
+    return;
+  }
+  for (const value of Object.values(node)) {
+    if (Array.isArray(value)) {
+      for (const child of value) {
+        if (child?.type != null) {
+          collectExpressionIdentifierNames(child, names);
+        }
+      }
+      continue;
+    }
+    if (value?.type != null) {
+      collectExpressionIdentifierNames(value, names);
+    }
+  }
+}
+
+function collectClassFieldCaptureNames(node, context) {
+  const names = new Set();
+  for (const member of node.methods) {
+    if (member.type !== "ClassFieldDefinition") {
+      continue;
+    }
+    collectExpressionIdentifierNames(member.init, names);
+    if (member.computed) {
+      collectExpressionIdentifierNames(member.key, names);
+    }
+  }
+  if (node.id?.name != null) {
+    names.delete(node.id.name);
+  }
+  return sortedUnique([...names].filter((name) => hasLocalBinding(context, name)));
+}
 
 function emitMethodParameterInitialization(param, index, context, lines, emitParameterInitialization, indent = "  ", offset = 0) {
   emitParameterInitialization(param, index + offset, context, lines, indent);
@@ -242,10 +296,11 @@ function renderConstructorClosure(
   emitStatement,
   renderExpression,
   hasSpreadArgument,
-  pushRenderedCallArguments
+  pushRenderedCallArguments,
+  outerCaptureNames
 ) {
-  const constructorCaptures = [context.classSelfAlias, ...instanceFieldList.map((field) => field.computedKeyAlias).filter(Boolean)];
-  const lines = [`jayess::make_callable([${constructorCaptures.join(", ")}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  const constructorCaptures = sortedUnique([context.classSelfAlias, ...outerCaptureNames, ...instanceFieldList.map((field) => field.computedKeyAlias).filter(Boolean)]);
+  const lines = [`jayess::make_callable([${constructorCaptures.join(", ")}](const std::vector<jayess::value>& jayess_args) mutable -> jayess::value {`];
   lines.push("  jayess::scope_cleanup_frame jayess_scope;");
   lines.push("  jayess::value this_value = jayess::argument_at(jayess_args, 0);");
 
@@ -321,11 +376,13 @@ export function renderClassValue(
   const constructorMethod = node.methods.find((method) => method.type === "MethodDefinition" && !method.static && method.kind === "constructor") ?? null;
   const instanceFieldList = [];
   const privateMethodList = [];
+  const outerCaptureNames = collectClassFieldCaptureNames(node, context);
   const classContext = node.id != null
     ? { ...context, classSelfName: node.id.name, classSelfAlias: "class_value" }
     : { ...context, classSelfAlias: "class_value" };
+  const classCaptureList = outerCaptureNames.join(", ");
   const lines = [
-    "([]() -> jayess::value {",
+    `([${classCaptureList}]() -> jayess::value {`,
     "  auto class_wrapper = std::make_shared<jayess::callable_value>();",
     "  jayess::value class_value = class_wrapper;"
   ];
@@ -366,7 +423,7 @@ export function renderClassValue(
     }
 
     if (member.type === "ClassFieldDefinition" && member.static) {
-      const init = member.init == null ? "0.0" : renderExpression(member.init, { ...classContext, thisAlias: "class_value" });
+      const init = member.init == null ? "0.0" : renderExpression(member.init, { ...classContext, thisAlias: "class_value", staticMethod: true });
       if (isPrivateFieldKey(member.key)) {
         lines.push(`  ${renderPrivateStaticFieldInitialization(member, init, classContext)};`);
         continue;
@@ -399,12 +456,12 @@ export function renderClassValue(
 
     if (member.type === "StaticInitializationBlock") {
       lines.push("  {");
-      emitStatement(member.body, { ...classContext, thisAlias: "class_value", topLevel: false }, lines, 2);
+      emitStatement(member.body, { ...classContext, thisAlias: "class_value", staticMethod: true, topLevel: false }, lines, 2);
       lines.push("  }");
     }
   }
 
-  lines.push(`  jayess::set_class_constructor(class_value, ${renderConstructorClosure(node, classContext, constructorMethod, instanceFieldList, privateMethodList, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushRenderedCallArguments)});`);
+  lines.push(`  jayess::set_class_constructor(class_value, ${renderConstructorClosure(node, classContext, constructorMethod, instanceFieldList, privateMethodList, emitParameterInitialization, emitStatement, renderExpression, hasSpreadArgument, pushRenderedCallArguments, outerCaptureNames)});`);
   lines.push("  class_wrapper->fn = [class_value](const std::vector<jayess::value>& jayess_args) -> jayess::value {");
   lines.push("    jayess::scope_cleanup_frame jayess_scope;");
   lines.push("    jayess::value this_value = jayess::make_object({});");

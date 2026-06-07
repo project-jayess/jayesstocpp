@@ -204,7 +204,7 @@ export function walkClassFieldDefinition(node, context) {
   } = context;
 
   if (node.computed) {
-    walk(node.key, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, null);
+    walk(node.key, activeScope, loopDepth, switchDepth, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, node);
   }
   const fieldScope = createScope(activeScope, "class-field");
   if (!node.static) {
@@ -214,7 +214,7 @@ export function walkClassFieldDefinition(node, context) {
       node: node.key
     });
   }
-  walk(node.init, fieldScope, 0, 0, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, null);
+  walk(node.init, fieldScope, 0, 0, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, node);
 }
 
 export function walkMethodDefinition(node, context) {
@@ -273,6 +273,6 @@ export function walkStaticInitializationBlock(node, context) {
   const staticBlockScope = createScope(activeScope, "class-static-block");
   bindBlockDeclarations(node.body.body, staticBlockScope, diagnostics, sourceText);
   for (const statement of node.body.body) {
-    walk(statement, staticBlockScope, 0, 0, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, null);
+    walk(statement, staticBlockScope, 0, 0, functionScope, functionNode, inAsyncFunction, inGeneratorFunction, currentClass, node);
   }
 }

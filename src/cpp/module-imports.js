@@ -16,10 +16,20 @@ export function collectImportBindings(imports) {
   return importBindings;
 }
 
-export function collectHeaderIncludes(imports, includeOverrides = new Map()) {
+function importHasRetainedBinding(entry, retainedImportLocalNames) {
+  if (retainedImportLocalNames == null || entry.specifiers.length === 0) {
+    return true;
+  }
+  return entry.specifiers.some((specifier) => retainedImportLocalNames.has(specifier.local));
+}
+
+export function collectHeaderIncludes(imports, includeOverrides = new Map(), retainedImportLocalNames = null) {
   const headers = new Set();
 
   for (const entry of imports) {
+    if (!importHasRetainedBinding(entry, retainedImportLocalNames)) {
+      continue;
+    }
     const classification = classifyImport(entry.source);
     if (classification.kind === "cpp-header") {
       headers.add(`#include <${classification.header}>`);

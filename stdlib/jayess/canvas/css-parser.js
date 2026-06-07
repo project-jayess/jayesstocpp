@@ -1,7 +1,7 @@
 import { parse as parseColor } from "jayess:color";
-import { parseFloat } from "jayess:number";
-import { slice, split, startsWith, trim } from "jayess:string";
+import { indexOf, slice, split, startsWith, trim } from "jayess:string";
 import { parseBoxValue } from "./box-values.js";
+import { parseCssSize } from "./css-values.js";
 
 const supportedProperties = [
   "display",
@@ -15,13 +15,16 @@ const supportedProperties = [
   "padding",
   "background-color",
   "color",
+  "font-family",
   "font-size",
+  "line-height",
   "border-width",
   "border-color",
   "border-radius",
   "text-align",
   "gap",
-  "overflow"
+  "overflow",
+  "box-sizing"
 ];
 
 function fail(message) {
@@ -37,21 +40,6 @@ function isSupportedProperty(name) {
   return false;
 }
 
-function parseSize(value) {
-  var text = trim(value);
-  if (text === "auto") {
-    return null;
-  }
-  if (text.length > 2 && slice(text, text.length - 2, text.length) === "px") {
-    text = slice(text, 0, text.length - 2);
-  }
-  var parsed = parseFloat(text);
-  if (parsed === null) {
-    fail("jayess:canvas css expected a numeric size");
-  }
-  return parsed;
-}
-
 function normalizeValue(property, value) {
   var normalized = trim(value);
   if (property === "background-color" || property === "color" || property === "border-color") {
@@ -65,11 +53,15 @@ function normalizeValue(property, value) {
     || property === "min-height"
     || property === "max-height"
     || property === "font-size"
+    || property === "line-height"
     || property === "border-width"
     || property === "border-radius"
     || property === "gap"
   ) {
-    return parseSize(normalized);
+    return parseCssSize(normalized);
+  }
+  if (property === "font-family") {
+    return normalized;
   }
   if (property === "margin" || property === "padding") {
     return parseBoxValue(normalized);
@@ -77,6 +69,11 @@ function normalizeValue(property, value) {
   if (property === "overflow") {
     if (normalized !== "visible" && normalized !== "hidden") {
       fail("jayess:canvas css overflow must be visible or hidden");
+    }
+  }
+  if (property === "box-sizing") {
+    if (normalized !== "border-box" && normalized !== "content-box") {
+      fail("jayess:canvas css box-sizing must be border-box or content-box");
     }
   }
   return normalized;
@@ -135,6 +132,19 @@ function parseSimpleSelector(selector) {
 }
 
 function parseSelector(selector) {
+  var childParts = split(selector, ">");
+  if (childParts.length > 1) {
+    var childChain = [];
+    for (var childIndex = 0; childIndex < childParts.length; childIndex = childIndex + 1) {
+      childChain.push(parseSimpleSelector(childParts[childIndex]));
+    }
+    return {
+      kind: "child",
+      name: selector,
+      chain: childChain
+    };
+  }
+
   var parts = split(selector, " ");
   var chain = [];
   for (var index = 0; index < parts.length; index = index + 1) {
@@ -160,9 +170,28 @@ function parseSelector(selector) {
   };
 }
 
+function stripComments(css) {
+  var output = "";
+  var cursor = 0;
+  while (cursor < css.length) {
+    var start = indexOf(slice(css, cursor, css.length), "/*");
+    if (start < 0) {
+      return output + slice(css, cursor, css.length);
+    }
+    start = cursor + start;
+    output = output + slice(css, cursor, start);
+    var end = indexOf(slice(css, start + 2, css.length), "*/");
+    if (end < 0) {
+      fail("jayess:canvas css comment is not closed");
+    }
+    cursor = start + 2 + end + 2;
+  }
+  return output;
+}
+
 export function parseCss(css, options) {
   var rules = [];
-  var chunks = split(css, "}");
+  var chunks = split(stripComments(css), "}");
   for (var index = 0; index < chunks.length; index = index + 1) {
     var chunk = trim(chunks[index]);
     if (chunk.length === 0) {
@@ -176,14 +205,22 @@ export function parseCss(css, options) {
     if (selector.length === 0) {
       fail("jayess:canvas css selector is empty");
     }
-    var parsedSelector = parseSelector(selector);
-    rules.push({
-      selector: selector,
-      kind: parsedSelector.kind,
-      name: parsedSelector.name,
-      chain: parsedSelector.chain,
-      style: parseInlineStyle(parts[1])
-    });
+    var selectors = split(selector, ",");
+    var style = parseInlineStyle(parts[1]);
+    for (var selectorIndex = 0; selectorIndex < selectors.length; selectorIndex = selectorIndex + 1) {
+      var selectorText = trim(selectors[selectorIndex]);
+      if (selectorText.length === 0) {
+        fail("jayess:canvas css selector is empty");
+      }
+      var parsedSelector = parseSelector(selectorText);
+      rules.push({
+        selector: selectorText,
+        kind: parsedSelector.kind,
+        name: parsedSelector.name,
+        chain: parsedSelector.chain,
+        style: style
+      });
+    }
   }
   return { rules: rules };
 }

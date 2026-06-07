@@ -201,7 +201,7 @@ Exports: `create`, `on`, `once`, `off`, `emit`, `listenerCount`.
 
 ### `jayess:font`
 
-Exports: `measureText`, `lineHeight`, `charWidth`, `drawText`, `drawTextAligned`. See [jayess-font-module.md](./jayess-font-module.md).
+Exports: `defaultFont`, `createFont`, `registerFont`, `getFont`, `setDefaultFont`, `loadFont`, `fontMetrics`, `measureGlyph`, `measureText`, `lineHeight`, `charWidth`, `drawText`, `drawTextAligned`. The current module supports deterministic bitmap JSON fonts plus file-backed TTF, TrueType-style OTF, WOFF, and WOFF2 handles for metrics and registry selection. See [jayess-font-module.md](./jayess-font-module.md).
 
 ### `jayess:form`
 

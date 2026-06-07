@@ -39,7 +39,7 @@ export function renderAsyncCallableClosure(
   renderExpression,
   options = {}
 ) {
-  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) -> jayess::value {`];
+  const lines = [`jayess::make_callable([${captureList}](const std::vector<jayess::value>& jayess_args) mutable -> jayess::value {`];
   emitAsyncCallableBody(node, context, lines, emitParameterInitialization, emitStatement, renderExpression, options);
   lines.push("})");
   return lines.join("\n");

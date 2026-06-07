@@ -463,7 +463,7 @@ test("transpileFile writes runtime regex helpers into the generated runtime", (t
   assert.match(cppSource, /constexpr const char\* kJayessRegexFlagsKey = "__jayess_regex_flags";/);
   assert.match(cppSource, /regex_flags parse_regex_flags\(const value& input\)/);
   assert.match(cppSource, /std::regex_constants::icase/);
-  assert.match(cppSource, /std::regex_constants::multiline/);
+  assert.match(cppSource, /std::string apply_multiline_pattern_transform\(const std::string& pattern\)/);
   assert.match(cppSource, /std::string apply_dot_all_pattern_transform\(const std::string& pattern\)/);
   assert.match(cppSource, /std::regex require_compiled_regex\(const value& input\)/);
   assert.match(cppSource, /value regex_create\(const value& pattern\)/);

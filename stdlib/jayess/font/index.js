@@ -1,21 +1,26 @@
 import { fillRect } from "jayess:canvas";
-import { defaultBitmapFont, glyphRows } from "./glyphs.js";
+import { parse as parseJson } from "jayess:json";
+import { readTextSync } from "jayess:fs";
+import { slice as sliceString } from "jayess:string";
+import { jayessFontKind, jayessFontLoad, jayessFontSystemDefault } from "./font-primitives.hpp";
+import {
+  bitmapFontByName,
+  createBitmapFont,
+  defaultBitmapFont,
+  glyphExistsForFont,
+  glyphRowsForFont,
+  registerBitmapFont,
+  setDefaultBitmapFont
+} from "./glyphs.js";
 
 function activeFont(font) {
   if (font === null) {
     return defaultBitmapFont();
   }
-  if (font.charWidth === null || font.charHeight === null || font.spacing === null) {
-    throw "jayess:font expected a font with charWidth, charHeight, and spacing";
+  if (font.charWidth === null || font.charHeight === null || font.advance === null || font.lineHeight === null) {
+    throw "jayess:font expected a font with charWidth, charHeight, advance, and lineHeight";
   }
   return font;
-}
-
-function fontLineSpacing(font) {
-  if (font.lineSpacing === null) {
-    return 1;
-  }
-  return font.lineSpacing;
 }
 
 function requireGlyph(char) {
@@ -25,9 +30,80 @@ function requireGlyph(char) {
   return char;
 }
 
+export function defaultFont() {
+  return defaultBitmapFont();
+}
+
+export function createFont(name, glyphs, metrics) {
+  return createBitmapFont(name, glyphs, metrics);
+}
+
+export function registerFont(font) {
+  return registerBitmapFont(font);
+}
+
+export function getFont(name) {
+  return bitmapFontByName(name);
+}
+
+export function setDefaultFont(name) {
+  return setDefaultBitmapFont(name);
+}
+
+export function loadFont(name, path, options) {
+  var kind = jayessFontKind(path);
+  if (kind !== "bitmap-json") {
+    return registerFont(jayessFontLoad(name, path, options));
+  }
+
+  var parsed = parseJson(readTextSync(path));
+  var fontName = name === null ? parsed.name : name;
+  var font = createBitmapFont(fontName, parsed.glyphs, {
+    charWidth: parsed.charWidth,
+    charHeight: parsed.charHeight,
+    advance: parsed.advance,
+    baseline: parsed.baseline,
+    lineHeight: parsed.lineHeight
+  });
+  return registerFont(font);
+}
+
+function bitmapFallbackFromSystemHandle(name, handle) {
+  var fallback = defaultBitmapFont();
+  fallback.name = name === null ? "system-default" : name;
+  fallback.family = "jayess-default-5x7";
+  fallback.kind = "bitmap-font";
+  fallback.sourcePath = "";
+  fallback.sourceFormat = "bitmap";
+  fallback.systemFont = true;
+  fallback.platform = handle.platform;
+  fallback.fallbackUsed = true;
+  fallback.diagnostic = handle.diagnostic;
+  fallback.ascent = handle.ascent;
+  fallback.descent = handle.descent;
+  fallback.fallbackGlyph = "?";
+  return fallback;
+}
+
+export function systemDefaultFont(options) {
+  var handle = jayessFontSystemDefault("system-default", options);
+  if (handle.fallbackUsed === true) {
+    return bitmapFallbackFromSystemHandle("system-default", handle);
+  }
+  return handle;
+}
+
+export function registerSystemDefaultFont(name, options) {
+  var fontName = name === null ? "system-default" : name;
+  var handle = jayessFontSystemDefault(fontName, options);
+  if (handle.fallbackUsed === true) {
+    return registerFont(bitmapFallbackFromSystemHandle(fontName, handle));
+  }
+  return registerFont(handle);
+}
+
 export function lineHeight(font) {
-  var used = activeFont(font);
-  return used.charHeight + fontLineSpacing(used);
+  return activeFont(font).lineHeight;
 }
 
 export function charWidth(font, char) {
@@ -35,7 +111,41 @@ export function charWidth(font, char) {
   if (char === "\n") {
     return 0;
   }
-  return activeFont(font).charWidth;
+  return activeFont(font).advance;
+}
+
+export function fontMetrics(font) {
+  var used = activeFont(font);
+  return {
+    charWidth: used.charWidth,
+    charHeight: used.charHeight,
+    advance: used.advance,
+    baseline: used.baseline,
+    lineHeight: used.lineHeight,
+    ascent: used.ascent === null ? used.baseline : used.ascent,
+    descent: used.descent === null ? used.lineHeight - used.baseline : used.descent,
+    fallbackGlyph: used.fallbackGlyph === null ? "?" : used.fallbackGlyph
+  };
+}
+
+export function measureGlyph(font, char) {
+  requireGlyph(char);
+  var metrics = fontMetrics(font);
+  if (char === "\n") {
+    return {
+      width: 0,
+      height: metrics.lineHeight,
+      advance: 0,
+      missing: false
+    };
+  }
+  var used = activeFont(font);
+  return {
+    width: metrics.charWidth,
+    height: metrics.charHeight,
+    advance: metrics.advance,
+    missing: !glyphExistsForFont(used, char)
+  };
 }
 
 export function measureText(font, text) {
@@ -57,7 +167,7 @@ export function measureText(font, text) {
       lines = lines + 1;
     } else {
       if (currentWidth > 0) {
-        currentWidth = currentWidth + used.spacing;
+        currentWidth = currentWidth + (used.advance - used.charWidth);
       }
       currentWidth = currentWidth + charWidth(used, char);
     }
@@ -69,12 +179,13 @@ export function measureText(font, text) {
 
   return {
     width: maxWidth,
-    height: used.charHeight * lines + fontLineSpacing(used) * (lines - 1)
+    height: used.lineHeight * lines
   };
 }
 
 function drawGlyph(canvas, char, x, y, color) {
-  var rows = glyphRows(requireGlyph(char));
+  var used = activeFont(null);
+  var rows = glyphRowsForFont(used, requireGlyph(char));
   for (var row = 0; row < rows.length; row = row + 1) {
     var pixels = rows[row];
     for (var column = 0; column < pixels.length; column = column + 1) {
@@ -96,9 +207,17 @@ export function drawText(canvas, font, text, x, y, color) {
       cursorY = cursorY + lineHeight(used);
     } else {
       if (char !== " ") {
-        drawGlyph(canvas, char, cursorX, cursorY, color);
+        var rows = glyphRowsForFont(used, char);
+        for (var row = 0; row < rows.length; row = row + 1) {
+          var pixels = rows[row];
+          for (var column = 0; column < pixels.length; column = column + 1) {
+            if (pixels[column] === "1") {
+              fillRect(canvas, cursorX + column, cursorY + row, 1, 1, color);
+            }
+          }
+        }
       }
-      cursorX = cursorX + used.charWidth + used.spacing;
+      cursorX = cursorX + used.advance;
     }
   }
   return canvas;
@@ -145,7 +264,7 @@ export function drawTextAligned(canvas, font, text, bounds, color, options) {
 
   for (var index = 0; index <= text.length; index = index + 1) {
     if (index === text.length || text[index] === "\n") {
-      var line = text.slice(start, index);
+      var line = sliceString(text, start, index);
       var lineSize = measureText(used, line);
       var cursorX = bounds.x + horizontalOffset(bounds, lineSize, align);
       drawText(canvas, used, line, cursorX, cursorY, color);
