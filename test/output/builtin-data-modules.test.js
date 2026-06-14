@@ -226,6 +226,7 @@ test("transpileFile resolves built-in Jayess array modules into generated output
   const primitiveSource = fs.readFileSync(path.join(targetDir, "native", "array-primitives.hpp"), "utf8");
   assert.match(primitiveSource, /jayessArraySlice/);
   assert.match(primitiveSource, /jayessArrayConcat/);
+  assert.match(primitiveSource, /jayessArrayIsArray/);
   assert.match(primitiveSource, /jayessArrayIndexOf/);
   assert.match(primitiveSource, /jayessArrayFind/);
   assert.match(primitiveSource, /jayessArrayFindIndex/);

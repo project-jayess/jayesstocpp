@@ -71,7 +71,7 @@ Properties:
 - `overflow`
 - `box-sizing`
 
-Lengths accept unitless numeric pixels, explicit `px`, `%`, and `auto` where the property supports automatic sizing. Percentage widths resolve against the containing content width. Percentage heights resolve against the containing content height only when the parent has a definite height, including the root child of `layoutHtml(document, bounds)`. Unsupported units such as `em`, `rem`, `vh`, `vw`, and `calc(...)` produce focused diagnostics instead of being guessed.
+Lengths accept unitless numeric pixels, explicit `px`, `%`, `em`, `rem`, `vh`, `vw`, simple `calc(...)`, and `auto` where the property supports automatic sizing. Percentage widths resolve against the containing content width. Percentage heights resolve against the containing content height only when the parent has a definite height, including the root child of `layoutHtml(document, bounds)`. `em` resolves against the current element font size for box and layout properties and against the inherited font size when resolving `font-size`; `rem` resolves against the renderer root font size. `vw` and `vh` resolve against the current `layoutHtml(document, bounds)` viewport. The first `calc(...)` slice supports whitespace-separated `+`, `-`, `*`, and `/` terms evaluated left-to-right, such as `calc(100% - 2rem)`, `calc(1rem * 1.5)`, and `calc(100% / 2)`.
 
 Color values use `jayess:color` parsing. `font-family` selects a registered `jayess:font` bitmap font or file-backed vector-font handle and falls back to the active default font when the family is unknown. `font-size` maps into the canvas glyph size, while `line-height` controls the vertical step between wrapped text lines. File-backed fonts currently provide deterministic metrics and registry selection; glyph pixels still use the Jayess-owned fallback glyph path until outline rasterization lands. `margin` and `padding` accept one to four CSS-like numeric or percentage values and expose resolved per-side layout metadata (`marginTop`, `marginRight`, `marginBottom`, `marginLeft`, `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft`). A uniform resolved shorthand also preserves the compact `margin` or `padding` metadata value for callers that only need the old scalar shape.
 
@@ -80,6 +80,20 @@ Color values use `jayess:color` parsing. `font-family` selects a registered `jay
 `overflow` currently accepts `visible` and `hidden`. `hidden` clips canvas painting for that render-tree box through the normal canvas clip stack; it does not add browser scrolling or CSS overflow layout behavior.
 
 Ordinary `/* comment */` CSS comments are stripped before rule parsing. Unterminated comments produce a focused diagnostic.
+
+The first media-query slice supports simple viewport breakpoints:
+
+```css
+@media (max-width: 620) {
+  p { font-size: 14; line-height: 24; width: 88%; }
+}
+
+@media (min-width: 720px) {
+  p { font-size: 20px; line-height: 32px; }
+}
+```
+
+Supported media features are `min-width`, `max-width`, `min-height`, and `max-height` with the same length units as ordinary CSS sizes. Media rules are parsed once with the stylesheet and evaluated whenever `layoutHtml(document, bounds)` runs, so resize handlers can relayout the same document against new viewport bounds. This is a focused viewport-condition subset, not a full browser media-query implementation.
 
 HTML attributes support quoted values, common unquoted simple values such as `id=root`, and boolean attributes such as `disabled`. Self-closing syntax is supported for void elements such as `<input />` and `<img />`, and the parser also treats those void tags as self-closing when written without a slash.
 
@@ -118,7 +132,7 @@ Canvas-rendered `<input>` elements use their `value` attribute as editable text.
 - CSS animations
 - broad flexbox/grid compatibility
 - full CSS cascade, specificity, inheritance, or layout compatibility
-- compound selectors, pseudo selectors, media queries, CSS variables, and selector specificity scoring
+- compound selectors, pseudo selectors, CSS variables, and selector specificity scoring
 - DOM mutation APIs
 - network loading
 - GPU dependency

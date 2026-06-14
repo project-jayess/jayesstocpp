@@ -42,6 +42,11 @@ inline jayess::value jayessArrayConcat(const std::vector<jayess::value>& jayessA
   return jayess::array_concat(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
 }
 
+inline jayess::value jayessArrayIsArray(const std::vector<jayess::value>& jayessArgs) {
+  jayessArrayRequireExactArgs(jayessArgs, 1, "Jayess array isArray expects exactly one argument");
+  return std::holds_alternative<jayess::array_ptr>(jayess::argument_at(jayessArgs, 0));
+}
+
 inline jayess::value jayessArrayIndexOf(const std::vector<jayess::value>& jayessArgs) {
   jayessArrayRequireExactArgs(jayessArgs, 2, "Jayess array indexOf expects exactly two arguments");
   return jayess::array_index_of(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));

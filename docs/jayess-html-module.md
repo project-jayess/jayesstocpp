@@ -1,6 +1,6 @@
 # Jayess `jayess:html` Module
 
-`jayess:html` provides focused HTML string helpers for server, webview, and generated UI output. It is a Jayess-written module and does not provide a DOM.
+`jayess:html` provides focused HTML string helpers for server, generated UI output, and markup-producing libraries.
 
 ## Surface
 
@@ -31,4 +31,4 @@ export function render(title) {
 
 ## Boundaries
 
-This module is intentionally a compact text helper layer. `sanitizeSubset` is a deterministic allow-list pass for Jayess-generated fragments and markdown output; it is not a full browser-grade HTML parser or sanitizer. The module does not provide a DOM, CSS selectors, or browser APIs.
+This module is intentionally a compact text helper layer. `sanitizeSubset` is a deterministic allow-list pass for Jayess-generated fragments and markdown output; it is not a full browser-grade HTML parser or sanitizer. Browser-window-style HTML rendering belongs to `jayess:gui`, which composes the HTML/CSS renderer from `jayess:canvas` with native presentation from `jayess:window`.

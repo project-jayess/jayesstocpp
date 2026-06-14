@@ -99,6 +99,17 @@ int main() {
   require(std::get<double>(compatibilityItems[11]) == 255.0, "html child selector paint");
   require(std::get<std::string>(compatibilityItems[12]) == "child", "html child selector hit target");
 
+  auto mediaResult = ${namespace}::inspectMediaQueryLayout(std::vector<jayess::value>{});
+  const auto& mediaItems = std::get<jayess::array_ptr>(mediaResult)->items;
+  require(std::get<double>(mediaItems[0]) == 3.0, "html media rule count");
+  require(std::get<std::string>(mediaItems[1]) == "min-width", "html media min width feature");
+  require(std::get<double>(mediaItems[2]) == 120.0, "html media wide width");
+  require(std::get<double>(mediaItems[3]) == 20.0, "html media wide font size");
+  require(std::get<double>(mediaItems[4]) == 32.0, "html media wide line height");
+  require(std::get<double>(mediaItems[5]) == 40.0, "html media narrow width");
+  require(std::get<double>(mediaItems[6]) == 12.0, "html media narrow font size");
+  require(std::get<double>(mediaItems[7]) == 16.0, "html media narrow line height");
+
   auto maturityResult = ${namespace}::inspectHtmlMaturity(std::vector<jayess::value>{});
   const auto& maturityItems = std::get<jayess::array_ptr>(maturityResult)->items;
   require(std::get<double>(maturityItems[0]) == 1.0, "html padding shorthand top");

@@ -60,3 +60,20 @@ test("transpileFile accepts modules that use trailing commas", (t) => {
 
   assert.ok(result.files.some((file) => file.endsWith("trailing_commas_main_js.cpp")));
 });
+
+test("transpileFile embeds canvas HTML and CSS assets into generated C++", (t) => {
+  const targetDir = createManagedTempDir(t, "asset-embed-output");
+  const fixture = path.resolve("test/fixtures/modules/asset-embed-main.js");
+  const result = transpileFile(fixture, targetDir);
+
+  const sourcePath = result.files.find((file) => file.endsWith("asset_embed_main_js.cpp"));
+  assert.ok(sourcePath);
+  const source = fs.readFileSync(sourcePath, "utf8");
+  assert.match(source, /Embedded HTML asset/);
+  assert.match(source, /asset-probe/);
+  assert.match(source, /calc\(100% \/ 2\)/);
+  assert.doesNotMatch(source, /packHtml/);
+  assert.doesNotMatch(source, /packCss/);
+  assert.ok(!fs.existsSync(path.join(targetDir, "asset-embed.html")));
+  assert.ok(!fs.existsSync(path.join(targetDir, "asset-embed.css")));
+});

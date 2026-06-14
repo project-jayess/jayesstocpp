@@ -6,6 +6,7 @@ import {
   glyphRowsForFont
 } from "../font/glyphs.js";
 import { slice as sliceString } from "jayess:string";
+import { readTextSync } from "jayess:fs";
 import {
   copy as copyImage,
   create as createImage,
@@ -40,12 +41,42 @@ import {
 export { parseHtml } from "./html-parser.js";
 export { parseCss } from "./css-parser.js";
 export { createHtmlDocument } from "./html-style.js";
+import { styleHtmlDocument } from "./html-style.js";
 export { hitTestHtml, hitTestHtmlNode } from "./html-hit-test.js";
 import { layoutHtml as layoutHtmlDocument } from "./html-layout.js";
 import { paintHtmlDocument } from "./html-paint.js";
 
 function fail(message) {
   throw message;
+}
+
+function endsWithText(text, suffix) {
+  if (text.length < suffix.length) {
+    return false;
+  }
+  return sliceString(text, text.length - suffix.length, text.length) === suffix;
+}
+
+export function packHtml(filename) {
+  fail("jayess:canvas packHtml() must be embedded by transpileFile()");
+}
+
+export function packCss(filename) {
+  fail("jayess:canvas packCss() must be embedded by transpileFile()");
+}
+
+export function loadHtml(filename) {
+  if (!endsWithText(filename, ".html")) {
+    fail("jayess:canvas loadHtml() expects a .html filename");
+  }
+  return readTextSync(filename);
+}
+
+export function loadCss(filename) {
+  if (!endsWithText(filename, ".css")) {
+    fail("jayess:canvas loadCss() expects a .css filename");
+  }
+  return readTextSync(filename);
 }
 
 function makeCanvas(image, title, clipStack, state, stateStack) {
@@ -295,7 +326,14 @@ function clippedRect(canvas, x, y, width, height, clip) {
   if (right <= left || bottom <= top) {
     return { x: left, y: top, width: 0, height: 0 };
   }
-  return { x: left, y: top, width: right - left, height: bottom - top };
+  var pixelLeft = round(left);
+  var pixelTop = round(top);
+  var pixelRight = round(right);
+  var pixelBottom = round(bottom);
+  if (pixelRight <= pixelLeft || pixelBottom <= pixelTop) {
+    return { x: pixelLeft, y: pixelTop, width: 0, height: 0 };
+  }
+  return { x: pixelLeft, y: pixelTop, width: pixelRight - pixelLeft, height: pixelBottom - pixelTop };
 }
 
 function fillImageRectByAlpha(image, x, y, width, height, color) {
@@ -932,6 +970,7 @@ export function saveImage(canvas, path) {
 }
 
 export function layoutHtml(document, bounds) {
+  styleHtmlDocument(document, bounds);
   return layoutHtmlDocument(document, bounds, function (textValue, options) {
     return measureText(null, textValue, options);
   });

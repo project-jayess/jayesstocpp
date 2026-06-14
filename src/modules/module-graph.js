@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { throwDiagnostics } from "../diagnostics.js";
+import { embedCompileTimeAssets } from "../assets/embed-assets.js";
 import { createModuleFileDiagnostic } from "../diagnostics/module-diagnostic.js";
 import { parse } from "../parser/parse.js";
 import { createSourceText } from "../source/source-text.js";
@@ -233,7 +234,7 @@ function resolveImportTarget(fromFilename, source) {
   return { resolved: null, failure: null };
 }
 
-export function buildModuleGraph(entryFilename) {
+export function buildModuleGraph(entryFilename, options = {}) {
   const visited = new Map();
   const root = path.resolve(entryFilename);
   const projectRoot = path.dirname(root);
@@ -252,6 +253,9 @@ export function buildModuleGraph(entryFilename) {
 
     const sourceText = createSourceText(fs.readFileSync(filename, "utf8"), filename);
     const ast = parse(sourceText);
+    if (options.embedAssets === true) {
+      embedCompileTimeAssets(ast, sourceText, projectRoot);
+    }
     const analysis = analyzeModule(ast, sourceText);
     const moduleRecord = { filename, source, sourceText, ast, analysis, dependencies: [] };
     visited.set(filename, moduleRecord);

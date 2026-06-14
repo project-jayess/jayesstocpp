@@ -1,4 +1,4 @@
-import { split, trim } from "jayess:string";
+import { trim } from "jayess:string";
 import { parseCssSize } from "./css-values.js";
 
 function fail(message) {
@@ -6,13 +6,37 @@ function fail(message) {
 }
 
 function splitBoxParts(value) {
-  var raw = split(trim(value), " ");
   var parts = [];
-  for (var index = 0; index < raw.length; index = index + 1) {
-    var part = trim(raw[index]);
-    if (part !== "") {
-      parts.push(part);
+  var text = trim(value);
+  var part = "";
+  var depth = 0;
+  for (var index = 0; index < text.length; index = index + 1) {
+    var char = text[index];
+    if (char === "(") {
+      depth = depth + 1;
     }
+    if (char === ")") {
+      depth = depth - 1;
+      if (depth < 0) {
+        fail("jayess:canvas css box shorthand has an unopened parenthesis");
+      }
+    }
+    if (char === " " && depth === 0) {
+      var trimmed = trim(part);
+      if (trimmed !== "") {
+        parts.push(trimmed);
+      }
+      part = "";
+    } else {
+      part = part + char;
+    }
+  }
+  if (depth !== 0) {
+    fail("jayess:canvas css box shorthand has an unclosed parenthesis");
+  }
+  var finalPart = trim(part);
+  if (finalPart !== "") {
+    parts.push(finalPart);
   }
   if (parts.length < 1 || parts.length > 4) {
     fail("jayess:canvas css box shorthand expects one to four sizes");

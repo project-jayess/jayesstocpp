@@ -302,7 +302,7 @@ Current system-module note:
 - `jayess:url` currently exports `parse`, `format`, `joinPath`, `getQuery`, and `setQuery`
 - `jayess:time` currently exports `millis`, `seconds`, `minutes`, `elapsed`, and `formatDuration`
 - `jayess:iter` currently exports `next`, `toArray`, `take`, `map`, `filter`, `forEach`, `reduce`, `some`, `every`, `find`, `chain`, and `range` for Jayess generator handles
-- `jayess:array` currently exports `slice`, `concat`, `indexOf`, `includes`, `find`, `findIndex`, `some`, `every`, `join`, `reverse`, `sort`, `map`, `filter`, and `reduce`
+- `jayess:array` currently exports `slice`, `concat`, `isArray`, `indexOf`, `includes`, `find`, `findIndex`, `some`, `every`, `join`, `reverse`, `sort`, `map`, `filter`, and `reduce`
 - `jayess:string` currently exports `trim`, `startsWith`, `endsWith`, `includes`, `indexOf`, `slice`, `split`, `replaceFirst`, `replaceAll`, `padStart`, `padEnd`, `repeat`, `toLower`, and `toUpper`
 - `jayess:object` currently exports `has`, `keys`, `values`, `entries`, `fromEntries`, and `assign`
 - `jayess:number` currently exports `isInteger`, `isFinite`, `parseInt`, and `parseFloat`
@@ -392,7 +392,7 @@ The generated project is meant to be compiled later by an external compiler such
   - `jayess:number` module exports `parseInt(text)` and `parseFloat(text)`
   - `jayess:date` module exports `now()`, `fromUnixMillis(value)`, `toUnixMillis(date)`, `toIsoString(date)`, UTC component helpers, `addMillis(date, amount)`, `diffMillis(left, right)`, `parseIso(text)`, and `isDate(value)`
   - `jayess:json` module exports `parse(text)`, `stringify(value)`, `stringifyPretty(value, indent?)`, `validate(text)`, and `isJsonText(text)`
-  - `jayess:array` module exports `slice`, `concat`, `indexOf`, `includes`, `find`, `findIndex`, `some`, `every`, `join`, `reverse`, `sort`, `map`, `filter`, and `reduce`
+  - `jayess:array` module exports `slice`, `concat`, `isArray`, `indexOf`, `includes`, `find`, `findIndex`, `some`, `every`, `join`, `reverse`, `sort`, `map`, `filter`, and `reduce`
   - `jayess:collections/map` module exports `create`, `get`, `set`, `has`, `deleteKey`, `clear`, `size`, `keys`, `values`, `entries`, `fromEntries`, `setAll`, `deleteAll`, and `isMap`
   - `jayess:collections/set` module exports `create`, `add`, `has`, `deleteValue`, `clear`, `size`, `values`, `entries`, `fromValues`, `union`, `intersection`, `difference`, and `isSet`
   - `jayess:regex` module exports `create(pattern, ...flags)`, `test(regex, text)`, `exec(regex, text)`, `split(regex, text)`, `matchAll(regex, text)`, `replaceFirst(regex, text, replacement)`, `replaceAll(regex, text, replacement)`, and `isRegex(value)`

@@ -95,6 +95,7 @@ using jayess_get_dc_fn = jayess_hdc (*)(jayess_hwnd);
 using jayess_release_dc_fn = int (*)(jayess_hwnd, jayess_hdc);
 using jayess_stretch_dibits_fn = int (*)(jayess_hdc, int, int, int, int, int, int, int, int, const void*, const jayess_bitmapinfo*, unsigned int, unsigned long);
 using jayess_get_client_rect_fn = int (*)(jayess_hwnd, jayess_rect*);
+using jayess_pat_blt_fn = int (*)(jayess_hdc, int, int, int, int, unsigned long);
 
 struct jayess_windows_window_api {
   jayess_hmodule user32 = nullptr;
@@ -114,6 +115,7 @@ struct jayess_windows_window_api {
   jayess_release_dc_fn release_dc = nullptr;
   jayess_stretch_dibits_fn stretch_dibits = nullptr;
   jayess_get_client_rect_fn get_client_rect = nullptr;
+  jayess_pat_blt_fn pat_blt = nullptr;
   jayess_hinstance module = nullptr;
   bool attempted = false;
   bool class_registered = false;
@@ -141,6 +143,7 @@ constexpr jayess_uint jayess_wm_mbuttonup = 0x0208U;
 constexpr jayess_dword jayess_bi_rgb = 0UL;
 constexpr unsigned int jayess_dib_rgb_colors = 0U;
 constexpr unsigned long jayess_srccopy = 0x00cc0020UL;
+constexpr unsigned long jayess_blackness = 0x00000042UL;
 
 const char* window_windows_class_name() {
   return "JayessWindowClass";
@@ -293,6 +296,7 @@ jayess_windows_window_api& window_windows_api() {
   api.release_dc = reinterpret_cast<jayess_release_dc_fn>(GetProcAddress(api.user32, "ReleaseDC"));
   api.get_client_rect = reinterpret_cast<jayess_get_client_rect_fn>(GetProcAddress(api.user32, "GetClientRect"));
   api.stretch_dibits = reinterpret_cast<jayess_stretch_dibits_fn>(GetProcAddress(api.gdi32, "StretchDIBits"));
+  api.pat_blt = reinterpret_cast<jayess_pat_blt_fn>(GetProcAddress(api.gdi32, "PatBlt"));
   if (api.get_module_handle != nullptr) {
     api.module = api.get_module_handle(nullptr);
   }
@@ -318,6 +322,7 @@ bool window_platform_available() {
     && api.release_dc != nullptr
     && api.get_client_rect != nullptr
     && api.stretch_dibits != nullptr
+    && api.pat_blt != nullptr
     && api.module != nullptr;
 }
 
@@ -422,11 +427,11 @@ void window_platform_present(const window_ptr& window, const window_canvas_pixel
   info.bmiHeader.biCompression = jayess_bi_rgb;
   info.bmiHeader.biSizeImage = static_cast<jayess_dword>(bgra.size());
   jayess_rect client{};
-  int targetWidth = canvas.width;
-  int targetHeight = canvas.height;
+  int clientWidth = canvas.width;
+  int clientHeight = canvas.height;
   if (api.get_client_rect(hwnd, &client) != 0) {
-    targetWidth = (std::max)(1, static_cast<int>(client.right - client.left));
-    targetHeight = (std::max)(1, static_cast<int>(client.bottom - client.top));
+    clientWidth = (std::max)(1, static_cast<int>(client.right - client.left));
+    clientHeight = (std::max)(1, static_cast<int>(client.bottom - client.top));
   }
   auto dc = api.get_dc(hwnd);
   if (dc == nullptr) {
@@ -436,8 +441,8 @@ void window_platform_present(const window_ptr& window, const window_canvas_pixel
     dc,
     0,
     0,
-    targetWidth,
-    targetHeight,
+    canvas.width,
+    canvas.height,
     0,
     0,
     canvas.width,
@@ -447,6 +452,13 @@ void window_platform_present(const window_ptr& window, const window_canvas_pixel
     jayess_dib_rgb_colors,
     jayess_srccopy
   );
+  if (clientWidth > canvas.width) {
+    api.pat_blt(dc, canvas.width, 0, clientWidth - canvas.width, clientHeight, jayess_blackness);
+  }
+  if (clientHeight > canvas.height) {
+    const int bottomWidth = (std::min)(clientWidth, canvas.width);
+    api.pat_blt(dc, 0, canvas.height, bottomWidth, clientHeight - canvas.height, jayess_blackness);
+  }
   api.release_dc(hwnd, dc);
 }
 

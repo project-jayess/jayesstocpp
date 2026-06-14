@@ -42,6 +42,12 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   assert.match(cppSource, /RegisterClassExA/);
   assert.match(cppSource, /CreateWindowExA/);
   assert.match(cppSource, /StretchDIBits/);
+  assert.match(cppSource, /PatBlt/);
+  assert.match(cppSource, /jayess_blackness/);
+  assert.doesNotMatch(cppSource, /api\.pat_blt\(dc, 0, 0, clientWidth, clientHeight, jayess_blackness\);/);
+  assert.match(cppSource, /clientWidth > canvas\.width/);
+  assert.match(cppSource, /clientHeight > canvas\.height/);
+  assert.match(cppSource, /canvas\.width,\s*canvas\.height,\s*0,\s*0,\s*canvas\.width,\s*canvas\.height/s);
   assert.match(cppSource, /PeekMessageA/);
   assert.match(cppSource, /macos-cocoa/);
   assert.match(cppSource, /NSApplication/);

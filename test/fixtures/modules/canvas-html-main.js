@@ -175,6 +175,54 @@ export function inspectCssCompatibility() {
   ];
 }
 
+export function inspectMediaQueryLayout() {
+  var document = createHtmlDocument(
+    "<div><p id=\"message\">Media</p></div>",
+    "p { width: 80; font-size: 14; line-height: 20; } @media (min-width: 720px) { p { width: 120; font-size: 20; line-height: 32; } } @media (max-width: 719px) { p { width: 40; font-size: 12; line-height: 16; } }",
+    null
+  );
+  layoutHtml(document, { x: 0, y: 0, width: 800, height: 60 });
+  var wide = document.tree.children[0].children[0];
+  var wideWidth = wide.layout.width;
+  var wideFont = wide.layout.fontSize;
+  var wideLineHeight = wide.layout.lineHeight;
+  layoutHtml(document, { x: 0, y: 0, width: 600, height: 60 });
+  var narrow = document.tree.children[0].children[0];
+  return [
+    document.stylesheet.rules.length,
+    document.stylesheet.rules[1].media.feature,
+    wideWidth,
+    wideFont,
+    wideLineHeight,
+    narrow.layout.width,
+    narrow.layout.fontSize,
+    narrow.layout.lineHeight
+  ];
+}
+
+export function inspectCssRelativeLengths() {
+  var document = createHtmlDocument(
+    "<div><p id=\"message\">Relative lengths wrap text</p></div>",
+    "div { font-size: 10; width: 50vw; height: 25vh; padding: 1rem; } p { font-size: 2em; line-height: calc(1em * 1.5); width: calc(100% / 2); margin: 1rem; padding: 1em; } @media (max-width: 30rem) { p { width: 60vw; } }",
+    null
+  );
+  layoutHtml(document, { x: 0, y: 0, width: 200, height: 120 });
+  var root = document.tree.children[0];
+  var message = root.children[0];
+  return [
+    root.layout.width,
+    root.layout.height,
+    root.layout.padding,
+    message.layout.fontSize,
+    message.layout.lineHeight,
+    message.layout.width,
+    message.layout.margin,
+    message.layout.padding,
+    document.stylesheet.rules[2].media.feature,
+    document.stylesheet.rules[2].media.size.kind
+  ];
+}
+
 export function inspectHtmlMaturity() {
   var document = createHtmlDocument(
     "<form id=\"login\"><p id=\"copy\"><span>Hello</span><span> Jayess</span></p><button id=\"send\" type=\"submit\">Send</button><button id=\"off\" disabled=\"true\">Off</button><input id=\"field\" disabled=\"true\" value=\"A\" /></form>",

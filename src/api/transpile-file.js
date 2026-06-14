@@ -39,7 +39,7 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
   const resolvedTargetDir = path.resolve(targetDirname);
   fs.mkdirSync(resolvedTargetDir, { recursive: true });
 
-  const graph = buildModuleGraph(entryFilename);
+  const graph = buildModuleGraph(entryFilename, { embedAssets: true });
   const reachableSymbols = analyzeReachableSymbols(graph);
   const emittedModules = createEmittedModuleSet(graph, reachableSymbols);
   const runtimeFeatures = options.runtimeFeatures ?? analyzeRuntimeFeatures(graph, { reachableSymbols, emittedModules });

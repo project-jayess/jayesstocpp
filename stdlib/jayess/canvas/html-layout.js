@@ -1,4 +1,4 @@
-import { hasExplicitSize, resolveBoxSide, resolveCssSize, uniformResolvedBoxValue } from "./css-layout-values.js";
+import { hasExplicitSize, resolveBoxSideWithContext, resolveCssSizeWithContext, uniformResolvedBoxValue } from "./css-layout-values.js";
 import { slice as sliceString, split } from "jayess:string";
 
 function styleValue(style, key, fallback) {
@@ -9,17 +9,26 @@ function styleValue(style, key, fallback) {
   return value;
 }
 
-function resolvedStyleSize(style, key, basis, fallback) {
-  return resolveCssSize(styleValue(style, key, null), basis, fallback);
+function resolvedStyleSize(style, key, basis, fallback, context) {
+  return resolveCssSizeWithContext(styleValue(style, key, null), basis, fallback, context);
 }
 
-function applySizeConstraints(style, width, height, widthBasis, heightBasis) {
+function lengthContext(fontSize, rootFontSize, viewport) {
+  return {
+    fontSize: fontSize,
+    rootFontSize: rootFontSize,
+    viewportWidth: viewport === null ? 0 : viewport.width,
+    viewportHeight: viewport === null ? 0 : viewport.height
+  };
+}
+
+function applySizeConstraints(style, width, height, widthBasis, heightBasis, context) {
   var constrainedWidth = width;
   var constrainedHeight = height;
-  var minWidth = resolvedStyleSize(style, "min-width", widthBasis, null);
-  var maxWidth = resolvedStyleSize(style, "max-width", widthBasis, null);
-  var minHeight = resolvedStyleSize(style, "min-height", heightBasis, null);
-  var maxHeight = resolvedStyleSize(style, "max-height", heightBasis, null);
+  var minWidth = resolvedStyleSize(style, "min-width", widthBasis, null, context);
+  var maxWidth = resolvedStyleSize(style, "max-width", widthBasis, null, context);
+  var minHeight = resolvedStyleSize(style, "min-height", heightBasis, null, context);
+  var maxHeight = resolvedStyleSize(style, "max-height", heightBasis, null, context);
   if (minWidth !== null && constrainedWidth < minWidth) {
     constrainedWidth = minWidth;
   }
@@ -117,28 +126,31 @@ function wrapText(text, availableWidth, charWidth) {
   return lines;
 }
 
-function layoutNode(node, x, y, width, heightBasis, measureText) {
+function layoutNode(node, x, y, width, heightBasis, measureText, viewport, parentFontSize, rootFontSize) {
   var style = node.style;
+  var inheritedContext = lengthContext(parentFontSize, rootFontSize, viewport);
+  var fontSize = resolvedStyleSize(style, "font-size", width, parentFontSize, inheritedContext);
+  var context = lengthContext(fontSize, rootFontSize, viewport);
   var marginValue = styleValue(style, "margin", null);
   var paddingValue = styleValue(style, "padding", null);
-  var marginTop = resolveBoxSide(marginValue, "top", width);
-  var marginRight = resolveBoxSide(marginValue, "right", width);
-  var marginBottom = resolveBoxSide(marginValue, "bottom", width);
-  var marginLeft = resolveBoxSide(marginValue, "left", width);
+  var marginTop = resolveBoxSideWithContext(marginValue, "top", width, context);
+  var marginRight = resolveBoxSideWithContext(marginValue, "right", width, context);
+  var marginBottom = resolveBoxSideWithContext(marginValue, "bottom", width, context);
+  var marginLeft = resolveBoxSideWithContext(marginValue, "left", width, context);
   var availableOuterWidth = width - marginLeft - marginRight;
   if (availableOuterWidth < 0) {
     availableOuterWidth = 0;
   }
-  var paddingTop = resolveBoxSide(paddingValue, "top", availableOuterWidth);
-  var paddingRight = resolveBoxSide(paddingValue, "right", availableOuterWidth);
-  var paddingBottom = resolveBoxSide(paddingValue, "bottom", availableOuterWidth);
-  var paddingLeft = resolveBoxSide(paddingValue, "left", availableOuterWidth);
+  var paddingTop = resolveBoxSideWithContext(paddingValue, "top", availableOuterWidth, context);
+  var paddingRight = resolveBoxSideWithContext(paddingValue, "right", availableOuterWidth, context);
+  var paddingBottom = resolveBoxSideWithContext(paddingValue, "bottom", availableOuterWidth, context);
+  var paddingLeft = resolveBoxSideWithContext(paddingValue, "left", availableOuterWidth, context);
   var margin = uniformResolvedBoxValue(marginTop, marginRight, marginBottom, marginLeft);
   var padding = uniformResolvedBoxValue(paddingTop, paddingRight, paddingBottom, paddingLeft);
-  var borderWidth = resolvedStyleSize(style, "border-width", availableOuterWidth, 0);
+  var borderWidth = resolvedStyleSize(style, "border-width", availableOuterWidth, 0, context);
   var contentX = x + marginLeft + borderWidth + paddingLeft;
   var contentY = y + marginTop + borderWidth + paddingTop;
-  var explicitOuterWidth = resolvedStyleSize(style, "width", availableOuterWidth, null);
+  var explicitOuterWidth = resolvedStyleSize(style, "width", availableOuterWidth, null, context);
   if (explicitOuterWidth !== null && style["box-sizing"] === "content-box") {
     explicitOuterWidth = explicitOuterWidth + paddingLeft + paddingRight + borderWidth * 2;
   }
@@ -150,8 +162,7 @@ function layoutNode(node, x, y, width, heightBasis, measureText) {
 
   if (node.type === "text" || node.children.length === 0 || node.tagName === "button" || node.tagName === "input" || hasOnlyInlineChildren(node)) {
     var textValue = childText(node);
-    var fontSize = resolvedStyleSize(style, "font-size", availableOuterWidth, 8);
-    var lineHeight = resolvedStyleSize(style, "line-height", availableOuterWidth, fontSize);
+    var lineHeight = resolvedStyleSize(style, "line-height", availableOuterWidth, fontSize, context);
     var charWidth = fontSize * 0.85;
     var explicitWidth = hasExplicitSize(style.width);
     var explicitHeight = hasExplicitSize(style.height);
@@ -166,7 +177,7 @@ function layoutNode(node, x, y, width, heightBasis, measureText) {
     };
     var lineHeightTotal = lines.length === 0 ? lineHeight : lines.length * lineHeight;
     var fallbackHeight = lineHeightTotal + paddingTop + paddingBottom + borderWidth * 2 + marginTop + marginBottom;
-    var nodeHeight = resolvedStyleSize(style, "height", heightBasis, fallbackHeight);
+    var nodeHeight = resolvedStyleSize(style, "height", heightBasis, fallbackHeight, context);
     if (hasExplicitSize(style.height) && style["box-sizing"] === "content-box") {
       nodeHeight = nodeHeight + paddingTop + paddingBottom + borderWidth * 2;
     }
@@ -178,7 +189,7 @@ function layoutNode(node, x, y, width, heightBasis, measureText) {
       fallbackWidth = width;
     }
     var nodeWidth = explicitWidth ? explicitOuterWidth : fallbackWidth;
-    var constrained = applySizeConstraints(style, nodeWidth, nodeHeight, availableOuterWidth, heightBasis);
+    var constrained = applySizeConstraints(style, nodeWidth, nodeHeight, availableOuterWidth, heightBasis, context);
     nodeWidth = constrained.width;
     nodeHeight = constrained.height;
     node.layout = {
@@ -211,7 +222,7 @@ function layoutNode(node, x, y, width, heightBasis, measureText) {
   }
 
   var usedHeight = paddingTop + borderWidth;
-  var childHeightBasis = resolvedStyleSize(style, "height", heightBasis, null);
+  var childHeightBasis = resolvedStyleSize(style, "height", heightBasis, null, context);
   if (childHeightBasis !== null) {
     if (style["box-sizing"] === "content-box") {
       childHeightBasis = childHeightBasis + paddingTop + paddingBottom + borderWidth * 2;
@@ -221,23 +232,23 @@ function layoutNode(node, x, y, width, heightBasis, measureText) {
       childHeightBasis = 0;
     }
   }
-  var gap = resolvedStyleSize(style, "gap", availableOuterWidth, 0);
+  var gap = resolvedStyleSize(style, "gap", availableOuterWidth, 0, context);
   for (var index = 0; index < node.children.length; index = index + 1) {
     var child = node.children[index];
     var childY = contentY + usedHeight;
-    var childHeight = layoutNode(child, contentX, childY, contentWidth, childHeightBasis, measureText);
+    var childHeight = layoutNode(child, contentX, childY, contentWidth, childHeightBasis, measureText, viewport, fontSize, rootFontSize);
     usedHeight = usedHeight + childHeight + gap;
   }
   if (node.children.length > 0) {
     usedHeight = usedHeight - gap;
   }
 
-  var totalHeight = resolvedStyleSize(style, "height", heightBasis, usedHeight + paddingBottom + borderWidth + marginTop + marginBottom);
+  var totalHeight = resolvedStyleSize(style, "height", heightBasis, usedHeight + paddingBottom + borderWidth + marginTop + marginBottom, context);
   if (hasExplicitSize(style.height) && style["box-sizing"] === "content-box") {
     totalHeight = totalHeight + paddingTop + paddingBottom + borderWidth * 2;
   }
   var totalWidth = explicitOuterWidth === null ? width - marginLeft - marginRight : explicitOuterWidth;
-  var constrained = applySizeConstraints(style, totalWidth, totalHeight, availableOuterWidth, heightBasis);
+  var constrained = applySizeConstraints(style, totalWidth, totalHeight, availableOuterWidth, heightBasis, context);
   totalWidth = constrained.width;
   totalHeight = constrained.height;
   node.layout = {
@@ -250,8 +261,8 @@ function layoutNode(node, x, y, width, heightBasis, measureText) {
     contentWidth: contentWidth,
     text: "",
     textLines: [],
-    lineHeight: resolvedStyleSize(style, "line-height", availableOuterWidth, resolvedStyleSize(style, "font-size", availableOuterWidth, 8)),
-    fontSize: resolvedStyleSize(style, "font-size", availableOuterWidth, 8),
+    lineHeight: resolvedStyleSize(style, "line-height", availableOuterWidth, fontSize, context),
+    fontSize: fontSize,
     margin: margin,
     padding: padding,
     marginTop: marginTop,
@@ -273,8 +284,13 @@ export function layoutHtml(document, bounds, measureText) {
   var root = document.tree;
   root.layout = bounds;
   var cursorY = bounds.y;
+  var viewport = {
+    width: bounds.width,
+    height: bounds.height
+  };
+  var rootFontSize = 8;
   for (var index = 0; index < root.children.length; index = index + 1) {
-    cursorY = cursorY + layoutNode(root.children[index], bounds.x, cursorY, bounds.width, bounds.height, measureText);
+    cursorY = cursorY + layoutNode(root.children[index], bounds.x, cursorY, bounds.width, bounds.height, measureText, viewport, rootFontSize, rootFontSize);
   }
   document.layout = bounds;
   return document;

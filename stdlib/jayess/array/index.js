@@ -6,6 +6,7 @@ import {
   jayessArrayFindIndex,
   jayessArrayIncludes,
   jayessArrayIndexOf,
+  jayessArrayIsArray,
   jayessArrayJoin,
   jayessArrayMap,
   jayessArrayReduce,
@@ -21,6 +22,10 @@ export function slice(items, start, ...end) {
 
 export function concat(left, right) {
   return jayessArrayConcat(left, right);
+}
+
+export function isArray(value) {
+  return jayessArrayIsArray(value);
 }
 
 export function indexOf(items, needle) {

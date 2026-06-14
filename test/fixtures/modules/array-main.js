@@ -1,9 +1,11 @@
-import { concat, every, filter, find, findIndex, includes, indexOf, join, map, reduce, reverse, slice, some, sort } from "jayess:array";
+import { concat, every, filter, find, findIndex, includes, indexOf, isArray, join, map, reduce, reverse, slice, some, sort } from "jayess:array";
 
 export function run(items) {
   return [
     slice(items, 1, 3),
     concat(items, [4, 5]),
+    isArray(items),
+    isArray("items"),
     indexOf(items, 2),
     includes(items, 3),
     find(items, function aboveTwo(value) { return value > 2; }),

@@ -43,6 +43,8 @@ test("transpileFile resolves built-in Jayess canvas module over image and color 
   assert.match(canvasSource, /text/);
   assert.match(canvasSource, /clipRect/);
   assert.match(canvasSource, /fillRectClipped/);
+  assert.match(canvasSource, /pixelLeft/);
+  assert.match(canvasSource, /jayess_module_stdlib_jayess_math_index_js::round/);
   assert.match(canvasSource, /drawImageClipped/);
   assert.match(canvasSource, /fillPolygon/);
   assert.match(canvasSource, /strokePolygon/);

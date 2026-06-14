@@ -35,6 +35,14 @@ The HTML/CSS bridge is deliberately small. `attachHtmlDocument(...)` stores a ca
 - `attachHtmlDocument(windowState, document)`
 - `updateHtmlDocument(windowState, events)`
 - `drawHtmlDocument(windowState, canvas)`
+- `htmlRenderer(options)`
+- `showHtmlRenderer(renderer)`
+- `updateHtmlRenderer(renderer)`
+- `reloadHtmlRenderer(renderer, html, css)`
+- `runHtmlRenderer(renderer)`
+- `shouldCloseHtmlRenderer(renderer)`
+- `closeHtmlRenderer(renderer)`
+- `drainHtmlRendererActions(renderer)`
 
 ## Object Roles
 
@@ -183,6 +191,39 @@ Use `drainActions(windowState)` to retrieve and clear the queued actions.
 - `Enter` while an HTML input is focused queues `{ type: "htmlChange", targetId, value }`.
 
 Disabled HTML buttons and inputs expose disabled metadata and do not queue click, focus, input, change, or submit actions. This interaction layer edits the attached canvas render tree. It is not a browser DOM, does not run JavaScript, and does not submit forms over the network or navigate.
+
+## HTML Renderer Facade
+
+`jayess:gui/html-renderer` provides `htmlRenderer(options)` for a browser-window-style GUI surface over existing Jayess modules. It creates the native window, canvas, parsed HTML/CSS document, and first rendered surface. It belongs to the `jayess:gui` module family because it owns live GUI orchestration, event polling, resize relayout, presentation, reload actions, and close handling.
+
+Supported first-slice options include:
+
+- `title`
+- `width`
+- `height`
+- `background`
+- `html`
+- `css` as one string or an array of strings
+- `resizeDelay`
+
+`runHtmlRenderer(renderer)` shows the window and runs the simple blocking event loop. `updateHtmlRenderer(renderer)` runs one event/render/present frame for apps that own their loop. `reloadHtmlRenderer(renderer, html, css)` replaces the renderer's HTML/CSS strings when non-null values are provided, recreates the canvas HTML document, relayouts, and repaints. `css` may be one string or an array of stylesheet strings; arrays are joined in order. `drainHtmlRendererActions(renderer)` returns queued HTML actions and clears the queue.
+
+The renderer deliberately accepts HTML/CSS text instead of filenames. Callers choose the source:
+
+```js
+import { loadHtml, loadCss } from "jayess:canvas";
+import { htmlRenderer } from "jayess:gui/html-renderer";
+
+var renderer = htmlRenderer({
+  html: loadHtml("../src/window.html"),
+  css: [
+    loadCss("../src/base.css"),
+    loadCss("../src/window.css")
+  ]
+});
+```
+
+Compile-time packed assets can use the same renderer shape by passing `packHtml(...)` as `html` and one or more `packCss(...)` results as `css`.
 
 ## Layout And Paint
 

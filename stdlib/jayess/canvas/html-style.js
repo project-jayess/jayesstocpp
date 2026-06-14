@@ -1,5 +1,6 @@
 import { split } from "jayess:string";
 import { parseCss, parseInlineStyle } from "./css-parser.js";
+import { resolveCssSizeWithContext } from "./css-layout-values.js";
 import { parseHtml } from "./html-parser.js";
 
 function copyStyle(style) {
@@ -92,7 +93,40 @@ function descendantSelectorMatches(node, rule, ancestors) {
   return true;
 }
 
-function ruleMatches(node, rule, ancestors) {
+function mediaMatches(media, viewport) {
+  if (media === null) {
+    return true;
+  }
+  if (viewport === null) {
+    return false;
+  }
+  var context = {
+    fontSize: 8,
+    rootFontSize: 8,
+    viewportWidth: viewport.width,
+    viewportHeight: viewport.height
+  };
+  var basis = media.feature === "max-height" || media.feature === "min-height" ? viewport.height : viewport.width;
+  var threshold = resolveCssSizeWithContext(media.size, basis, null, context);
+  if (threshold === null) {
+    return false;
+  }
+  if (media.feature === "max-width") {
+    return viewport.width <= threshold;
+  }
+  if (media.feature === "min-width") {
+    return viewport.width >= threshold;
+  }
+  if (media.feature === "max-height") {
+    return viewport.height <= threshold;
+  }
+  return viewport.height >= threshold;
+}
+
+function ruleMatches(node, rule, ancestors, viewport) {
+  if (!mediaMatches(rule.media, viewport)) {
+    return false;
+  }
   if (rule.kind === "descendant") {
     return descendantSelectorMatches(node, rule, ancestors);
   }
@@ -143,11 +177,11 @@ function defaultStyle(parentStyle, node) {
   };
 }
 
-function styleNode(node, stylesheet, parentStyle, ancestors) {
+function styleNode(node, stylesheet, parentStyle, ancestors, viewport) {
   var style = defaultStyle(parentStyle, node);
   for (var index = 0; index < stylesheet.rules.length; index = index + 1) {
     var rule = stylesheet.rules[index];
-    if (ruleMatches(node, rule, ancestors)) {
+    if (ruleMatches(node, rule, ancestors, viewport)) {
       applyStyle(style, rule.style);
     }
   }
@@ -162,19 +196,25 @@ function styleNode(node, stylesheet, parentStyle, ancestors) {
     }
     childAncestors.push(node);
     for (var childIndex = 0; childIndex < node.children.length; childIndex = childIndex + 1) {
-      styleNode(node.children[childIndex], stylesheet, style, childAncestors);
+      styleNode(node.children[childIndex], stylesheet, style, childAncestors, viewport);
     }
   }
+}
+
+export function styleHtmlDocument(document, viewport) {
+  styleNode(document.tree, document.stylesheet, null, [], viewport);
+  return document;
 }
 
 export function createHtmlDocument(html, css, options) {
   var tree = parseHtml(html, options);
   var stylesheet = parseCss(css, options);
-  styleNode(tree, stylesheet, null, []);
-  return {
+  var document = {
     tree: tree,
     stylesheet: stylesheet,
     layout: null,
     actions: []
   };
+  styleHtmlDocument(document, null);
+  return document;
 }

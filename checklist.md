@@ -308,3 +308,100 @@ Each active slice should:
 - [x] Replace rectangle stroke pixel loops with filled border bands for faster HTML box borders.
 - [x] Document the `window-canvas-html` startup timing diagnosis under `docs/`.
 - [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after the diagnostics update.
+
+## 401. Window Canvas Browser-Like Presentation Resize
+
+- [x] Change Win32 software-buffer presentation so resizing the native window does not scale the canvas bitmap, fixed CSS lengths, or font pixels.
+- [x] Clear exposed native client-area pixels before presenting the 1:1 canvas buffer.
+- [x] Add focused generated-output coverage for the non-scaling Win32 present path.
+- [x] Document the current browser-like resize rule for `jayess:window` and canvas HTML probes.
+- [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after the presentation update.
+
+## 402. Window Canvas Present Flicker Fix
+
+- [x] Stop clearing the full Win32 client area before every 1:1 canvas present.
+- [x] Clear only exposed right and bottom strips outside the canvas buffer.
+- [x] Add focused generated-output coverage preventing full-client clear before present.
+- [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after the flicker fix.
+
+## 403. Window Canvas HTML Responsive Probe
+
+- [x] Update `custom-test/window-canvas-html` CSS to use percentage widths plus min/max constraints while keeping font sizes fixed.
+- [x] Recreate the canvas and rerun HTML layout when `jayess:window` emits resize events.
+- [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after the responsive probe update.
+
+## 404. Responsive Canvas Fractional Rectangle Fix
+
+- [x] Round clipped canvas rectangle bounds before delegating to native image rectangle fills.
+- [x] Add focused generated-output coverage for pixel-aligned canvas rectangle fills.
+- [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after the fractional rectangle fix.
+
+## 405. Window Canvas Responsive Resize Coalescing
+
+- [x] Reuse the parsed `window-canvas-html` document across resize relayouts instead of reparsing HTML/CSS for every resize event.
+- [x] Coalesce resize event batches to the latest viewport size and throttle responsive repaints during drag resizing.
+- [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after resize coalescing.
+
+## 406. Canvas HTML Media Query Slice
+
+- [x] Parse first-slice CSS `@media` blocks with `min-width`, `max-width`, `min-height`, and `max-height` viewport conditions.
+- [x] Reapply stylesheet rules during `layoutHtml(document, bounds)` so media queries respond to relayout bounds.
+- [x] Update `custom-test/window-canvas-html` to exercise a narrow-width media query.
+- [x] Add focused output coverage for media parser and style evaluator helpers.
+- [x] Document supported media-query syntax and limitations under `/docs`.
+- [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after media query support.
+
+## 407. Canvas CSS Relative Length Units And Calc
+
+- [x] Extend canvas CSS size parsing for `em`, `rem`, `vh`, `vw`, and simple whitespace-separated `calc(...)` addition/subtraction expressions.
+- [x] Add a focused CSS length resolver context for current font size, root font size, viewport width, and viewport height.
+- [x] Thread length resolution context through HTML layout for widths, heights, min/max constraints, margins, padding, borders, gaps, font size, and line height.
+- [x] Let media-query viewport conditions use the same CSS length resolver as ordinary layout lengths.
+- [x] Add focused output coverage and fixture coverage for relative length parsing and generated helper emission.
+- [x] Update `custom-test/window-canvas-html` to exercise `rem`, `em`, viewport units, and `calc(...)` in responsive CSS.
+- [x] Document supported relative units and first-slice `calc(...)` syntax under `/docs`.
+- [x] Rebuild `custom-test/window-canvas-html` from a clean generated directory after relative length support.
+
+## 408. Canvas CSS Calc Multiplication And Division
+
+- [x] Extend first-slice `calc(...)` parsing to accept whitespace-separated `*` and `/` operators.
+- [x] Resolve `calc(...)` multiplication and division left-to-right with a focused division-by-zero diagnostic.
+- [x] Update fixture and manual window probe CSS to exercise `calc(...)` multiplication and division.
+- [x] Document Jayess canvas `calc(...)` multiplication and division support under `/docs`.
+- [x] Rebuild `custom-test/window-canvas-html` after the `calc(...)` operator update.
+
+## 409. Canvas HTML Media Font Breakpoint Verification
+
+- [x] Update `custom-test/window-canvas-html` to use explicit `720px` media breakpoints for paragraph and button font sizes.
+- [x] Add generated executable assertions that media query relayout changes width, font size, and line height across the breakpoint.
+- [x] Document the `min-width: 720px` font-size breakpoint pattern under `/docs`.
+- [x] Rebuild `custom-test/window-canvas-html` after the media font breakpoint update.
+
+## 410. Canvas HTML Compile-Time Asset Embedding
+
+- [x] Add a focused `transpileFile()` AST transform that embeds static `packHtml()` and `packCss()` calls before semantic analysis.
+- [x] Add `jayess:canvas` source-facing pack declarations for `packHtml` and `packCss`.
+- [x] Restrict compile-time asset embedding to static relative `.html` and `.css` files inside the project root.
+- [x] Move `custom-test/window-canvas-html` HTML and CSS into separate source assets and load them through compile-time loaders.
+- [x] Add focused generated-output coverage proving HTML/CSS assets are embedded into generated C++ and not copied to `dist`.
+- [x] Document compile-time asset embedding under `/docs`.
+- [x] Rebuild `custom-test/window-canvas-html` after moving HTML/CSS into source assets.
+
+## 411. Canvas Runtime HTML/CSS Loading
+
+- [x] Add `loadHtml()` and `loadCss()` to `jayess:canvas` for runtime `.html` and `.css` text loading.
+- [x] Keep `packHtml()` and `packCss()` as compile-time embedding helpers separate from runtime loaders.
+- [x] Add generated executable coverage proving runtime HTML/CSS files are read through `jayess:canvas`.
+- [x] Update `custom-test/window-canvas-html` to load source HTML/CSS through explicit runtime calls without polling.
+- [x] Document runtime loading versus compile-time packing under `/docs`.
+- [x] Rebuild `custom-test/window-canvas-html` after adding runtime HTML/CSS loading.
+
+## 412. GUI HTML Renderer Facade
+
+- [x] Add a focused `jayess:gui/html-renderer` facade that composes `jayess:canvas`, `jayess:window`, `jayess:thread`, and `jayess:time`.
+- [x] Provide `htmlRenderer()` and frame helpers for native window creation, canvas creation, caller-provided HTML/CSS strings, layout, painting, presentation, event polling, responsive resize relayout, manual reload, and close handling.
+- [x] Keep top-level `jayess:html` string helpers from pulling in `jayess:canvas` or `jayess:window`.
+- [x] Update `custom-test/window-canvas-html` to use `htmlRenderer()` instead of manually wiring canvas, window, resize, reload, and event-loop code.
+- [x] Support one CSS string or an ordered CSS string array in `htmlRenderer()` options and `reloadHtmlRenderer()`.
+- [x] Add focused module-graph, output, and compile coverage for `jayess:gui/html-renderer`.
+- [x] Document the renderer facade under `/docs`.

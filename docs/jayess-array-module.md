@@ -6,6 +6,7 @@
 
 - `slice(items, start, end)`
 - `concat(left, right)`
+- `isArray(value)`
 - `indexOf(items, needle)`
 - `includes(items, needle)`
 - `find(items, callback)`
@@ -28,6 +29,7 @@
 - out-of-range slice indexes clamp to the array length.
 - `slice(items, start, end, extra)` is rejected.
 - `concat(left, right)` requires both arguments to be Jayess arrays and returns a new array.
+- `isArray(value)` returns whether the value is a Jayess array.
 - `indexOf(items, needle)` uses Jayess exact equality and returns `-1` when no match exists.
 - `includes(items, needle)` uses Jayess exact equality and returns a boolean.
 - `find(items, callback)` returns the first element whose callback result is truthy, or `null` when no element matches.

@@ -16,3 +16,13 @@ compileTest("transpileFile jayess:html output compiles with the available C++ co
   compileCppFiles(cppFiles, targetDir);
   assert.ok(cppFiles.some((file) => file.includes("stdlib_jayess_html_index_js.cpp")));
 });
+
+compileTest("transpileFile jayess:gui html renderer output compiles with guarded window adapters", (t) => {
+  const targetDir = createManagedTempDir(t, "html-renderer-compile");
+  const fixture = path.resolve("test/fixtures/modules/html-renderer-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(cppFiles.some((file) => file.includes("stdlib_jayess_gui_html_renderer_index_js.cpp")));
+});
