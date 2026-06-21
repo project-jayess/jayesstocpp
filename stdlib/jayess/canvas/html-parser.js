@@ -1,6 +1,6 @@
 import { includes, slice, toLower, trim } from "jayess:string";
 
-const supportedElements = ["div", "span", "p", "button", "input", "label", "img", "ul", "ol", "li", "form"];
+const supportedElements = ["html", "body", "main", "section", "div", "span", "p", "button", "input", "label", "img", "ul", "ol", "li", "form"];
 const voidElements = ["img", "input"];
 
 function fail(message) {

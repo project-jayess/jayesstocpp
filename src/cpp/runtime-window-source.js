@@ -49,6 +49,7 @@ void window_push_key_event(const window_ptr& window, const std::string& type, co
 void window_push_text_input_event(const window_ptr& window, const std::string& text);
 void window_push_mouse_move_event(const window_ptr& window, int x, int y);
 void window_push_mouse_button_event(const window_ptr& window, const std::string& type, int button, int x, int y);
+void window_push_wheel_event(const window_ptr& window, double delta_x, double delta_y, int x, int y);
 
 ${getWindowWindowsAdapterCppFragment()}
 ${getWindowMacosAdapterCppFragment()}
@@ -263,6 +264,16 @@ void window_push_mouse_button_event(const window_ptr& window, const std::string&
     {"x", static_cast<double>(x)},
     {"y", static_cast<double>(y)},
     {"pressed", type == "mouseDown"}
+  }));
+}
+
+void window_push_wheel_event(const window_ptr& window, double delta_x, double delta_y, int x, int y) {
+  window->events.push_back(window_event({
+    {"type", std::string("wheel")},
+    {"deltaX", delta_x},
+    {"deltaY", delta_y},
+    {"x", static_cast<double>(x)},
+    {"y", static_cast<double>(y)}
   }));
 }
 

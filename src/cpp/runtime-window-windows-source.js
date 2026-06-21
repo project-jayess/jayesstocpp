@@ -91,6 +91,7 @@ using jayess_peek_message_a_fn = int (*)(jayess_msg*, jayess_hwnd, jayess_uint, 
 using jayess_translate_message_fn = int (*)(const jayess_msg*);
 using jayess_dispatch_message_a_fn = jayess_lresult (*)(const jayess_msg*);
 using jayess_def_window_proc_a_fn = jayess_lresult (*)(jayess_hwnd, jayess_uint, jayess_wparam, jayess_lparam);
+using jayess_screen_to_client_fn = int (*)(jayess_hwnd, jayess_point*);
 using jayess_get_dc_fn = jayess_hdc (*)(jayess_hwnd);
 using jayess_release_dc_fn = int (*)(jayess_hwnd, jayess_hdc);
 using jayess_stretch_dibits_fn = int (*)(jayess_hdc, int, int, int, int, int, int, int, int, const void*, const jayess_bitmapinfo*, unsigned int, unsigned long);
@@ -111,6 +112,7 @@ struct jayess_windows_window_api {
   jayess_translate_message_fn translate_message = nullptr;
   jayess_dispatch_message_a_fn dispatch_message = nullptr;
   jayess_def_window_proc_a_fn def_window_proc = nullptr;
+  jayess_screen_to_client_fn screen_to_client = nullptr;
   jayess_get_dc_fn get_dc = nullptr;
   jayess_release_dc_fn release_dc = nullptr;
   jayess_stretch_dibits_fn stretch_dibits = nullptr;
@@ -140,6 +142,9 @@ constexpr jayess_uint jayess_wm_rbuttondown = 0x0204U;
 constexpr jayess_uint jayess_wm_rbuttonup = 0x0205U;
 constexpr jayess_uint jayess_wm_mbuttondown = 0x0207U;
 constexpr jayess_uint jayess_wm_mbuttonup = 0x0208U;
+constexpr jayess_uint jayess_wm_mousewheel = 0x020aU;
+constexpr jayess_uint jayess_wm_mousehwheel = 0x020eU;
+constexpr double jayess_wheel_delta = 120.0;
 constexpr jayess_dword jayess_bi_rgb = 0UL;
 constexpr unsigned int jayess_dib_rgb_colors = 0U;
 constexpr unsigned long jayess_srccopy = 0x00cc0020UL;
@@ -220,6 +225,10 @@ int window_windows_high_word(jayess_lparam value) {
   return static_cast<int>(static_cast<short>(static_cast<unsigned short>((static_cast<std::uintptr_t>(value) >> 16U) & 0xffffU)));
 }
 
+int window_windows_signed_high_word(jayess_wparam value) {
+  return static_cast<int>(static_cast<short>(static_cast<unsigned short>((static_cast<std::uintptr_t>(value) >> 16U) & 0xffffU)));
+}
+
 jayess_lresult window_windows_wnd_proc(jayess_hwnd hwnd, jayess_uint message, jayess_wparam wParam, jayess_lparam lParam) {
   window_ptr window;
   {
@@ -247,6 +256,22 @@ jayess_lresult window_windows_wnd_proc(jayess_hwnd hwnd, jayess_uint message, ja
     }
     if (message == jayess_wm_mousemove) {
       window_push_mouse_move_event(window, window_windows_low_word(lParam), window_windows_high_word(lParam));
+      return 0;
+    }
+    if (message == jayess_wm_mousewheel || message == jayess_wm_mousehwheel) {
+      const int screenX = window_windows_low_word(lParam);
+      const int screenY = window_windows_high_word(lParam);
+      jayess_point point{screenX, screenY};
+      auto& api = window_windows_api();
+      if (api.screen_to_client != nullptr) {
+        api.screen_to_client(hwnd, &point);
+      }
+      const double delta = static_cast<double>(window_windows_signed_high_word(wParam)) / jayess_wheel_delta;
+      if (message == jayess_wm_mousehwheel) {
+        window_push_wheel_event(window, delta, 0.0, static_cast<int>(point.x), static_cast<int>(point.y));
+      } else {
+        window_push_wheel_event(window, 0.0, -delta, static_cast<int>(point.x), static_cast<int>(point.y));
+      }
       return 0;
     }
     if (message == jayess_wm_lbuttondown || message == jayess_wm_lbuttonup) {
@@ -292,6 +317,7 @@ jayess_windows_window_api& window_windows_api() {
   api.translate_message = reinterpret_cast<jayess_translate_message_fn>(GetProcAddress(api.user32, "TranslateMessage"));
   api.dispatch_message = reinterpret_cast<jayess_dispatch_message_a_fn>(GetProcAddress(api.user32, "DispatchMessageA"));
   api.def_window_proc = reinterpret_cast<jayess_def_window_proc_a_fn>(GetProcAddress(api.user32, "DefWindowProcA"));
+  api.screen_to_client = reinterpret_cast<jayess_screen_to_client_fn>(GetProcAddress(api.user32, "ScreenToClient"));
   api.get_dc = reinterpret_cast<jayess_get_dc_fn>(GetProcAddress(api.user32, "GetDC"));
   api.release_dc = reinterpret_cast<jayess_release_dc_fn>(GetProcAddress(api.user32, "ReleaseDC"));
   api.get_client_rect = reinterpret_cast<jayess_get_client_rect_fn>(GetProcAddress(api.user32, "GetClientRect"));
@@ -318,6 +344,7 @@ bool window_platform_available() {
     && api.translate_message != nullptr
     && api.dispatch_message != nullptr
     && api.def_window_proc != nullptr
+    && api.screen_to_client != nullptr
     && api.get_dc != nullptr
     && api.release_dc != nullptr
     && api.get_client_rect != nullptr

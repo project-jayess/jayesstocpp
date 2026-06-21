@@ -47,6 +47,48 @@ function applySizeConstraints(style, width, height, widthBasis, heightBasis, con
   };
 }
 
+function scrollValue(node, key) {
+  var value = node[key];
+  if (value === null) {
+    return 0;
+  }
+  return value;
+}
+
+function childLayoutBottom(node, fallback) {
+  var bottom = fallback;
+  if (node.children === null) {
+    return bottom;
+  }
+  for (var index = 0; index < node.children.length; index = index + 1) {
+    var child = node.children[index];
+    if (child.layout !== null) {
+      var childBottom = child.layout.y + child.layout.height;
+      if (childBottom > bottom) {
+        bottom = childBottom;
+      }
+    }
+  }
+  return bottom;
+}
+
+function childLayoutRight(node, fallback) {
+  var right = fallback;
+  if (node.children === null) {
+    return right;
+  }
+  for (var index = 0; index < node.children.length; index = index + 1) {
+    var child = node.children[index];
+    if (child.layout !== null) {
+      var childRight = child.layout.x + child.layout.width;
+      if (childRight > right) {
+        right = childRight;
+      }
+    }
+  }
+  return right;
+}
+
 function childText(node) {
   if (node.type === "text") {
     return node.text;
@@ -216,7 +258,15 @@ function layoutNode(node, x, y, width, heightBasis, measureText, viewport, paren
       paddingLeft: paddingLeft,
       borderWidth: borderWidth,
       disabled: node.type === "element" && node.attributes !== null && (node.attributes.disabled === "true" || node.attributes.disabled === "disabled"),
-      overflow: style.overflow
+      overflow: style.overflow,
+      overflowX: style.overflow,
+      overflowY: style.overflow,
+      clientWidth: nodeWidth - paddingLeft - paddingRight - borderWidth * 2,
+      clientHeight: nodeHeight - paddingTop - paddingBottom - borderWidth * 2,
+      scrollWidth: measured.width,
+      scrollHeight: lineHeightTotal,
+      scrollLeft: scrollValue(node, "scrollLeft"),
+      scrollTop: scrollValue(node, "scrollTop")
     };
     return nodeHeight;
   }
@@ -251,6 +301,22 @@ function layoutNode(node, x, y, width, heightBasis, measureText, viewport, paren
   var constrained = applySizeConstraints(style, totalWidth, totalHeight, availableOuterWidth, heightBasis, context);
   totalWidth = constrained.width;
   totalHeight = constrained.height;
+  var clientHeight = totalHeight - paddingTop - paddingBottom - borderWidth * 2;
+  if (clientHeight < 0) {
+    clientHeight = 0;
+  }
+  var clientWidth = totalWidth - paddingLeft - paddingRight - borderWidth * 2;
+  if (clientWidth < 0) {
+    clientWidth = 0;
+  }
+  var scrollHeight = childLayoutBottom(node, contentY) - contentY + paddingBottom + borderWidth;
+  if (scrollHeight < clientHeight) {
+    scrollHeight = clientHeight;
+  }
+  var scrollWidth = childLayoutRight(node, contentX) - contentX + paddingRight + borderWidth;
+  if (scrollWidth < clientWidth) {
+    scrollWidth = clientWidth;
+  }
   node.layout = {
     x: x + marginLeft,
     y: y + marginTop,
@@ -275,7 +341,15 @@ function layoutNode(node, x, y, width, heightBasis, measureText, viewport, paren
     paddingLeft: paddingLeft,
     borderWidth: borderWidth,
     disabled: node.type === "element" && node.attributes !== null && (node.attributes.disabled === "true" || node.attributes.disabled === "disabled"),
-    overflow: style.overflow
+    overflow: style.overflow,
+    overflowX: style.overflow,
+    overflowY: style.overflow,
+    clientWidth: clientWidth,
+    clientHeight: clientHeight,
+    scrollWidth: scrollWidth,
+    scrollHeight: scrollHeight,
+    scrollLeft: scrollValue(node, "scrollLeft"),
+    scrollTop: scrollValue(node, "scrollTop")
   };
   return totalHeight;
 }

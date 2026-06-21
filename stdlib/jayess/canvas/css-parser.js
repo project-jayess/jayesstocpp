@@ -67,8 +67,8 @@ function normalizeValue(property, value) {
     return parseBoxValue(normalized);
   }
   if (property === "overflow") {
-    if (normalized !== "visible" && normalized !== "hidden") {
-      fail("jayess:canvas css overflow must be visible or hidden");
+    if (normalized !== "visible" && normalized !== "hidden" && normalized !== "auto" && normalized !== "scroll") {
+      fail("jayess:canvas css overflow must be visible, hidden, auto, or scroll");
     }
   }
   if (property === "box-sizing") {

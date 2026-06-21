@@ -43,8 +43,15 @@ export { parseCss } from "./css-parser.js";
 export { createHtmlDocument } from "./html-style.js";
 import { styleHtmlDocument } from "./html-style.js";
 export { hitTestHtml, hitTestHtmlNode } from "./html-hit-test.js";
+export {
+  hitTestHtmlScrollTarget,
+  hitTestHtmlScrollbar,
+  scrollHtmlNodeBy,
+  scrollHtmlNodeTo,
+  scrollHtmlTo
+} from "./html-scroll.js";
 import { layoutHtml as layoutHtmlDocument } from "./html-layout.js";
-import { paintHtmlDocument } from "./html-paint.js";
+import { paintHtmlDocument, paintHtmlScrollbarsDocument } from "./html-paint.js";
 
 function fail(message) {
   throw message;
@@ -978,6 +985,17 @@ export function layoutHtml(document, bounds) {
 
 export function drawHtml(canvas, document) {
   return paintHtmlDocument(canvas, document, {
+    fillRect: fillRect,
+    strokeRect: strokeRect,
+    clipRect: pushClip,
+    popClip: popClip,
+    text: text,
+    drawImage: drawImage
+  });
+}
+
+export function drawHtmlScrollbars(canvas, document) {
+  return paintHtmlScrollbarsDocument(canvas, document, {
     fillRect: fillRect,
     strokeRect: strokeRect,
     clipRect: pushClip,

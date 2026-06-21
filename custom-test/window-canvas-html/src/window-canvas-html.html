@@ -1,5 +1,29 @@
-<div>
-  <button id="ok">Window Probe</button>
-  <p>Responsive canvas HTML: resize the native window and the layout will reflow without scaling fixed font pixels.</p>
-  <p>Jayess fallback covers lowercase and symbols: hello_world (ok) abc xyz 123 !? @#$%</p>
-</div>
+<html>
+  <body>
+    <main>
+      <button id="ok">Window Probe</button>
+      <p>Responsive canvas HTML: resize the native window and the layout will reflow without scaling fixed font pixels.</p>
+      <p>Jayess fallback covers lowercase and symbols: hello_world (ok) abc xyz 123 !? @#$%</p>
+      <section class="scroll-pane vertical">
+        <p>Nested vertical scroll 01: wheel over this panel should scroll this panel first.</p>
+        <p>Nested vertical scroll 02: the outer body should stay still until this panel reaches its edge.</p>
+        <p>Nested vertical scroll 03: this line should not bleed outside the panel.</p>
+        <p>Nested vertical scroll 04: the panel scrollbar should move independently.</p>
+        <p>Nested vertical scroll 05: bottom of nested vertical panel.</p>
+      </section>
+      <section class="scroll-pane horizontal">
+        <p class="wide-line">Nested horizontal scroll: this very long single line should overflow horizontally so Shift-like horizontal wheel events or direct horizontal deltas can move it across the panel without moving the body viewport first.</p>
+      </section>
+      <p>Scroll check 01: mouse wheel should move this content immediately, without animated sliding.</p>
+      <p>Scroll check 02: the scrollbar thumb should move while the viewport changes.</p>
+      <p>Scroll check 03: text remains clipped inside the scrollable panel.</p>
+      <p>Scroll check 04: this custom renderer remains lightweight and does not require Chromium.</p>
+      <p>Scroll check 05: resizing the window should keep fixed pixel text sizes unless CSS media rules change them.</p>
+      <p>Scroll check 06: wheel input should feel direct and browser-like.</p>
+      <p>Scroll check 07: the bottom content should become visible after a few wheel steps.</p>
+      <p>Scroll check 08: scrollbars are rendered by the Jayess canvas HTML painter.</p>
+      <p>Scroll check 09: this line exists to force overflow in the manual probe.</p>
+      <p>Scroll check 10: end of the scroll probe with no black bottom gap.</p>
+    </main>
+  </body>
+</html>
