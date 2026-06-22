@@ -82,7 +82,15 @@ void window_wayland_pointer_button(void* data, wl_pointer*, std::uint32_t, std::
   window_push_mouse_button_event(host->window, state == 1U ? "mouseDown" : "mouseUp", normalizedButton, host->pointer_x, host->pointer_y);
 }
 
-void window_wayland_pointer_axis(void*, wl_pointer*, std::uint32_t, std::uint32_t, wl_fixed_t) {}
+void window_wayland_pointer_axis(void* data, wl_pointer*, std::uint32_t, std::uint32_t axis, wl_fixed_t value) {
+  auto* host = static_cast<jayess_wayland_window_host*>(data);
+  const double delta = static_cast<double>(value) / 256.0 / 120.0;
+  if (axis == 0U) {
+    window_push_wheel_event(host->window, 0.0, delta, host->pointer_x, host->pointer_y);
+  } else if (axis == 1U) {
+    window_push_wheel_event(host->window, delta, 0.0, host->pointer_x, host->pointer_y);
+  }
+}
 
 void window_wayland_keyboard_keymap(void*, wl_keyboard*, std::uint32_t, int fd, std::uint32_t) {
   if (fd >= 0) {

@@ -17,6 +17,7 @@
   "files": [
     "src/",
     "stdlib/",
+    "externals/",
     "README.md",
     "LICENSE"
   ],

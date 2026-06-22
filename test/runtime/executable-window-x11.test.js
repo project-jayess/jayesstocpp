@@ -204,6 +204,20 @@ bool has_mouse_button_event(const std::vector<jayess::value>& events, const std:
   return false;
 }
 
+bool has_wheel_event(const std::vector<jayess::value>& events, double delta_x, double delta_y, double x, double y) {
+  for (const auto& item : events) {
+    const auto event = std::get<jayess::object_ptr>(item);
+    if (std::get<std::string>(event->fields.at("type")) == "wheel"
+        && std::get<double>(event->fields.at("deltaX")) == delta_x
+        && std::get<double>(event->fields.at("deltaY")) == delta_y
+        && std::get<double>(event->fields.at("x")) == x
+        && std::get<double>(event->fields.at("y")) == y) {
+      return true;
+    }
+  }
+  return false;
+}
+
 int main() {
   ${namespace}::jayess_module_init();
 
@@ -309,6 +323,16 @@ int main() {
     buttonUp.button.y = 13;
     send_event(window->host_display, window->host_window, 0, buttonReleaseMask, &buttonUp);
 
+    jayess_xevent wheelDown{};
+    wheelDown.type = buttonPress;
+    wheelDown.button.display = window->host_display;
+    wheelDown.button.window = window->host_window;
+    wheelDown.button.same_screen = 1;
+    wheelDown.button.button = 5;
+    wheelDown.button.x = 17;
+    wheelDown.button.y = 19;
+    send_event(window->host_display, window->host_window, 0, buttonPressMask, &wheelDown);
+
     if (window->host_close_atom != 0) {
       jayess_xevent close{};
       close.type = clientMessage;
@@ -332,6 +356,7 @@ int main() {
           && has_mouse_move_event(collected, 11.0, 13.0)
           && has_mouse_button_event(collected, "mouseDown", "left", true)
           && has_mouse_button_event(collected, "mouseUp", "left", false)
+          && has_wheel_event(collected, 0.0, 1.0, 17.0, 19.0)
           && has_event_type(collected, "close")) {
         break;
       }
@@ -345,6 +370,7 @@ int main() {
     require(has_mouse_move_event(collected, 11.0, 13.0), "x11 mouseMove event normalized");
     require(has_mouse_button_event(collected, "mouseDown", "left", true), "x11 mouseDown event normalized");
     require(has_mouse_button_event(collected, "mouseUp", "left", false), "x11 mouseUp event normalized");
+    require(has_wheel_event(collected, 0.0, 1.0, 17.0, 19.0), "x11 wheel event normalized");
     require(has_event_type(collected, "close"), "x11 close event normalized");
     auto shouldClose = ${namespace}::isClosing(std::vector<jayess::value>{windowValue});
     require(std::get<bool>(shouldClose) == true, "x11 close intent observed");
@@ -369,7 +395,7 @@ int main() {
 `;
 }
 
-runtimeTest("generated C++ verifies current X11 window lifecycle, present, resize, close, keyboard, and mouse normalization when the host adapter is available", (t) => {
+runtimeTest("generated C++ verifies current X11 window lifecycle, present, resize, close, keyboard, mouse, and wheel normalization when the host adapter is available", (t) => {
   const fixturePath = path.resolve("test/fixtures/runtime/window-x11-main.js");
   const targetDir = createManagedTempDir(t, "runtime-window-x11");
   const result = transpileFile(fixturePath, targetDir);

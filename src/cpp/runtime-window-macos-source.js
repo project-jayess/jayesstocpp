@@ -169,19 +169,19 @@ std::string window_macos_key_name(jayess_objc_id eventObject) {
   if (text.empty()) {
     return "unknown";
   }
-  if (text == "\x1b") {
+  if (text == "\\x1b") {
     return "Escape";
   }
-  if (text == "\r" || text == "\n") {
+  if (text == "\\r" || text == "\\n") {
     return "Enter";
   }
-  if (text == "\t") {
+  if (text == "\\t") {
     return "Tab";
   }
   if (text == " ") {
     return " ";
   }
-  if (text == "\x7f") {
+  if (text == "\\x7f") {
     return "Backspace";
   }
   return std::string(1, text[0]);

@@ -271,7 +271,7 @@ function dispatchRendererEvent(renderer, event) {
   }
   if (event.type === "mouseUp" && event.button === "left") {
     var hit = hitTestHtml(renderer.document, event.x, event.y);
-    if (hit.targetId !== null) {
+    if (hit !== null && hit.targetId !== null) {
       queueClick(renderer, hit);
     }
   }

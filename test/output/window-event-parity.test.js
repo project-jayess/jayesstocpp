@@ -21,6 +21,7 @@ test("window runtime emits Cocoa and Wayland normalized input event bridges", (t
   assert.match(cppSource, /jayess_ns_event_key_down \? "keyDown" : "keyUp"/);
   assert.match(cppSource, /window_push_mouse_move_event\(window,/);
   assert.match(cppSource, /window_push_mouse_button_event\(/);
+  assert.match(cppSource, /window_push_wheel_event\(/);
   assert.match(cppSource, /\? "mouseDown" : "mouseUp"/);
 
   assert.match(cppSource, /struct wl_seat_listener/);
@@ -34,6 +35,8 @@ test("window runtime emits Cocoa and Wayland normalized input event bridges", (t
   assert.match(cppSource, /window_wayland_allocate_buffer/);
   assert.match(cppSource, /window_wayland_pointer_motion/);
   assert.match(cppSource, /window_wayland_pointer_button/);
+  assert.match(cppSource, /window_wayland_pointer_axis/);
+  assert.match(cppSource, /window_push_wheel_event\(host->window/);
   assert.match(cppSource, /window_wayland_keyboard_key/);
   assert.match(cppSource, /window_wayland_key_name/);
   assert.match(cppSource, /wl_compositor global was not advertised/);

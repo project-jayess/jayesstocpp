@@ -45,7 +45,9 @@ function platformLibraries(targetDir) {
     return [];
   }
   const hints = JSON.parse(fs.readFileSync(hintsPath, "utf8"));
-  const requiredAtLinkTime = new Set(["gdi32", "user32", "ws2_32"]);
+  const requiredAtLinkTime = process.platform === "win32"
+    ? new Set(["gdi32", "user32", "ws2_32"])
+    : new Set();
   const libraries = new Set();
   for (const hint of hints.platformLibraryHints ?? []) {
     for (const library of hint.libraries ?? []) {

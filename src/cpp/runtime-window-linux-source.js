@@ -407,6 +407,27 @@ void window_x11_platform_poll_events(const window_ptr& window) {
       continue;
     }
     if (event.type == buttonPress || event.type == buttonRelease) {
+      if (event.button.button >= 4U && event.button.button <= 7U) {
+        if (event.type == buttonRelease) {
+          continue;
+        }
+        if (event.button.button == 4U) {
+          window_push_wheel_event(window, 0.0, -1.0, event.button.x, event.button.y);
+          continue;
+        }
+        if (event.button.button == 5U) {
+          window_push_wheel_event(window, 0.0, 1.0, event.button.x, event.button.y);
+          continue;
+        }
+        if (event.button.button == 6U) {
+          window_push_wheel_event(window, -1.0, 0.0, event.button.x, event.button.y);
+          continue;
+        }
+        if (event.button.button == 7U) {
+          window_push_wheel_event(window, 1.0, 0.0, event.button.x, event.button.y);
+          continue;
+        }
+      }
       window_push_mouse_button_event(window, event.type == buttonPress ? "mouseDown" : "mouseUp", static_cast<int>(event.button.button) - 1, event.button.x, event.button.y);
       continue;
     }

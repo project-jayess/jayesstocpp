@@ -16,7 +16,9 @@ function platformLibrariesForTarget(targetDir) {
       libraries.add(library);
     }
   }
-  const requiredAtLinkTime = new Set(["gdi32", "user32", "ws2_32"]);
+  const requiredAtLinkTime = process.platform === "win32"
+    ? new Set(["gdi32", "user32", "ws2_32"])
+    : new Set();
   return [...libraries].filter((library) => requiredAtLinkTime.has(library)).sort();
 }
 
