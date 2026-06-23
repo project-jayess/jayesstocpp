@@ -59,6 +59,11 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   assert.match(cppSource, /linux-x11/);
   assert.match(cppSource, /linux-wayland/);
   assert.match(cppSource, /WAYLAND_DISPLAY/);
+  assert.match(cppSource, /window_try_wayland_platform_create/);
+  assert.match(cppSource, /window_try_x11_platform_create/);
+  assert.match(cppSource, /window_linux_prefers_wayland\(\)/);
+  assert.match(cppSource, /window_try_wayland_platform_create\(window\) \|\| window_try_x11_platform_create\(window\)/);
+  assert.match(cppSource, /window_try_x11_platform_create\(window\) \|\| window_try_wayland_platform_create\(window\)/);
   assert.match(cppSource, /libwayland-client\.so\.0/);
   assert.match(cppSource, /xdg_wm_base/);
   assert.match(cppSource, /wl_display_connect/);
@@ -105,6 +110,7 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   assert.match(cppSource, /wl_compositor global was not advertised/);
   assert.match(cppSource, /wl_shm global was not advertised/);
   assert.match(cppSource, /xdg_wm_base global was not advertised/);
+  assert.match(cppSource, /Linux window support could not connect to Wayland or X11 on this host/);
   assert.match(cppSource, /Linux window support requires a usable X11 or Wayland adapter on this host/);
   assert.match(cppSource, /"pressed"/);
   assert.match(cppSource, /"textInput"/);

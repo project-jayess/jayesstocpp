@@ -456,17 +456,38 @@ bool window_linux_uses_wayland(const window_ptr& window) {
   return window->adapter == "linux-wayland";
 }
 
-void window_platform_create(const window_ptr& window) {
-  if (window_linux_prefers_wayland() && window_wayland_platform_available()) {
-    window_wayland_platform_create(window);
-    return;
+bool window_try_wayland_platform_create(const window_ptr& window) {
+  if (!window_wayland_platform_available()) {
+    return false;
   }
-  if (window_x11_platform_available()) {
+  try {
+    window_wayland_platform_create(window);
+    return true;
+  } catch (const std::exception&) {
+    return false;
+  }
+}
+
+bool window_try_x11_platform_create(const window_ptr& window) {
+  if (!window_x11_platform_available()) {
+    return false;
+  }
+  try {
     window_x11_platform_create(window);
-    return;
+    return true;
+  } catch (const std::exception&) {
+    return false;
   }
-  if (window_wayland_platform_available()) {
-    window_wayland_platform_create(window);
+}
+
+void window_platform_create(const window_ptr& window) {
+  if (window_linux_prefers_wayland()) {
+    if (window_try_wayland_platform_create(window) || window_try_x11_platform_create(window)) {
+      return;
+    }
+    throw_window_unavailable("Linux window support could not connect to Wayland or X11 on this host");
+  }
+  if (window_try_x11_platform_create(window) || window_try_wayland_platform_create(window)) {
     return;
   }
   throw_window_unavailable("Linux window support requires a usable X11 or Wayland adapter on this host");
