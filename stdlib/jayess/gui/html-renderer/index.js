@@ -8,8 +8,6 @@ import {
   layoutHtml,
   scrollHtmlNodeBy
 } from "jayess:canvas";
-import { blit as blitImage } from "jayess:image";
-import { ceil, round } from "jayess:math";
 import { isArray, join } from "jayess:array";
 import { rgb } from "jayess:color";
 import {
@@ -43,17 +41,6 @@ function createRendererDocument(renderer) {
   return createHtmlDocument(renderer.html, renderer.css, null);
 }
 
-function createRendererCanvas(renderer) {
-  return createCanvas(renderer.width, renderer.height, {
-    background: renderer.background,
-    title: renderer.title
-  });
-}
-
-function maxValue(left, right) {
-  return left > right ? left : right;
-}
-
 function rootScrollNode(renderer) {
   if (renderer.document.tree.children.length === 0) {
     return null;
@@ -77,107 +64,12 @@ function rootBackground(renderer) {
   return renderer.background;
 }
 
-function rootScrollTop(renderer) {
-  var root = rootScrollNode(renderer);
-  if (root === null || root.layout === null) {
-    return 0;
-  }
-  return round(root.layout.scrollTop);
-}
-
-function rootScrollLeft(renderer) {
-  var root = rootScrollNode(renderer);
-  if (root === null || root.layout === null) {
-    return 0;
-  }
-  return round(root.layout.scrollLeft);
-}
-
-function rootPageHeight(renderer) {
-  var root = rootScrollNode(renderer);
-  var pageHeight = renderer.height;
-  if (root === null || root.layout === null) {
-    return pageHeight;
-  }
-  var contentBottom = root.layout.contentY + root.layout.scrollHeight;
-  if (contentBottom > pageHeight) {
-    pageHeight = contentBottom;
-  }
-  if (pageHeight < 1) {
-    pageHeight = 1;
-  }
-  return ceil(pageHeight);
-}
-
-function rootPageWidth(renderer) {
-  var root = rootScrollNode(renderer);
-  var pageWidth = renderer.width;
-  if (root === null || root.layout === null) {
-    return pageWidth;
-  }
-  var contentRight = root.layout.contentX + root.layout.scrollWidth;
-  if (contentRight > pageWidth) {
-    pageWidth = contentRight;
-  }
-  if (pageWidth < 1) {
-    pageWidth = 1;
-  }
-  return ceil(pageWidth);
-}
-
-function renderPageCache(renderer) {
-  var root = rootScrollNode(renderer);
-  var pageHeight = rootPageHeight(renderer);
-  var pageWidth = rootPageWidth(renderer);
-  renderer.pageCanvas = createCanvas(pageWidth, pageHeight, {
-    background: renderer.background,
-    title: renderer.title
-  });
-  if (root === null || root.layout === null) {
-    drawHtml(renderer.pageCanvas, renderer.document);
-    return renderer;
-  }
-  var originalHeight = root.layout.height;
-  var originalClientHeight = root.layout.clientHeight;
-  var originalWidth = root.layout.width;
-  var originalClientWidth = root.layout.clientWidth;
-  var originalOverflow = root.layout.overflow;
-  var originalOverflowY = root.layout.overflowY;
-  var originalOverflowX = root.layout.overflowX;
-  var originalScrollTop = root.layout.scrollTop;
-  var originalScrollLeft = root.layout.scrollLeft;
-  root.layout.height = pageHeight;
-  root.layout.clientHeight = pageHeight;
-  root.layout.width = pageWidth;
-  root.layout.clientWidth = pageWidth;
-  root.layout.overflow = "visible";
-  root.layout.overflowY = "visible";
-  root.layout.overflowX = "visible";
-  root.layout.scrollTop = 0;
-  root.layout.scrollLeft = 0;
-  drawHtml(renderer.pageCanvas, renderer.document);
-  root.layout.height = originalHeight;
-  root.layout.clientHeight = originalClientHeight;
-  root.layout.width = originalWidth;
-  root.layout.clientWidth = originalClientWidth;
-  root.layout.overflow = originalOverflow;
-  root.layout.overflowY = originalOverflowY;
-  root.layout.overflowX = originalOverflowX;
-  root.layout.scrollTop = originalScrollTop;
-  root.layout.scrollLeft = originalScrollLeft;
-  return renderer;
-}
-
 function composeRendererViewport(renderer) {
   renderer.canvas = createCanvas(renderer.width, renderer.height, {
     background: rootBackground(renderer),
     title: renderer.title
   });
-  if (renderer.pageCanvas !== null) {
-    blitImage(renderer.canvas.image, renderer.pageCanvas.image, -rootScrollLeft(renderer), -rootScrollTop(renderer));
-  } else {
-    drawHtml(renderer.canvas, renderer.document);
-  }
+  drawHtml(renderer.canvas, renderer.document);
   drawHtmlScrollbars(renderer.canvas, renderer.document);
   renderer.dirty = false;
   renderer.needsLayout = false;
@@ -191,7 +83,6 @@ function renderRenderer(renderer) {
     width: renderer.width,
     height: renderer.height
   });
-  renderPageCache(renderer);
   composeRendererViewport(renderer);
   renderer.lastResizeRender = millis();
   return renderer;
@@ -246,9 +137,6 @@ function applyWheel(renderer, event) {
     return renderer;
   }
   scrollHtmlNodeBy(target, deltaX, deltaY);
-  if (target !== rootScrollNode(renderer)) {
-    renderPageCache(renderer);
-  }
   return composeRendererViewport(renderer);
 }
 
@@ -298,7 +186,6 @@ export function htmlRenderer(options) {
     }),
     canvas: null,
     document: null,
-    pageCanvas: null,
     html: optionValue(options, "html", ""),
     css: cssText(optionValue(options, "css", "")),
     title: title,

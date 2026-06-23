@@ -29,16 +29,17 @@ export function main()
     title: "Jayess Canvas + Window",
     width: 960,
     height: 540,
-    background: rgb(8, 12, 18),
+    background: rgb(16, 32, 48),
     html: packHtml("./window-canvas-html.html"),
-    css: packCss("./window-canvas-html.css")
+    css: packCss("./window-canvas-html.css"),
+    resizeDelay: 0
   });
   writeLine("Window is open. Use the native close button to exit.");
   showHtmlRenderer(renderer);
   while (!shouldCloseHtmlRenderer(renderer)) {
     updateHtmlRenderer(renderer);
     reportActions(renderer);
-    sleep(16);
+    sleep(1);
   }
   closeHtmlRenderer(renderer);
   return 0;
