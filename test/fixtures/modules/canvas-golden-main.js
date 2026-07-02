@@ -3,6 +3,7 @@ import { create as createImage, setPixel } from "jayess:image";
 import {
   create,
   drawImageClipped,
+  drawPolygon,
   drawTextBox,
   fillPolygon,
   fillRect,
@@ -10,11 +11,10 @@ import {
   popClip,
   pushClip,
   quadraticCurve,
-  savePpm,
-  strokePolygon
+  savePpm
 } from "jayess:canvas";
 
-export function renderScene(path) {
+export function renderCanvasGolden(path) {
   var canvas = create(6, 6, {
     background: rgb(0, 0, 0)
   });
@@ -32,7 +32,7 @@ export function renderScene(path) {
   drawImageClipped(canvas, image, 3, 2, { x: 3, y: 2, width: 1, height: 1 });
 
   fillPolygon(canvas, [{ x: 0, y: 4 }, { x: 2, y: 4 }, { x: 0, y: 5 }], rgb(0, 90, 0));
-  strokePolygon(canvas, [{ x: 3, y: 4 }, { x: 5, y: 4 }, { x: 5, y: 5 }], rgb(0, 0, 200));
+  drawPolygon(canvas, [{ x: 3, y: 4 }, { x: 5, y: 4 }, { x: 5, y: 5 }], rgb(0, 0, 200));
   quadraticCurve(canvas, 0, 5, 3, 2, 5, 5, rgb(140, 0, 0), { steps: 4 });
 
   savePpm(canvas, path);

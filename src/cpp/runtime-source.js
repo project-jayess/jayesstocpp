@@ -4,6 +4,7 @@ import {
   renderRuntimeHeaderFragments,
   renderRuntimeHeaderIncludes
 } from "./runtime-layout.js";
+import { resolveRuntimeFragmentKeys } from "./runtime-fragments.js";
 import {
   getCoreControlRuntimeCppFragment,
   getCoreControlRuntimeHeaderFragment
@@ -133,6 +134,7 @@ value get_length(const value& input);
 value array_pop(const value& input);
 value array_join(const value& input, const std::vector<value>& args);
 value array_includes(const value& input, const std::vector<value>& args);
+value get_native_property(const value& input, const std::string& key);
 value get_property(const value& input, const std::string& key);
 value get_index(const value& input, const value& key);
 std::string property_key_string(const value& input);
@@ -167,6 +169,7 @@ inline value call(const value& callable, Args&&... args) {
 
 export function getRuntimeCppSource(options = {}) {
   const features = options.features ?? "all";
+  const hasWindowRuntime = resolveRuntimeFragmentKeys(features).includes("window");
   return `#include "jayess_runtime.hpp"
 
 ${renderRuntimeCppIncludes()}
@@ -395,9 +398,20 @@ value array_includes(const value& input, const std::vector<value>& args) {
   return false;
 }
 
+value get_native_property(const value& input, const std::string& key) {
+${hasWindowRuntime ? `  if (std::holds_alternative<window_ptr>(input)) {
+    return window_get_property(input, key);
+  }
+` : ""}  return value(std::monostate{});
+}
+
 value get_property(const value& input, const std::string& key) {
   if (std::holds_alternative<callable_ptr>(input)) {
     return find_static_class_member(input, key);
+  }
+  auto nativeProperty = get_native_property(input, key);
+  if (!std::holds_alternative<std::monostate>(nativeProperty)) {
+    return nativeProperty;
   }
   if (!std::holds_alternative<object_ptr>(input)) {
     return value(std::monostate{});

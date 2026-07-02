@@ -1,0 +1,151 @@
+# Jayess Native Rendering
+
+Jayess should provide cross-platform native rendering through Jayess-owned standard-library modules instead of ambient browser APIs or Node.js GUI packages.
+
+The planned module family is:
+
+- `jayess:color` for color values, parsing, conversion, blending, and palette helpers.
+- `jayess:image` for pixel buffers, image dimensions, pixel access, and simple image file output.
+- `jayess:canvas` for off-screen 2D drawing operations over image buffers and the planned Jayess-owned XML scene renderer.
+- `jayess:window` for live native windows, frame presentation, input events, and event-loop integration.
+- `jayess:gpu` for optional GPU devices, surfaces, buffers, textures, shaders, pipelines, and draw commands.
+
+The current implemented rendering path is off-screen plus a guarded window presentation boundary: `jayess:canvas` draws into a `jayess:image` software pixel buffer and `savePpm` writes that buffer to a file. `jayess:window` owns live screen presentation through platform adapters.
+
+## Design Goals
+
+- Keep the public API under `jayess:*`.
+- Keep portable software rendering available without external GUI libraries.
+- Keep live native window rendering cross-platform by isolating platform adapters.
+- Keep GPU acceleration optional and isolated behind explicit backend adapters.
+- Keep rendering runtime files small and split by responsibility.
+- Keep generated project metadata explicit about native window, GPU backend, and platform adapter requirements.
+
+## Layering
+
+`jayess:color` is the lowest layer. It should produce deterministic color values that can be consumed by image and canvas helpers.
+
+`jayess:image` owns raster image buffers. It supports pixel access, dimensions, simple transformations, metadata reads, deterministic file output such as PPM/PGM/BMP/TGA, and PPM byte encode/decode before more complex encoders are added.
+
+`jayess:canvas` owns higher-level drawing. The current slice supports dimensions, pixel reads, deep copies, clipped image/canvas blits, a focused clip-stack state layer for clip-aware helpers, explicit draw/fill shape helpers, text boxes, and image output over `jayess:image` buffers. Bitmap text alignment, file-backed font handles, and optional system default font discovery are provided by `jayess:font` over the same canvas surface. System font discovery falls back to `jayess-default-5x7` when no usable host font is available. The next document-rendering direction is XML scene rendering over canvas primitives: shape elements such as `<rectangle>`, `<ellipse>`, `<triangle>`, and `<capsule>` should normalize into deterministic drawing commands without adding browser DOM, CSS selector, or JavaScript-in-markup behavior.
+
+`jayess:image` still owns image-buffer manipulation as data: deterministic file formats, bytes helpers, crop/subimage/resize/flip/rotate, and image-level bulk rectangle/blit operations. `jayess:canvas` should sit above that layer rather than duplicate it.
+
+`jayess:window` should own live native window behavior. It should create/show/close windows, track close requests, poll normalized input events, expose window size and title state, and present a validated `jayess:canvas` image buffer to the screen.
+
+There is no shipped `jayess:gui` standard-library module for now. Native UI experiments should compose `jayess:canvas`, `jayess:window`, and app-owned state directly until the project direction changes again.
+
+`jayess:gpu` should own accelerated rendering behavior. It should not replace `jayess:canvas`; it should provide a separate optional API for GPU resources and draw commands that can present into a `jayess:window` surface when a backend is available.
+The current `jayess:gpu` slices provide the public module, handle shape, guarded backend boundary, backend capability metadata on runtime handles, deterministic command validation, frame lifecycle checks, and normalized backend-unavailable diagnostics.
+The currently shipped executable backends are:
+
+- the always-available `validation` backend for deterministic clear/draw/end-frame execution and testing
+- the first host-backed Win32 `direct3d` surface-present slice
+- the first host-backed Cocoa `metal` surface-present slice
+
+Those host-backed slices stay deliberately narrow: they bind GPU frames to real native window surfaces, convert validated draw resource descriptors into backend-owned binding records, and complete a focused present path without widening yet into a full cross-platform shader/swapchain/resource model.
+
+`jayess:canvas` now exposes backend selection metadata with `backend: "auto"` as the default scene-rendering request. Today that automatic path resolves to the CPU renderer because the XML scene renderer still draws into deterministic image buffers. Explicit `backend: "gpu"` is reserved for the later canvas-to-GPU renderer and fails with a focused diagnostic until the GPU path can render scene elements correctly. This avoids making every canvas program depend on GPU runtime code before acceleration is real.
+
+## Runtime Shape
+
+The preferred implementation is:
+
+- Jayess wrappers in `stdlib/jayess/color/`, `stdlib/jayess/image/`, and `stdlib/jayess/canvas/`.
+- Focused canvas XML scene helpers split under `stdlib/jayess/canvas/` by XML adapter, attribute normalization, scene normalization, primitive rendering, and hit-test metadata.
+- Focused font helpers under `stdlib/jayess/font/`, with system font discovery kept behind the font runtime fragment instead of canvas, GUI, or window runtime files.
+- Focused C++ runtime fragments where native storage or platform behavior is needed, such as `runtime-image-source.js`.
+- A focused `stdlib/jayess/window/` module and `runtime-window-source.js` when live window support is implemented.
+- A focused `stdlib/jayess/gpu/` module and `runtime-gpu-source.js` when GPU support is implemented.
+- Platform-window adapter files split by operating system when live rendering requires host APIs.
+- GPU backend adapter files split by graphics API and platform when accelerated rendering requires host APIs.
+
+The first `jayess:window` slices provide the public module, handle shape, guarded adapter boundary, normalized platform-unavailable diagnostics, Win32/Cocoa/Linux software-buffer presentation, and focused host-event polling. The Windows adapter creates and manages a Win32 window through dynamically loaded `user32` / `gdi32` symbols, uploads validated `jayess:canvas` pixel buffers through a DIB/GDI path, and converts host events through the same adapter boundary. The Cocoa adapter creates and manages an `NSWindow` through dynamically loaded `libobjc` / `AppKit` symbols, presents software buffers through `NSImageView` / `NSBitmapImageRep` / `NSImage`, and normalizes focused keyboard, text-input, and mouse `NSEvent` values without changing the generated-file model. The Linux runtime now emits separate X11 and Wayland adapter paths: X11 owns the Xlib event path, while Wayland owns create/show/close/title/present plus close/resize/keyboard/text-input/pointer normalization through a narrow `libwayland-client` + `xdg-shell` + `wl_seat` client path. The Wayland code is split into focused registry, input, and shared-memory buffer fragments so protocol discovery, event normalization, and pixel upload do not accumulate in one adapter source file.
+The event queue shape is stable across adapters: close, resize, keyboard, mouse movement, and mouse button events use the same object fields on every host.
+Generated metadata records those compiled event families as `close`, `resize`, `key`, `text-input`, `pointer`, and `mouse-button` so build tooling can tell which adapter-neutral event shapes are present without opening a host window.
+The current automated runtime checks cover deterministic unavailable diagnostics plus platform-neutral lifecycle and event-queue behavior on every host, then add host-conditional real lifecycle/present/event verification for Win32, focused lifecycle/title/present/poll verification for Cocoa, full lifecycle/present/event verification for Linux/X11 when that adapter and display are available, and focused lifecycle/present verification for Linux/Wayland when a compositor, `WAYLAND_DISPLAY`, and input-seat path are available. Output and compile checks also verify that Cocoa and Wayland emit their normalized keyboard and pointer bridge code.
+The first shared event-loop helpers remain explicit and Jayess-owned: `jayess:window` layers `requestFrame(window, callback, args)` and `runFrame(window, state, callback, args)` over `jayess:timers` instead of introducing a separate hidden platform loop. Real apps still call `pollEvents(window)` in their frame/update callback when they want to drain host events.
+
+The Linux host boundary is intentionally split in project metadata and runtime structure:
+
+- `x11` for one shipped Linux adapter
+- `wayland` for a separate shipped Linux adapter family
+
+That split exists so Linux windowing does not collapse into one mixed adapter bucket. The public Jayess API should stay protocol-neutral even though the generated runtime now contains both adapter families.
+
+Generated metadata now reports that Linux projects compile both adapter families and records the current selection order: prefer Wayland when `WAYLAND_DISPLAY` is set and the Wayland client path is available, otherwise fall back to X11 when available.
+
+Do not place a full GUI stack into the standard library or one runtime source file while `jayess:gui` is out of scope.
+
+## Window Adapter Direction
+
+Live screen rendering should be added by small platform adapters, not by folding every host API into `jayess:canvas`.
+
+The preferred no-default-third-party path is:
+
+- Windows: Win32 window creation plus a DIB/GDI presentation path for the first software-buffer slice.
+- macOS: Cocoa adapter isolated in a focused runtime file, with Objective-C runtime calls kept behind a narrow dynamic bridge.
+- Linux: X11 and Wayland as separate adapter families rather than one generic Linux adapter.
+
+The first live-window surface should stay small:
+
+- `create(options)`
+- `show(window)`
+- `close(window)`
+- `shouldClose(window)`
+- `requestClose(window)`
+- `pollEvents(window)`
+- `present(window, canvas)`
+- `width(window)` and `height(window)`
+- `setTitle(window, title)`
+
+Unsupported host platforms should fail with clear platform-unavailable diagnostics.
+
+## GPU Adapter Direction
+
+Jayess can expose a Jayess-owned GPU API, but generated native code still has to use operating-system and driver graphics APIs. User programs should import `jayess:gpu`; they should not be forced to write directly against backend-specific C++ APIs for ordinary accelerated drawing.
+
+The first `jayess:gpu` surface should stay explicit and small:
+
+- `createDevice(options)`
+- `createSurface(window)`
+- `createBuffer(device, options)`
+- `createTexture(device, options)`
+- `uploadBuffer(buffer, data)`
+- `createShader(device, source)`
+- `createPipeline(device, options)`
+- `beginFrame(surface)`
+- `clear(frame, color)`
+- `draw(frame, pipeline, resources)`
+- `endFrame(frame)`
+
+Backend adapters should stay isolated, for example:
+
+- Windows: Direct3D adapter first.
+- macOS: Metal adapter first.
+- Linux: Vulkan adapter first when the guarded loader and compatible X11/Wayland window handle are available, then OpenGL for the focused X11 clear/upload path, then validation.
+
+Vulkan is a good Windows/Linux backend candidate, but it is not native on macOS without a compatibility layer such as MoltenVK. If the no-default-third-party policy is kept, macOS GPU support should use Metal directly.
+
+The Linux Vulkan slice is deliberately loader-first rather than a full graphics stack. It proves `libvulkan.so.1` loading, `vkCreateInstance` probing, compatible window-handle selection, and clear-present routing while leaving swapchains, synchronization, shader modules, and backend resource memory as later focused slices. The Jayess validation path now owns deterministic buffer uploads, shader stage/source metadata, minimal pipeline descriptors, descriptor-backed draw resource validation, and texture pixel storage so host adapters can be wired from a tested resource model rather than from backend-specific shortcuts.
+
+The first real host-backed slice is tracked separately in [gpu-backend-slice.md](./gpu-backend-slice.md) so resource lifetime, texture format, shader policy, pipeline shape, and presentation model remain independent implementation tasks instead of collapsing into one umbrella GPU milestone. The current emitted metadata records that Windows compiles `validation` plus `direct3d`, macOS compiles `validation` plus `metal`, and Linux compiles `validation` plus `opengl` / `vulkan`; Linux selection now prefers the guarded Vulkan surface path before falling back to OpenGL and then validation.
+
+## Dependency Policy
+
+The first portable slice should not depend on a copied third-party GUI toolkit. It should provide software rendering and image output with the standard C++ runtime support already used by Jayess.
+
+Live window rendering should use platform-native adapters first. GPU rendering should use explicit backend adapters behind `jayess:gpu`. Later explicit backend modules such as `jayess:glfw`, `jayess:webview`, `jayess:vulkan`, or `jayess:metal` can exist, but those dependencies must be visible in generated metadata and isolated from pure image rendering.
+
+## Example Direction
+
+```js
+import { create as createCanvas, fillRect, savePpm } from "jayess:canvas";
+import { rgb } from "jayess:color";
+
+var canvas = createCanvas(640, 480, { title: "Jayess" });
+fillRect(canvas, 20, 20, 160, 80, rgb(40, 120, 220));
+savePpm(canvas, "frame.ppm");
+```
+
+This document describes the feature direction. Keep diagnostics explicit until each module slice is implemented.

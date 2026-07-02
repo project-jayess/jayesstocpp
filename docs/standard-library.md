@@ -91,12 +91,11 @@ Jayess should provide a cross-platform native rendering family through focused `
 
 - `jayess:color` for color values, parsing, conversion, blending, and palette helpers.
 - `jayess:image` for pixel buffers, image dimensions, pixel access, and simple image file output.
-- `jayess:canvas` for higher-level off-screen 2D drawing operations over image buffers and the Jayess-owned focused HTML/CSS renderer.
+- `jayess:canvas` for higher-level off-screen 2D drawing operations over image buffers and the planned Jayess-owned XML scene renderer.
 - `jayess:window` for live native windows, frame presentation, and input events.
 - `jayess:gpu` for optional accelerated resources, pipelines, and draw commands.
-- `jayess:gui` for the default Jayess-owned widget toolkit over layout, canvas-rendered documents, and normalized window events.
 
-The current canvas implementation renders off-screen, can save deterministic image files, and can be presented through `jayess:window` where a host adapter is available. The Linux/X11 window adapter uploads validated software canvas pixels through dynamically loaded X11 image functions. The shipped layering is `jayess:color` under `jayess:image` under `jayess:canvas`, with `jayess:window` presenting canvas buffers to real native windows. `jayess:canvas` owns higher-level drawing commands and should own the focused HTML/CSS renderer over image/font/layout primitives. `jayess:gui` sits above `jayess:layout`, `jayess:canvas`, and `jayess:window` as the default Jayess-owned widget-toolkit slice; it consumes canvas-rendered documents for interaction, invalidation, action queues, and presentation. `jayess:image` owns the raster buffer and image-manipulation layer. `jayess:gpu` remains a separate optional acceleration layer rather than a requirement for `jayess:canvas` or `jayess:gui`. The portable implementation favors software rendering and deterministic image output. Live window and GPU rendering stay behind narrow runtime adapters and platform-isolated native code.
+The current canvas implementation renders off-screen, can save deterministic image files, and can be presented through `jayess:window` where a host adapter is available. The Linux/X11 window adapter uploads validated software canvas pixels through dynamically loaded X11 image functions. The shipped layering is `jayess:color` under `jayess:image` under `jayess:canvas`, with `jayess:window` presenting canvas buffers to real native windows. `jayess:canvas` owns higher-level drawing commands and should own XML scene rendering over image/font/layout primitives. HTML/CSS rendering is being removed from the canvas direction rather than retained as a compatibility layer. `jayess:image` owns the raster buffer and image-manipulation layer. `jayess:gpu` remains a separate optional acceleration layer rather than a requirement for `jayess:canvas`. There is no shipped `jayess:gui` standard-library module for now. The portable implementation favors software rendering and deterministic image output. Live window and GPU rendering stay behind narrow runtime adapters and platform-isolated native code.
 
 ## Module Index
 
@@ -138,9 +137,9 @@ Exports: `deflate`, `inflate`, `gzip`, `gunzip`. See [jayess-compress-module.md]
 
 ### `jayess:canvas`
 
-Exports: `create`, `clear`, `width`, `height`, `getPixel`, `copy`, `saveState`, `restoreState`, `setFillColor`, `setStrokeColor`, `setStrokeWidth`, `setTextColor`, `setTextSize`, `translate`, `scale`, `fillRect`, `clipRect`, `currentClip`, `pushClip`, `popClip`, `fillRectClipped`, `fillRectAlpha`, `strokeRect`, `drawImage`, `drawImageClipped`, `drawCanvas`, `fillCircle`, `strokeCircle`, `fillEllipse`, `strokeEllipse`, `line`, `polyline`, `quadraticCurve`, `bezierCurve`, `fillPolygon`, `strokePolygon`, `measureText`, `text`, `drawTextBox`, `parseHtml`, `parseCss`, `createHtmlDocument`, `layoutHtml`, `hitTestHtml`, `drawHtml`, `savePpm`, `saveImage`. See [jayess-canvas-module.md](./jayess-canvas-module.md) and [jayess-canvas-html-css.md](./jayess-canvas-html-css.md).
+Exports: `create`, `clear`, `width`, `height`, `getPixel`, `copy`, `saveState`, `restoreState`, `setFillColor`, `setStrokeColor`, `setStrokeWidth`, `setTextColor`, `setTextSize`, `translate`, `scale`, `drawPixel`, `drawLine`, `drawRect`, `fillRect`, `drawEllipse`, `fillEllipse`, `drawSemiellipse`, `fillSemiellipse`, `drawTriangle`, `fillTriangle`, `drawCapsule`, `fillCapsule`, `drawPolyline`, `drawPolygon`, `fillPolygon`, `clipRect`, `currentClip`, `pushClip`, `popClip`, `drawImage`, `drawImageClipped`, `drawCanvas`, `measureText`, `text`, `drawTextBox`, `parseScene`, `drawScene`, `renderScene`, `findElement`, `setAttribute`, `setAttributes`, `hitElement`, `hitElements`, `addEventListener`, `dispatchEvent`, `packXml`, `packImage`, `savePpm`, `saveImage`. See [jayess-canvas-module.md](./jayess-canvas-module.md) and [jayess-canvas-xml-scenes.md](./jayess-canvas-xml-scenes.md).
 
-The shipped state slice includes a clip stack, save/restore, fill/stroke/text defaults, and focused translate/scale transforms. Pixel-writing helpers route through active clip and transform state. The HTML/CSS renderer belongs to `jayess:canvas` and exposes focused document parsing, CSS parsing, descendant selector matching, min/max box-model layout metadata, margin/padding shorthand metadata, `overflow: hidden` clipping, adjacent inline text wrapping, disabled control metadata, hit-testing, and paint helpers for GUI and off-screen use.
+The shipped state slice includes a clip stack, save/restore, fill/stroke/text defaults, and focused translate/scale transforms. Pixel-writing helpers route through active clip and transform state. The XML scene renderer belongs to `jayess:canvas` and exposes focused shape parsing, attribute normalization, shape-tree rendering, stable element IDs, runtime attribute mutation, and canvas-level pointer transition helpers for app-owned UI state.
 The shipped stroke-style slice is `strokeWidth` only; caps and joins stay separate later slices.
 
 ### `jayess:collections/map`
@@ -201,7 +200,7 @@ Exports: `create`, `on`, `once`, `off`, `emit`, `listenerCount`.
 
 ### `jayess:font`
 
-Exports: `defaultFont`, `createFont`, `registerFont`, `getFont`, `setDefaultFont`, `loadFont`, `fontMetrics`, `measureGlyph`, `measureText`, `lineHeight`, `charWidth`, `drawText`, `drawTextAligned`. The current module supports deterministic bitmap JSON fonts plus file-backed TTF, TrueType-style OTF, WOFF, and WOFF2 handles for metrics and registry selection. See [jayess-font-module.md](./jayess-font-module.md).
+Exports: `defaultFont`, `createFont`, `registerFont`, `getFont`, `setDefaultFont`, `loadFont`, `packFont`, `fontMetrics`, `measureGlyph`, `measureText`, `lineHeight`, `charWidth`, `drawText`, `drawTextAligned`. The current module supports deterministic bitmap JSON fonts plus file-backed or packaged TTF, TrueType-style OTF, and supported WOFF handles with Jayess-owned glyph rasterization. WOFF2 and CFF-backed outlines remain limited. See [jayess-font-module.md](./jayess-font-module.md).
 
 ### `jayess:form`
 
@@ -222,12 +221,6 @@ Exports: `matches`, `globSync`. See [jayess-glob-module.md](./jayess-glob-module
 ### `jayess:gpu`
 
 Exports: `createDevice`, `createSurface`, `createBuffer`, `uploadBuffer`, `createTexture`, `uploadImage`, `createShader`, `createPipeline`, `beginFrame`, `clear`, `draw`, `endFrame`. Runtime handles record backend capability metadata, deterministic buffer bytes, shader/pipeline metadata, texture pixels, descriptor-backed draw bindings, and command/frame lifecycle shapes before broader real-backend adapters are available. See [jayess-gpu-module.md](./jayess-gpu-module.md).
-
-### `jayess:gui`
-
-Exports: `createApplication`, `createWindowState`, `setRoot`, `invalidate`, `needsRedraw`, `drainActions`, `createLabel`, `createButton`, `createTextInput`, `createCheckbox`, `createRadio`, `value`, `setValue`, `selection`, `accessibility`, `checked`, `setChecked`, `formState`, `createPanel`, `createStack`, `createColumn`, `createRow`, `layout`, `update`, `draw`, `runGuiFrame`, `attachHtmlDocument`, `updateHtmlDocument`, `drawHtmlDocument`. The `jayess:gui/html-renderer` submodule exports `htmlRenderer`, `runHtmlRenderer`, `updateHtmlRenderer`, `reloadHtmlRenderer`, `showHtmlRenderer`, `shouldCloseHtmlRenderer`, `closeHtmlRenderer`, and `drainHtmlRendererActions`; callers pass HTML/CSS text from `loadHtml`, `loadCss`, `packHtml`, `packCss`, or another source. See [jayess-gui-module.md](./jayess-gui-module.md).
-
-The first shipped slice is a pure Jayess-owned software toolkit layer. It records click, text `input`, text `change`, checkbox/radio `change`, HTML click, HTML submit, HTML input focus, HTML input, and HTML change actions through an explicit action queue instead of hiding a broad callback/runtime loop, and it stays above `jayess:layout`, `jayess:canvas`, and normalized `jayess:window` events without depending on `jayess:gpu`. Disabled canvas-rendered HTML controls expose metadata and skip interaction actions. `runGuiFrame(...)` is a one-frame helper for explicit event/update/callback/draw/present flow and reports deterministic render/present/close/action metadata. Text inputs expose collapsed selection metadata, and widgets expose plain accessibility-style metadata without binding to browser or OS accessibility APIs. GUI should use the `jayess:canvas` HTML/CSS renderer for document-style UI rather than owning a separate browser DOM or renderer.
 
 ### `jayess:html`
 
@@ -384,7 +377,7 @@ Exports: `watch`, `poll`, `close`, `isWatcher`. See [jayess-watch-module.md](./j
 
 ### `jayess:window`
 
-Exports: `create`, `show`, `close`, `shouldClose`, `requestClose`, `pollEvents`, `requestFrame`, `cancelFrame`, `runFrame`, `present`, `width`, `height`, `setTitle`. `pollEvents` drains normalized close, resize, key, text-input, pointer, and mouse-button events from the host adapter where available. Generated metadata records those event families alongside the compiled `win32`, `cocoa`, `x11`, and `wayland` adapter families. See [jayess-window-module.md](./jayess-window-module.md).
+Exports: `create`, `show`, `hide`, `frame`, `close`, `shouldClose`, `isClosing`, `requestClose`, `pollEvents`, `addEventListener`, `removeEventListener`, `dispatchEvents`, `run`, `setFps`, `currentFps`, `requestFrame`, `cancelFrame`, `runFrame`, `present`, `requestRender`, `width`, `height`, `setTitle`. `pollEvents` drains normalized close, resize, key, text-input, pointer, and mouse-button events from the host adapter where available. `requestRender` schedules the current canvas for the next `run` loop tick instead of presenting synchronously from an input callback. Generated metadata records those event families alongside the compiled `win32`, `cocoa`, `x11`, and `wayland` adapter families. See [jayess-window-module.md](./jayess-window-module.md).
 
 ### `jayess:xml`
 

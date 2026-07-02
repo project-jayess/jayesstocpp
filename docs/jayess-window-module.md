@@ -6,10 +6,19 @@
 
 - `create(options)`
 - `show(window)`
+- `hide(window)`
+- `frame(window, enabled)`
 - `close(window)`
 - `shouldClose(window)`
+- `isClosing(window)`
 - `requestClose(window)`
 - `pollEvents(window)`
+- `addEventListener(window, name, callback)`
+- `removeEventListener(window, name, callback)`
+- `dispatchEvents(window)`
+- `run(window)`
+- `setFps(window, fps)`
+- `currentFps(window)`
 - `requestFrame(window, callback, args)`
 - `cancelFrame(handle)`
 - `runFrame(window, state, callback, args)`
@@ -23,6 +32,9 @@
 - `title`: window title string
 - `width`: positive integer
 - `height`: positive integer
+- `frame`: optional boolean, defaults to `true`; use `false` for a frameless content-only window where the host adapter supports decoration control
+
+New windows use a black native background by default. This keeps empty windows and the short interval before the first canvas presentation consistent with Jayess canvas defaults.
 
 ## Event Shape
 
@@ -45,6 +57,49 @@ Mouse buttons normalize to `"left"`, `"middle"`, `"right"`, or `"unknown"`.
 
 `requestClose(window)` records close intent and queues a normalized close event without destroying the host window handle. `shouldClose(window)` reports whether the handle has been closed or a close request has been queued.
 
+`isClosing(window)` is the preferred name for close-state checks. `shouldClose(window)` remains available for lower-level loops and existing code.
+
+`addEventListener(window, name, callback)` registers a JavaScript-style callback for normalized window events. It is a convenience layer over `jayess:events`; it does not replace `pollEvents(window)`. `dispatchEvents(window)` is the low-level event pump: it drains the native event queue with `pollEvents(window)`, emits each event by its `type`, and returns the drained events. `removeEventListener(window, name, callback)` removes matching listeners by callback identity.
+
+`run(window)` is the high-level blocking event loop. It shows the window if it is not already visible, repeatedly dispatches events at the configured target frame rate, presents the most recent canvas only when rendering is requested, and returns after the window is closing. If the window has not already been closed when the loop exits, it closes the native handle.
+
+`setFps(window, fps)` sets the target event-loop frequency used by `run(window)`. `currentFps(window)` returns that configured target value. The default target is 60 FPS. The first slice reports the configured target FPS, not measured rendering throughput.
+
+`frame(window, enabled)` toggles native window decorations at runtime. `frame(window, false)` requests a frameless content-only window; `frame(window, true)` requests normal platform chrome again. The same setting can be passed during creation with `create({ frame: false })`. Win32, Cocoa, and X11 apply native decoration changes directly. Wayland keeps the API stable but decoration control is compositor/protocol dependent, so this first adapter slice treats the request as best-effort until dedicated decoration protocol support is added.
+
+Window handles also expose a small method-style surface for user code that reads more like JavaScript:
+
+- `window.show()`
+- `window.hide()`
+- `window.frame(enabled)`
+- `window.close()`
+- `window.renderCanvas(canvas)`
+- `window.present(canvas)`
+- `window.requestRender(canvas)`
+- `window.addEventListener(name, callback)`
+- `window.removeEventListener(name, callback)`
+- `window.dispatchEvents()`
+- `window.run()`
+- `window.setFps(fps)`
+- `window.currentFps()`
+- `window.isClosing()`
+- `window.shouldClose()`
+
+These methods are aliases over the module functions. `window.renderCanvas(canvas)` and `window.present(canvas)` present immediately. `window.requestRender(canvas)` stores the canvas and asks `window.run()` to present it on the next loop tick, which is preferable inside input callbacks. `window.run()` is the simple high-level loop for normal programs. `window.dispatchEvents()`, `window.isClosing()`, and `window.shouldClose()` are lower-level pieces for custom loops, games, animation, tests, or frame helpers.
+
+Example:
+
+```js
+var closed = false;
+window.addEventListener("close", function () {
+  closed = true;
+  window.close();
+});
+
+window.renderCanvas(canvas);
+window.run();
+```
+
 `requestFrame(window, callback, args)` is the first narrow Jayess-owned event-loop helper. It is built on `jayess:timers` and schedules one zero-delay callback tick associated with a window. The callback still owns `pollEvents(window)` explicitly; the helper does not hide event draining or create a broad implicit app loop. If `shouldClose(window)` is already true when the scheduled frame tick runs, the callback is skipped and the frame handle resolves to `null`.
 
 `cancelFrame(handle)` cancels a scheduled frame handle through the same underlying timer-cancellation path as `jayess:timers`.
@@ -57,8 +112,6 @@ Mouse buttons normalize to `"left"`, `"middle"`, `"right"`, or `"unknown"`.
 
 When `shouldClose(window)` is already true, `scheduled` is `false`, `done` and `handle` are `null`, and the callback is not scheduled. Otherwise, the helper schedules one frame tick and calls `callback(window, state, ...args)`. The callback still owns `pollEvents(window)` explicitly.
 
-`jayess:gui` adds `runGuiFrame(window, windowState, canvas, callback, args)` for the common canvas GUI case. It is still a one-frame helper, not a hidden app loop. The callback contract receives the polled events explicitly as `callback(window, windowState, events, ...args)`. The helper updates GUI state from those events, runs the callback, draws and presents only when redraw is needed and the window is still open, and returns deterministic frame records with `rendered`, `presented`, `closed`, and `queuedActions` fields.
-
 The current platform-neutral lifecycle invariants are explicit:
 
 - `show(window)` is idempotent for an already shown open window
@@ -66,8 +119,7 @@ The current platform-neutral lifecycle invariants are explicit:
 - `close(window)` preserves already queued events, appends one final normalized close event when needed, marks the handle closed, and clears the shown state
 - `present(window, canvas)` records the presented software-buffer dimensions through the neutral runtime layer before the platform adapter uploads pixels
 - `requestFrame(window, callback, args)` shares the timer scheduler with `jayess:timers` but keeps `pollEvents(window)` explicit in user callback code
-- `runFrame(window, state, callback, args)` keeps the same explicit polling model while giving GUI loops a stable per-frame state/callback record
-- `jayess:gui` `runGuiFrame(window, windowState, canvas, callback, args)` keeps events visible in the callback contract while handling GUI update/draw/present for one frame
+- `runFrame(window, state, callback, args)` keeps the same explicit polling model while giving canvas/window loops a stable per-frame state/callback record
 
 ## Platform Boundary
 

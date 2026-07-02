@@ -75,6 +75,11 @@ inline jayess::value jayessStringSplit(const std::vector<jayess::value>& jayessA
   return jayess::string_split(text, separator);
 }
 
+inline jayess::value jayessStringChars(const std::vector<jayess::value>& jayessArgs) {
+  jayessStringRequireExactArgs(jayessArgs, 1, "Jayess string chars expects exactly one argument");
+  return jayess::string_chars(jayess::argument_at(jayessArgs, 0));
+}
+
 inline jayess::value jayessStringReplaceFirst(const std::vector<jayess::value>& jayessArgs) {
   jayessStringRequireExactArgs(jayessArgs, 3, "Jayess string replaceFirst expects exactly three arguments");
   return jayess::string_replace_first(

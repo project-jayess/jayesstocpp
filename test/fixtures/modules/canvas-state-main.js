@@ -1,8 +1,8 @@
 import { rgb } from "jayess:color";
 import {
   create,
+  drawLine,
   fillRect,
-  line,
   pushClip,
   restoreState,
   savePpm,
@@ -39,7 +39,7 @@ export function renderStateScene(path) {
   scale(canvas, 2, 2);
   setStrokeColor(canvas, rgb(255, 255, 0));
   setStrokeWidth(canvas, 1);
-  line(canvas, 1, 1, 2, 1, null);
+  drawLine(canvas, 1, 1, 2, 1, null);
   restoreState(canvas);
 
   setTextColor(canvas, rgb(255, 255, 255));

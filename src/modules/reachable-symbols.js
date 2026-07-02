@@ -81,7 +81,7 @@ export function analyzeReachableSymbols(graph) {
         continue;
       }
 
-      const requestedNames = requestedNamedImportNames(dependency.specifiers);
+      const requestedNames = requestedNamesForDependency(dependency, importerSummary);
       summary.reachableExports = sortedUnique([...summary.reachableExports, ...requestedNames]);
       if (summary.wholeModuleReasons.length === 0) {
         summary.retainedExports = sortedUnique([...summary.retainedExports, ...requestedNames]);
@@ -93,6 +93,20 @@ export function analyzeReachableSymbols(graph) {
   }
 
   return summaries;
+}
+
+function requestedNamesForDependency(dependency, importerSummary) {
+  if (
+    dependency.specifiers.every((specifier) => specifier.kind === "named" || specifier.kind === "re-export")
+    && importerSummary?.wholeModuleReasons?.length === 0
+  ) {
+    const retainedImports = new Set(importerSummary?.retainedImportLocals ?? []);
+    return dependency.specifiers
+      .filter((specifier) => retainedImports.has(specifier.local))
+      .map((specifier) => specifier.imported)
+      .sort();
+  }
+  return requestedNamedImportNames(dependency.specifiers);
 }
 
 function retainedImportLocals(moduleRecord, declarationReferences, retainedDeclarations, retainedExports) {

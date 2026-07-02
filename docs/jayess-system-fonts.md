@@ -47,7 +47,7 @@ Jayess does not copy or mutate system font files. Discovered paths are used only
 
 ## Supported Formats
 
-Discovered fonts use the same validation path as `loadFont(...)`:
+Discovered fonts use the same validation and TrueType raster path as `loadFont(...)`:
 
 - `.ttf`
 - TrueType-style `.otf`
@@ -62,4 +62,4 @@ Generated `jayess_build_hints.json` and `jayess_dependency_plan.json` include `s
 
 ## Non-Goals
 
-System font discovery is not a fontconfig, CoreText, DirectWrite, or browser font stack clone. It probes deterministic paths and validates files through Jayess runtime font loading. Applications that need exact typography should ship explicit font files and use `loadFont(...)`.
+System font discovery is not a fontconfig, CoreText, DirectWrite, HarfBuzz, or browser font stack clone. It probes deterministic paths and validates/rasterizes TrueType-compatible files through Jayess runtime font loading. Applications that need exact typography should ship explicit font files and use `loadFont(...)`.

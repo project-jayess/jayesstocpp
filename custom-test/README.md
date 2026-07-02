@@ -11,3 +11,5 @@ custom-test/<feature>/dist/  # compiled binaries and run artifacts
 ```
 
 Keep generated `cpp/` and `dist/` outputs local unless a task explicitly asks to check them in. When a manual probe exposes a bug, add focused automated coverage under `test/` with the fix.
+
+Current focused probes should use shipped standard-library modules only. There is no `jayess:gui` probe because `jayess:gui` is not shipped for now.

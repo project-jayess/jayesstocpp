@@ -29,7 +29,7 @@ int main() {
     const std::string ppmPath = ${JSON.stringify(`${targetDir.replace(/\\/g, "/")}/canvas-golden-scene.ppm`)};
     const std::string expectedPath = ${JSON.stringify(path.resolve("test/fixtures/runtime/canvas-golden-scene.ppm").replace(/\\/g, "/"))};
     ${namespace}::jayess_module_init();
-    auto rendered = ${namespace}::renderScene(std::vector<jayess::value>{ppmPath});
+    auto rendered = ${namespace}::renderCanvasGolden(std::vector<jayess::value>{ppmPath});
     require(std::get<bool>(rendered) == true, "canvas golden scene render");
     require(readFile(ppmPath) == readFile(expectedPath), "canvas golden scene ppm content");
     std::cout << "ok\\n";

@@ -46,7 +46,7 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
   const runtimeFragmentInput = options.runtimeFragments === "all" ? "all" : runtimeFeatures;
   const runtimeFragmentKeys = resolveRuntimeFragmentKeys(runtimeFragmentInput);
   const outputs = [...writeRuntime(resolvedTargetDir, { features: runtimeFragmentInput })];
-  const forcedRetainedDeclarations = collectForcedRetainedDeclarations(graph, emittedModules);
+  const forcedRetainedDeclarations = collectForcedRetainedDeclarations(graph, emittedModules, reachableSymbols);
   const forcedRetainedImportLocals = collectForcedRetainedImportLocals(graph, forcedRetainedDeclarations);
   const { metadata } = planEmittedModuleMetadata(graph, resolvedTargetDir, reachableSymbols);
   const lifetimeMetadataByModule = new Map(graph.modules.map((moduleRecord) => {

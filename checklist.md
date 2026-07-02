@@ -405,3 +405,132 @@ Each active slice should:
 - [x] Support one CSS string or an ordered CSS string array in `htmlRenderer()` options and `reloadHtmlRenderer()`.
 - [x] Add focused module-graph, output, and compile coverage for `jayess:gui/html-renderer`.
 - [x] Document the renderer facade under `/docs`.
+
+## 413. Canvas And GUI XML Rework Direction
+
+- [x] Remove public HTML/CSS canvas-renderer guidance from docs and state that the replacement direction is XML scene rendering instead of browser-like HTML/CSS.
+- [x] Update `Agents.md` to state that `jayess:canvas` owns primitive software drawing and XML scene rendering, while HTML/CSS rendering is no longer the default Jayess GUI/document direction.
+- [x] Update `README.md` to replace HTML/CSS canvas-renderer language with the XML shape scene direction.
+- [x] Update `docs/standard-library.md`, `docs/jayess-canvas-module.md`, `docs/jayess-gui-module.md`, and `docs/standard-library-matrix.md` with the new canvas/XML layering.
+- [x] Add or update a focused `/docs` markdown file describing the XML scene model, default shape elements, supported attributes, non-goals, and the later GUI rework plan.
+- [x] Keep `jayess:html` as server/string helper functionality only; do not route GUI rendering through `jayess:html`.
+- [x] Keep `jayess:xml` as the parser layer for XML text; do not add a second XML parser inside `jayess:canvas`.
+- [x] Define migration notes for retargeting `custom-test/window-canvas-html` to XML scene rendering after the XML canvas renderer exists.
+
+## 414. Canvas Primitive API Cleanup
+
+- [x] Audit the current `stdlib/jayess/canvas/index.js` public exports and classify each export as primitive drawing, text/font drawing, image bridge, state/clip/transform, HTML/CSS renderer, or deprecated compatibility.
+- [x] Preserve existing low-level canvas/image behavior that is still useful for XML rendering: `create`, `clear`, `width`, `height`, `getPixel`, `copy`, `savePpm`, `saveImage`, `drawImage`, `drawImageClipped`, and canvas state helpers.
+- [x] Normalize public primitive names around explicit draw/fill pairs: `drawPixel`, `drawLine`, `drawPolyline`, `drawRect`, `fillRect`, `drawEllipse`, `fillEllipse`, `drawTriangle`, `fillTriangle`, `drawCapsule`, `fillCapsule`, `drawPolygon`, and `fillPolygon`.
+- [x] Hard-remove legacy aliases such as `line`, `strokeRect`, `strokeEllipse`, `fillCircle`, `strokeCircle`, `polyline`, and `strokePolygon`; use explicit names such as `drawLine`, `drawRect`, `fillRect`, `drawEllipse`, `fillEllipse`, `drawPolyline`, `drawPolygon`, and `fillPolygon` instead.
+- [x] Split primitive drawing helpers from `stdlib/jayess/canvas/index.js` into small focused files such as `primitives.js`, `shapes.js`, `text.js`, `state.js`, and `scene-render.js` without creating a large replacement file.
+- [x] Add focused output tests proving named imports from `jayess:canvas` retain only the requested primitive drawing helpers and their direct dependencies.
+- [x] Add generated C++ compile tests for each first-slice primitive drawing helper without importing XML, GUI, window, or HTML/CSS renderer code.
+- [x] Add deterministic runtime image tests under `test/` that render primitive shapes to an image/PPM and verify selected pixels.
+- [x] Update docs after the primitive API cleanup lands, keeping examples small and independent of GUI/window support.
+- [x] Add drawSemiellipse(), fillSemiellipse(), which are for semi-ellipse
+
+## 415. Canvas XML Scene Schema
+
+- [x] Define the first XML scene root shape, either `<canvas>` or `<scene>`, with `width`, `height`, `background`, and optional `title` attributes.
+- [x] Define first-slice shape elements: `<rectangle>`, `<ellipse>`, `<semiellipse>`, `<triangle>`, `<capsule>`, `<line>`, `<pixel>`, `<polyline>`, `<polygon>`, `<image>` and `<text>`.
+- [x] Define shared style attributes: `id`, `x`, `y`, `width`, `height`, `fill`, `outline`, `outline-thickness`, `opacity`, `rotation`, `clip`, and `visible`.
+- [x] Do not add `x1`, `y1`, `x2`, `y2`, `x3`, or `y3` attributes; all point-list shapes must use the shared `points` attribute.
+- [x] Do not add `radius`, `radius-x`, or `radius-y` for `<ellipse>`; ellipse geometry must be derived from `x`, `y`, `width`, and `height`.
+- [x] Define `points` syntax as comma-separated coordinate tuples such as `points="(10,10), (30,20), (60,90)"`, with optional whitespace inside tuples.
+- [x] Define `points` coordinates as relative offsets added to the element's resolved `x` and `y`, so `x="100" y="50" points="(10,10), (30,20)"` renders absolute points `(110,60)` and `(130,70)`.
+- [x] Define shape-specific attributes such as `points`, `src`, `font-family`, `font-size`, and `text` without adding alternate coordinate or radius attributes.
+- [x] Decide attribute parsing rules for numeric values, color values, booleans, IDs, relative points, and unsupported/malformed attributes.
+- [x] Add focused diagnostics for unknown elements, missing required attributes, invalid numeric values, invalid colors, invalid point lists, negative sizes, and unsupported style attributes.
+- [x] Add focused diagnostics that reject forbidden geometry attributes such as `x1`, `y1`, `x2`, `y2`, `x3`, `y3`, `radius`, `radius-x`, and `radius-y` with guidance to use `points`, `width`, `height`.
+- [x] `points` are calculated after `width`, `height`, `x` and `y`
+- [x] Keep the first XML scene schema deterministic and non-browser-like: no CSS selectors, no JavaScript execution, no network loading, no DOM mutation model, and no HTML compatibility layer.
+- [x] Document the XML schema and examples in `/docs`.
+
+## 416. Canvas XML Parser Adapter
+
+- [x] Add a small `stdlib/jayess/canvas/xml-scene.js` module that consumes parsed nodes from `jayess:xml` or XML text through `jayess:xml` helpers.
+- [x] Implement `parseScene(xmlText, options?)` for canvas XML scenes without importing `jayess:gui` or `jayess:window`.
+- [x] Implement `sceneSize(scene)`, `sceneBackground(scene)`, and `sceneTitle(scene)` helpers for generated metadata and window probes.
+- [x] Implement attribute normalization helpers in a focused file, for example `xml-attributes.js`, instead of adding parsing logic to the public canvas index.
+- [x] Implement shape node normalization into a Jayess-owned scene tree shape that is stable for render, hit-test, and future GUI use.
+- [x] Add parser/normalizer tests for root scene attributes, every first-slice shape element, shared attributes, nested groups, and malformed input diagnostics.
+- [x] Add output tests proving importing `parseScene` retains `jayess:xml` and canvas scene helpers but does not retain primitive drawing code unless rendering is imported.
+- [x] Update docs after the parser adapter lands.
+
+## 417. Canvas XML Scene Rendering
+
+- [x] Implement `drawScene(canvas, scene)` and `renderScene(xmlText, options?)` that walk the normalized XML scene tree and delegate to primitive canvas drawing helpers.
+- [x] Implement `<rectangle>` rendering from `x`, `y`, `width`, `height` and optional `points`
+- [x] Implement `<line>` rendering from `x`, `y` requiring exactly two relative points.
+- [x] Implement `<pixel>` rendering from `x`, `y`, and color can be choosen by optional `fill` default #000000.
+- [x] Implement `<ellipse>` rendering from `x`, `y`, `width`, `height` and optional `points`, with no radius attributes.
+- [x] Implement `<semiellipse>` rendering from `x`, `y`, `width`, `height` and optional `points`, with no radius attributes.
+- [x] Implement `<triangle>` rendering from `x`, `y`, `width`, `height` and optional `points`
+- [x] Implement `<polygon>` rendering from `x`, `y`, `width`, `height` and `points`, requiring at least three relative points respectively.
+- [x] Implement `<polyline>` rendering from `points`, requiring at least two relative points respectively.
+- [x] Implement `<capsule>` rendering from `x`, `y`, `width`, `height` and optional `points`. Default is horizontal capsule.
+- [x] Implement `<text>` rendering through the existing `jayess:font` and canvas text helpers.
+- [x] Implement `<image>` rendering for explicit Jayess image handles and local asset handles supported by existing runtime image loading policy.
+- [x] Fix the XML renderer `<line>` runtime path so a horizontal line from `points="(0,10), (5,10)"` reliably paints the expected selected pixels.
+- [x] Add deterministic runtime tests that render each XML shape to PPM or image pixels and verify selected pixels.
+- [x] Add generated C++ compile tests for XML scene rendering without opening native windows.
+- [x] Add docs with complete first-slice XML examples.
+
+## 418. Remove Canvas HTML/CSS Rendering Surface
+
+- [x] Identify every public `jayess:canvas` export tied to HTML/CSS rendering: `packHtml`, `packCss`, `loadHtml`, `loadCss`, `parseHtml`, `parseCss`, `createHtmlDocument`, `layoutHtml`, `hitTestHtml`, `drawHtml`, HTML scroll helpers, and CSS helper exports.
+- [x] Hard-remove those public exports without deprecated compatibility stubs because Jayess has no compatibility requirement for the old HTML/CSS renderer.
+- [x] Remove or quarantine canvas HTML/CSS internal files after XML scene rendering has replacement tests: `html-parser.js`, `css-parser.js`, `html-style.js`, `html-layout.js`, `html-paint.js`, `html-hit-test.js`, `html-scroll.js`, `css-values.js`, `css-layout-values.js`, and related helpers.
+- [x] Remove generated output tests and runtime tests that assert HTML/CSS canvas behavior after replacement XML tests exist.
+- [x] Retarget `custom-test/window-canvas-html` in place so its source assets, generated C++, dist output, and README exercise XML scene rendering instead of HTML/CSS rendering.
+- [x] Update generated project metadata tests so HTML/CSS renderer fragments are no longer expected for canvas imports.
+- [x] Update docs and README references so users are pointed to XML scenes and primitive drawing instead of canvas HTML/CSS.
+- [x] Keep unrelated `jayess:html` string helper docs intact, explicitly noting it is not the GUI renderer.
+
+## 420. Window Handle Method Surface
+
+- [x] Add native window handle methods for `show()`, `close()`, `renderCanvas(canvas)`, `present(canvas)`, `addEventListener(name, callback)`, `removeEventListener(name, callback)`, `dispatchEvents()`, and `shouldClose()`.
+- [x] Add `window.run()` as the high-level blocking event loop so simple programs do not need to write their own `dispatchEvents()` loop.
+- [x] Add `window.isClosing()` as the preferred close-state method name while preserving `window.shouldClose()` for lower-level/manual loop compatibility.
+- [x] Add `window.setFps(fps)` and `window.currentFps()` for first-slice target FPS configuration used by `window.run()`.
+- [x] Add `window.hide()` as a non-closing visibility operation paired with `window.show()`.
+- [x] Keep method-style window calls as aliases over the existing `jayess:window` module functions instead of adding a hidden browser-style event loop.
+- [x] Store window event listeners on the native window handle so callbacks do not rely on ad-hoc Jayess object properties or runtime handle equality hacks.
+- [x] Add focused output coverage proving method calls lower through the native window property hook.
+- [x] Update `custom-test/canvas-window` to use the method-style window API.
+- [x] Document the method-style API and explicit event-loop requirement in `/docs`.
+
+## 421. Canvas XML CSS-Like Shadow Rendering
+
+- [x] Reintroduce a single XML `shadow="offsetX offsetY [blur] [spread] color"` attribute instead of separate legacy shadow attributes.
+- [x] Parse shadow style into a focused shape object with `offsetX`, `offsetY`, `blurRadius`, `spreadRadius`, and `color`.
+- [x] Render shadows through a local shape alpha mask rather than duplicate transparent rectangles.
+- [x] Allocate the temporary shadow bitmap with padding for spread and blur so soft shadow edges are not clipped.
+- [x] Expand the alpha mask by spread radius before blur.
+- [x] Apply native image-runtime alpha blur so expensive blur work does not run as Jayess-level per-pixel loops.
+- [x] Tint the blurred alpha mask with the parsed shadow color.
+- [x] Alpha-blit the tinted shadow behind the original shape using native image compositing.
+- [x] Wire XML shadow rendering through a small `xml-shadow.js` helper instead of expanding the main XML renderer with unrelated logic.
+- [x] Add generated C++ runtime tests for parsed shadow metadata, hard shadows, spread shadows, blur tails, text shadows, and existing z-order behavior.
+- [x] Update `README.md`, `Agents.md`, and canvas docs with the supported shadow syntax and mask-based architecture.
+
+## 422. Remove `jayess:gui` Standard-Library Module
+
+- [x] Remove `stdlib/jayess/gui` so `jayess:gui` is not a shipped standard-library module.
+- [x] Remove GUI-only tests, fixtures, and custom probes that imported `jayess:gui`.
+- [x] Remove GUI frame-helper expectations from `jayess:window` tests while preserving plain window frame coverage.
+- [x] Update README, Agents.md, and `/docs` to state that native UI work currently uses `jayess:canvas`, `jayess:window`, and app-owned state directly.
+- [x] Keep canvas XML scene docs focused on drawing and app-level hit testing, not a shipped GUI toolkit.
+
+## 423. Canvas Runtime XML Updates
+
+- [x] Attach the normalized XML scene tree and render options to canvases returned by `renderScene` and canvases passed through `drawScene`.
+- [x] Add `setAttribute(canvas, id, name, value)` for mutating existing ID-bearing XML elements and redrawing the canvas buffer immediately.
+- [x] Add `setAttributes(canvas, id, attributes)` so event handlers can batch multiple attribute changes into one redraw.
+- [x] Keep the first mutable attribute list focused: `fill`, `outline`, `outline-thickness`, `opacity`, `visible`, `x`, `y`, `width`, `height`, `z`, `text`, and `src`.
+- [x] Add `findElement(canvas, id)`, `hitElement(canvas, x, y)`, and `hitElements(canvas, x, y)` for stable app-owned lookup and simple z-ordered pointer hit testing.
+- [x] Add canvas-owned event helpers `addEventListener(canvas, name, callback)` and `dispatchEvent(canvas, event)` without adding a DOM, widget layer, or hidden event loop.
+- [x] Derive `mouseover` and `mouseout` from explicit window `mouseMove` events so apps can choose when to feed events into canvas and when to present the updated canvas.
+- [x] Add generated C++ runtime coverage proving XML element mutation changes rendered pixels and pointer transitions are emitted.
+- [x] Update README, Agents.md, and `/docs` with the runtime update boundary and example event flow.

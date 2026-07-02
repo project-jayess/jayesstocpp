@@ -11,7 +11,7 @@ This is the authoritative quick standard-library/module matrix for shipped `jaye
 | `jayess:buffer` | higher-level byte buffers | bytes |
 | `jayess:bytes` | byte creation and mutation | bytes |
 | `jayess:channel` | queue-style communication handles | channel |
-| `jayess:canvas` | software 2D drawing over image buffers | image, color, math |
+| `jayess:canvas` | software 2D drawing and planned XML scene rendering over image buffers | image, color, math, xml |
 | `jayess:clipboard` | native clipboard text helpers | clipboard |
 | `jayess:compress` | stored DEFLATE and minimal gzip helpers | compress, bytes |
 | `jayess:cli` | command-line argument parsing | process/system |
@@ -31,7 +31,6 @@ This is the authoritative quick standard-library/module matrix for shipped `jaye
 | `jayess:fs` | async-by-default filesystem helpers and `Sync` variants | fs, async, bytes |
 | `jayess:glob` | simple filesystem glob matching | fs, path, string |
 | `jayess:gpu` | optional accelerated rendering handles and draw commands | gpu, window |
-| `jayess:gui` | first Jayess-owned widget toolkit slice | layout, canvas, font |
 | `jayess:hash` | higher-level hash helpers | crypto, encoding, fs, bytes |
 | `jayess:html` | HTML escaping and string construction helpers | array, object, string |
 | `jayess:http` | HTTP client/server, routing, and response helpers | http, async, bytes, json, querystring, mime, fs |

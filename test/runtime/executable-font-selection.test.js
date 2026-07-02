@@ -57,9 +57,8 @@ int main() {
     require(std::get<double>(items[5]) == 3.0, "descent option was not preserved");
     require(std::get<double>(items[6]) == 9.0, "glyph advance metric was not preserved");
     require(std::get<double>(items[7]) > 0.0 && std::get<double>(items[7]) < 255.0, "direct canvas text did not render vector coverage");
-    require(std::get<double>(items[8]) > 0.0 && std::get<double>(items[8]) < 255.0, "HTML/CSS font-family did not render vector coverage");
-    require(std::get<double>(items[9]) == 0.0, "default bitmap comparison pixel was unexpectedly filled");
-    require(std::get<double>(items[10]) > 0.0 && std::get<double>(items[10]) < 255.0, "loaded vector font did not produce deterministic grayscale pixels");
+    require(std::get<double>(items[8]) == 0.0, "default bitmap comparison pixel was unexpectedly filled");
+    require(std::get<double>(items[9]) > 0.0 && std::get<double>(items[9]) < 255.0, "loaded vector font did not produce deterministic grayscale pixels");
 
     std::cout << "ok\\n";
     return 0;

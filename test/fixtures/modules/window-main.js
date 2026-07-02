@@ -1,9 +1,10 @@
 import { rgb } from "jayess:color";
 import { create as createCanvas, fillRect } from "jayess:canvas";
-import { close, create, height, pollEvents, present, requestClose, setTitle, shouldClose, show, width } from "jayess:window";
+import { close, create, frame, height, pollEvents, present, requestClose, setTitle, shouldClose, show, width } from "jayess:window";
 
 export function openWindow() {
-  var window = create({ title: "Jayess", width: 320, height: 240 });
+  var window = create({ title: "Jayess", width: 320, height: 240, frame: false });
+  frame(window, true);
   show(window);
   return [width(window), height(window), shouldClose(window), pollEvents(window)];
 }

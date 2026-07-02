@@ -1,11 +1,20 @@
 import {
+  jayessWindowAddEventListener,
   jayessWindowClose,
   jayessWindowCreate,
+  jayessWindowCurrentFps,
+  jayessWindowDispatchEvents,
+  jayessWindowFrame,
   jayessWindowHeight,
+  jayessWindowHide,
   jayessWindowPollEvents,
   jayessWindowPresent,
+  jayessWindowRequestRender,
+  jayessWindowRemoveEventListener,
   jayessWindowRequestClose,
+  jayessWindowRun,
   jayessWindowSetTitle,
+  jayessWindowSetFps,
   jayessWindowShouldClose,
   jayessWindowShow,
   jayessWindowWidth
@@ -20,11 +29,23 @@ export function show(window) {
   return jayessWindowShow(window);
 }
 
+export function hide(window) {
+  return jayessWindowHide(window);
+}
+
+export function frame(window, enabled) {
+  return jayessWindowFrame(window, enabled);
+}
+
 export function close(window) {
   return jayessWindowClose(window);
 }
 
 export function shouldClose(window) {
+  return jayessWindowShouldClose(window);
+}
+
+export function isClosing(window) {
   return jayessWindowShouldClose(window);
 }
 
@@ -34,6 +55,30 @@ export function requestClose(window) {
 
 export function pollEvents(window) {
   return jayessWindowPollEvents(window);
+}
+
+export function addEventListener(window, name, callback) {
+  return jayessWindowAddEventListener(window, name, callback);
+}
+
+export function removeEventListener(window, name, callback) {
+  return jayessWindowRemoveEventListener(window, name, callback);
+}
+
+export function dispatchEvents(window) {
+  return jayessWindowDispatchEvents(window);
+}
+
+export function run(window) {
+  return jayessWindowRun(window);
+}
+
+export function setFps(window, fps) {
+  return jayessWindowSetFps(window, fps);
+}
+
+export function currentFps(window) {
+  return jayessWindowCurrentFps(window);
 }
 
 export function requestFrame(window, callback, args) {
@@ -74,6 +119,10 @@ export function runFrame(window, state, callback, args) {
 
 export function present(window, canvas) {
   return jayessWindowPresent(window, canvas);
+}
+
+export function requestRender(window, canvas) {
+  return jayessWindowRequestRender(window, canvas);
 }
 
 export function width(window) {

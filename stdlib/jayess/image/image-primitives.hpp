@@ -61,8 +61,55 @@ inline jayess::value jayessImageFillRectAlpha(const std::vector<jayess::value>& 
   );
 }
 
+inline jayess::value jayessImageDrawLine(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_draw_line(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3),
+    jayess::argument_at(jayessArgs, 4),
+    jayess::argument_at(jayessArgs, 5),
+    jayess::argument_at(jayessArgs, 6)
+  );
+}
+
+inline jayess::value jayessImageFillEllipse(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_fill_ellipse(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3),
+    jayess::argument_at(jayessArgs, 4),
+    jayess::argument_at(jayessArgs, 5)
+  );
+}
+
+inline jayess::value jayessImageFillCapsule(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_fill_capsule(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3),
+    jayess::argument_at(jayessArgs, 4),
+    jayess::argument_at(jayessArgs, 5)
+  );
+}
+
 inline jayess::value jayessImageCopy(const std::vector<jayess::value>& jayessArgs) {
   return jayess::image_copy(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageAntialias(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_antialias(jayess::argument_at(jayessArgs, 0), jayess::argument_at(jayessArgs, 1));
+}
+
+inline jayess::value jayessImageShadowMask(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_shadow_mask(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3)
+  );
 }
 
 inline jayess::value jayessImageSavePpm(const std::vector<jayess::value>& jayessArgs) {
@@ -162,6 +209,19 @@ inline jayess::value jayessImageTransparentBlit(const std::vector<jayess::value>
     jayess::argument_at(jayessArgs, 1),
     jayess::argument_at(jayessArgs, 2),
     jayess::argument_at(jayessArgs, 3)
+  );
+}
+
+inline jayess::value jayessImageTransparentBlitClipped(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_transparent_blit_clipped(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3),
+    jayess::argument_at(jayessArgs, 4),
+    jayess::argument_at(jayessArgs, 5),
+    jayess::argument_at(jayessArgs, 6),
+    jayess::argument_at(jayessArgs, 7)
   );
 }
 

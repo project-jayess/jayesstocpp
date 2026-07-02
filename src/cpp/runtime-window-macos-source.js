@@ -41,6 +41,7 @@ constexpr jayess_nsuinteger jayess_ns_window_style_titled = 1UL << 0U;
 constexpr jayess_nsuinteger jayess_ns_window_style_closable = 1UL << 1U;
 constexpr jayess_nsuinteger jayess_ns_window_style_miniaturizable = 1UL << 2U;
 constexpr jayess_nsuinteger jayess_ns_window_style_resizable = 1UL << 3U;
+constexpr jayess_nsuinteger jayess_ns_window_style_borderless = 0UL;
 constexpr jayess_nsinteger jayess_ns_backing_store_buffered = 2;
 constexpr jayess_nsuinteger jayess_ns_event_mask_any = ~static_cast<jayess_nsuinteger>(0);
 constexpr jayess_nsuinteger jayess_ns_event_left_mouse_down = 1;
@@ -187,6 +188,26 @@ std::string window_macos_key_name(jayess_objc_id eventObject) {
   return std::string(1, text[0]);
 }
 
+jayess_objc_id window_macos_black_color() {
+  auto& api = window_macos_api();
+  auto colorClass = api.get_class("NSColor");
+  auto blackColorFn = reinterpret_cast<jayess_objc_id (*)(jayess_objc_id, jayess_objc_sel)>(api.msg_send);
+  return blackColorFn(colorClass, window_macos_selector("blackColor"));
+}
+
+void window_macos_set_black_background(jayess_objc_id windowObject) {
+  auto& api = window_macos_api();
+  auto setBackgroundColorFn = reinterpret_cast<void (*)(jayess_objc_id, jayess_objc_sel, jayess_objc_id)>(api.msg_send);
+  setBackgroundColorFn(windowObject, window_macos_selector("setBackgroundColor:"), window_macos_black_color());
+}
+
+jayess_nsuinteger window_macos_style_mask(const window_ptr& window) {
+  if (!window->framed) {
+    return jayess_ns_window_style_borderless;
+  }
+  return jayess_ns_window_style_titled | jayess_ns_window_style_closable | jayess_ns_window_style_miniaturizable | jayess_ns_window_style_resizable;
+}
+
 void window_platform_create(const window_ptr& window) {
   auto& api = window_macos_api();
   auto pool = window_macos_autorelease_pool();
@@ -208,7 +229,7 @@ void window_platform_create(const window_ptr& window) {
     windowObject,
     window_macos_selector("initWithContentRect:styleMask:backing:defer:"),
     frame,
-    jayess_ns_window_style_titled | jayess_ns_window_style_closable | jayess_ns_window_style_miniaturizable | jayess_ns_window_style_resizable,
+    window_macos_style_mask(window),
     jayess_ns_backing_store_buffered,
     0
   );
@@ -216,6 +237,7 @@ void window_platform_create(const window_ptr& window) {
     window_macos_drain_pool(pool);
     throw_window_adapter_unavailable("Cocoa", "NSWindow allocation failed");
   }
+  window_macos_set_black_background(windowObject);
 
   auto imageView = allocFn(imageViewClass, window_macos_selector("alloc"));
   imageView = initViewFn(imageView, window_macos_selector("initWithFrame:"), frame);
@@ -240,6 +262,22 @@ void window_platform_show(const window_ptr& window) {
   auto voidBoolFn = reinterpret_cast<void (*)(jayess_objc_id, jayess_objc_sel, jayess_objc_bool)>(api.msg_send);
   voidIdFn(windowObject, window_macos_selector("makeKeyAndOrderFront:"), nullptr);
   voidBoolFn(app, window_macos_selector("activateIgnoringOtherApps:"), 1);
+  window_macos_drain_pool(pool);
+}
+
+void window_platform_hide(const window_ptr& window) {
+  auto& api = window_macos_api();
+  auto pool = window_macos_autorelease_pool();
+  auto orderOutFn = reinterpret_cast<void (*)(jayess_objc_id, jayess_objc_sel, jayess_objc_id)>(api.msg_send);
+  orderOutFn(window_macos_window_object(window), window_macos_selector("orderOut:"), nullptr);
+  window_macos_drain_pool(pool);
+}
+
+void window_platform_frame(const window_ptr& window) {
+  auto& api = window_macos_api();
+  auto pool = window_macos_autorelease_pool();
+  auto setStyleMaskFn = reinterpret_cast<void (*)(jayess_objc_id, jayess_objc_sel, jayess_nsuinteger)>(api.msg_send);
+  setStyleMaskFn(window_macos_window_object(window), window_macos_selector("setStyleMask:"), window_macos_style_mask(window));
   window_macos_drain_pool(pool);
 }
 

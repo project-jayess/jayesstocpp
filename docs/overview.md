@@ -2,7 +2,7 @@
 
 This repository contains a working Jayess to C++ transpiler with a broad but intentionally curated language and standard-library surface.
 
-The rendering standard-library slice includes deterministic canvas text, a license-safe default bitmap font, and file-backed TTF/TrueType-style OTF/WOFF/WOFF2 font handles for metrics and font-family selection. Real outline table decoding and grayscale vector glyph rasterization remain tracked implementation work rather than hidden host-font behavior.
+The rendering standard-library slice includes deterministic canvas text, a license-safe default bitmap font, and file-backed or packaged TrueType-compatible font handles with a Jayess-owned glyph rasterizer. The next canvas document-rendering direction is XML scenes over explicit canvas primitives, not browser-style HTML/CSS. CFF/CFF2, advanced OpenType shaping, and non-empty WOFF2 decoding remain tracked implementation work rather than hidden host-font behavior.
 
 ## Environment
 
@@ -121,7 +121,6 @@ The rendering standard-library slice includes deterministic canvas text, a licen
   - `jayess:crypto`
   - `jayess:date`
 - `jayess:encoding`
-- `jayess:gui`
 - `jayess:iter`
   - `jayess:json`
   - `jayess:math`
@@ -221,6 +220,8 @@ See [jayess-time-module.md](./jayess-time-module.md) for the shipped `jayess:tim
 See [jayess-system-modules.md](./jayess-system-modules.md) for the shipped `jayess:fs`, `jayess:os`, `jayess:path`, `jayess:process`, `jayess:system`, and `jayess:thread` surfaces and ownership split.
 See [jayess-timers-module.md](./jayess-timers-module.md) for the shipped `jayess:timers` helper surface.
 See [jayess-os-module.md](./jayess-os-module.md) for the shipped `jayess:os` operating-system information surface.
+See [jayess-canvas-xml-scenes.md](./jayess-canvas-xml-scenes.md) for the planned XML scene model over `jayess:canvas` and the runtime-mutable GUI relationship.
+See [canvas-primitive-api-audit.md](./canvas-primitive-api-audit.md) for the explicit canvas primitive API cleanup notes.
 
 ## Diagnostics Behavior
 
@@ -315,7 +316,7 @@ Current system-module note:
 - ambient `node:*` imports remain explicitly unsupported
 - env mutation remains outside the current system-module surface
 - subprocess execution is provided by the concrete [`jayess:subprocess`](./jayess-subprocess-module.md) module slice
-- Jayess ships a real native-rendering family surface through `jayess:color`, `jayess:image`, `jayess:canvas`, `jayess:window`, and `jayess:gpu`; `jayess:image` owns raster/image manipulation while `jayess:canvas` owns higher-level drawing over that buffer; see [jayess-native-gui.md](./jayess-native-gui.md)
+- Jayess ships a real native-rendering family surface through `jayess:color`, `jayess:image`, `jayess:canvas`, `jayess:window`, and `jayess:gpu`; `jayess:image` owns raster/image manipulation while `jayess:canvas` owns higher-level drawing over that buffer; see [jayess-native-rendering.md](./jayess-native-rendering.md)
 
 Current module/export hardening note:
 

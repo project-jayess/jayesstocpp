@@ -88,7 +88,7 @@ export const RUNTIME_FRAGMENT_DEFINITIONS = [
   { key: "url", header: getUrlRuntimeHeaderFragment, cpp: getUrlRuntimeCppFragment },
   { key: "validate", header: getValidateRuntimeHeaderFragment, cpp: getValidateRuntimeCppFragment },
   { key: "watch", header: getWatchRuntimeHeaderFragment, cpp: getWatchRuntimeCppFragment },
-  { key: "window", header: getWindowRuntimeHeaderFragment, cpp: getWindowRuntimeCppFragment, requires: ["image"] },
+  { key: "window", header: getWindowRuntimeHeaderFragment, cpp: getWindowRuntimeCppFragment, requires: ["events", "image"] },
   { key: "private", header: getPrivateRuntimeHeaderFragment, cpp: getPrivateRuntimeCppFragment, requires: ["class"] }
 ];
 

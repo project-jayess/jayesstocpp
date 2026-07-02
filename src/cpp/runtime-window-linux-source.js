@@ -14,6 +14,7 @@ using jayess_xput_image_fn = int (*)(void*, unsigned long, void*, void*, int, in
 using jayess_xdestroy_image_fn = int (*)(void*);
 using jayess_xstore_name_fn = int (*)(void*, unsigned long, const char*);
 using jayess_xmap_window_fn = int (*)(void*, unsigned long);
+using jayess_xunmap_window_fn = int (*)(void*, unsigned long);
 using jayess_xdestroy_window_fn = int (*)(void*, unsigned long);
 using jayess_xclose_display_fn = int (*)(void*);
 using jayess_xflush_fn = int (*)(void*);
@@ -23,6 +24,7 @@ using jayess_xnext_event_fn = int (*)(void*, void*);
 using jayess_xintern_atom_fn = unsigned long (*)(void*, const char*, int);
 using jayess_xset_wm_protocols_fn = int (*)(void*, unsigned long, unsigned long*, int);
 using jayess_xlookup_keysym_fn = unsigned long (*)(void*, int);
+using jayess_xchange_property_fn = int (*)(void*, unsigned long, unsigned long, unsigned long, int, int, const unsigned char*, int);
 
 struct jayess_xany_event {
   int type;
@@ -142,6 +144,7 @@ struct jayess_linux_window_api {
   jayess_xdestroy_image_fn destroy_image = nullptr;
   jayess_xstore_name_fn store_name = nullptr;
   jayess_xmap_window_fn map_window = nullptr;
+  jayess_xunmap_window_fn unmap_window = nullptr;
   jayess_xdestroy_window_fn destroy_window = nullptr;
   jayess_xclose_display_fn close_display = nullptr;
   jayess_xflush_fn flush = nullptr;
@@ -151,7 +154,16 @@ struct jayess_linux_window_api {
   jayess_xintern_atom_fn intern_atom = nullptr;
   jayess_xset_wm_protocols_fn set_wm_protocols = nullptr;
   jayess_xlookup_keysym_fn lookup_keysym = nullptr;
+  jayess_xchange_property_fn change_property = nullptr;
   bool attempted = false;
+};
+
+struct jayess_motif_wm_hints {
+  unsigned long flags;
+  unsigned long functions;
+  unsigned long decorations;
+  long input_mode;
+  unsigned long status;
 };
 
 jayess_linux_window_api& window_linux_api() {
@@ -176,6 +188,7 @@ jayess_linux_window_api& window_linux_api() {
   api.destroy_image = reinterpret_cast<jayess_xdestroy_image_fn>(dlsym(api.library, "XDestroyImage"));
   api.store_name = reinterpret_cast<jayess_xstore_name_fn>(dlsym(api.library, "XStoreName"));
   api.map_window = reinterpret_cast<jayess_xmap_window_fn>(dlsym(api.library, "XMapWindow"));
+  api.unmap_window = reinterpret_cast<jayess_xunmap_window_fn>(dlsym(api.library, "XUnmapWindow"));
   api.destroy_window = reinterpret_cast<jayess_xdestroy_window_fn>(dlsym(api.library, "XDestroyWindow"));
   api.close_display = reinterpret_cast<jayess_xclose_display_fn>(dlsym(api.library, "XCloseDisplay"));
   api.flush = reinterpret_cast<jayess_xflush_fn>(dlsym(api.library, "XFlush"));
@@ -185,6 +198,7 @@ jayess_linux_window_api& window_linux_api() {
   api.intern_atom = reinterpret_cast<jayess_xintern_atom_fn>(dlsym(api.library, "XInternAtom"));
   api.set_wm_protocols = reinterpret_cast<jayess_xset_wm_protocols_fn>(dlsym(api.library, "XSetWMProtocols"));
   api.lookup_keysym = reinterpret_cast<jayess_xlookup_keysym_fn>(dlsym(api.library, "XLookupKeysym"));
+  api.change_property = reinterpret_cast<jayess_xchange_property_fn>(dlsym(api.library, "XChangeProperty"));
   return api;
 }
 
@@ -202,6 +216,7 @@ bool window_x11_platform_available() {
     && api.destroy_image != nullptr
     && api.store_name != nullptr
     && api.map_window != nullptr
+    && api.unmap_window != nullptr
     && api.destroy_window != nullptr
     && api.close_display != nullptr
     && api.flush != nullptr
@@ -210,7 +225,8 @@ bool window_x11_platform_available() {
     && api.next_event != nullptr
     && api.intern_atom != nullptr
     && api.set_wm_protocols != nullptr
-    && api.lookup_keysym != nullptr;
+    && api.lookup_keysym != nullptr
+    && api.change_property != nullptr;
 }
 
 std::string window_linux_key_name(unsigned long keysym) {
@@ -256,6 +272,33 @@ std::string window_linux_key_name(unsigned long keysym) {
   return "unknown";
 }
 
+void window_x11_platform_frame(const window_ptr& window) {
+  auto& api = window_linux_api();
+  if (window->host_display == nullptr || window->host_window == 0) {
+    throw_window_adapter_unavailable("X11", "window handle is not open");
+  }
+  auto motifHintsAtom = api.intern_atom(window->host_display, "_MOTIF_WM_HINTS", 0);
+  if (motifHintsAtom == 0) {
+    throw_window_adapter_unavailable("X11", "_MOTIF_WM_HINTS atom is unavailable");
+  }
+  constexpr unsigned long mwmHintsDecorations = 1UL << 1U;
+  constexpr int propModeReplace = 0;
+  jayess_motif_wm_hints hints{};
+  hints.flags = mwmHintsDecorations;
+  hints.decorations = window->framed ? 1UL : 0UL;
+  api.change_property(
+    window->host_display,
+    window->host_window,
+    motifHintsAtom,
+    motifHintsAtom,
+    32,
+    propModeReplace,
+    reinterpret_cast<const unsigned char*>(&hints),
+    5
+  );
+  api.flush(window->host_display);
+}
+
 void window_x11_platform_create(const window_ptr& window) {
   auto& api = window_linux_api();
   void* display = api.open_display(nullptr);
@@ -273,7 +316,7 @@ void window_x11_platform_create(const window_ptr& window) {
     static_cast<unsigned int>(window->height),
     0,
     0,
-    0xffffff
+    0x000000
   );
   if (hostWindow == 0) {
     api.close_display(display);
@@ -290,6 +333,7 @@ void window_x11_platform_create(const window_ptr& window) {
     api.set_wm_protocols(display, hostWindow, &deleteAtom, 1);
   }
   api.store_name(display, hostWindow, window->title.c_str());
+  window_x11_platform_frame(window);
   api.flush(display);
 }
 
@@ -298,6 +342,12 @@ void window_x11_platform_show(const window_ptr& window) {
   api.map_window(window->host_display, window->host_window);
   api.flush(window->host_display);
   window->shown = true;
+}
+
+void window_x11_platform_hide(const window_ptr& window) {
+  auto& api = window_linux_api();
+  api.unmap_window(window->host_display, window->host_window);
+  api.flush(window->host_display);
 }
 
 void window_x11_platform_close(const window_ptr& window) {
@@ -336,16 +386,25 @@ void window_x11_platform_present(const window_ptr& window, const window_canvas_p
   if (visual == nullptr || gc == nullptr || depth <= 0) {
     throw_window_adapter_unavailable("X11", "default visual, depth, or graphics context is unavailable");
   }
-  const auto byteCount = expectedSize;
+  const auto uploadWidth = (std::max)(canvas.width, (std::max)(1, window->width));
+  const auto uploadHeight = (std::max)(canvas.height, (std::max)(1, window->height));
+  const auto byteCount = static_cast<std::size_t>(uploadWidth) * static_cast<std::size_t>(uploadHeight) * 4U;
   auto* data = static_cast<char*>(std::malloc(byteCount));
   if (data == nullptr) {
     throw std::runtime_error("Jayess window present could not allocate image upload buffer");
   }
-  for (std::size_t offset = 0; offset < expectedSize; offset += 4U) {
-    data[offset] = static_cast<char>((*canvas.pixels)[offset + 2U]);
-    data[offset + 1U] = static_cast<char>((*canvas.pixels)[offset + 1U]);
-    data[offset + 2U] = static_cast<char>((*canvas.pixels)[offset]);
-    data[offset + 3U] = static_cast<char>(0);
+  std::memset(data, 0, byteCount);
+  for (int row = 0; row < canvas.height; ++row) {
+    const auto sourceRow = static_cast<std::size_t>(row) * static_cast<std::size_t>(canvas.width) * 4U;
+    const auto targetRow = static_cast<std::size_t>(row) * static_cast<std::size_t>(uploadWidth) * 4U;
+    for (int column = 0; column < canvas.width; ++column) {
+      const auto source = sourceRow + static_cast<std::size_t>(column) * 4U;
+      const auto target = targetRow + static_cast<std::size_t>(column) * 4U;
+      data[target] = static_cast<char>((*canvas.pixels)[source + 2U]);
+      data[target + 1U] = static_cast<char>((*canvas.pixels)[source + 1U]);
+      data[target + 2U] = static_cast<char>((*canvas.pixels)[source]);
+      data[target + 3U] = static_cast<char>(0);
+    }
   }
   constexpr int zPixmap = 2;
   void* image = api.create_image(
@@ -355,8 +414,8 @@ void window_x11_platform_present(const window_ptr& window, const window_canvas_p
     zPixmap,
     0,
     data,
-    static_cast<unsigned int>(canvas.width),
-    static_cast<unsigned int>(canvas.height),
+    static_cast<unsigned int>(uploadWidth),
+    static_cast<unsigned int>(uploadHeight),
     32,
     0
   );
@@ -373,8 +432,8 @@ void window_x11_platform_present(const window_ptr& window, const window_canvas_p
     0,
     0,
     0,
-    static_cast<unsigned int>(canvas.width),
-    static_cast<unsigned int>(canvas.height)
+    static_cast<unsigned int>(uploadWidth),
+    static_cast<unsigned int>(uploadHeight)
   );
   api.destroy_image(image);
   window->presented_width = canvas.width;
@@ -392,6 +451,7 @@ void window_x11_platform_poll_events(const window_ptr& window) {
   constexpr int buttonPress = 4;
   constexpr int buttonRelease = 5;
   constexpr int motionNotify = 6;
+  constexpr int expose = 12;
   constexpr int configureNotify = 22;
   constexpr int clientMessage = 33;
   while (api.pending(window->host_display) > 0) {
@@ -399,6 +459,10 @@ void window_x11_platform_poll_events(const window_ptr& window) {
     api.next_event(window->host_display, &event);
     if (event.type == configureNotify) {
       window_push_resize_event(window, event.configure.width, event.configure.height);
+      continue;
+    }
+    if (event.type == expose) {
+      window->render_requested = true;
       continue;
     }
     if (event.type == keyPress || event.type == keyRelease) {
@@ -499,6 +563,22 @@ void window_platform_show(const window_ptr& window) {
     return;
   }
   window_x11_platform_show(window);
+}
+
+void window_platform_hide(const window_ptr& window) {
+  if (window_linux_uses_wayland(window)) {
+    window_wayland_platform_hide(window);
+    return;
+  }
+  window_x11_platform_hide(window);
+}
+
+void window_platform_frame(const window_ptr& window) {
+  if (window_linux_uses_wayland(window)) {
+    window_wayland_platform_frame(window);
+    return;
+  }
+  window_x11_platform_frame(window);
 }
 
 void window_platform_close(const window_ptr& window) {

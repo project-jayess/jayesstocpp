@@ -10,25 +10,40 @@ export function getWindowRuntimeHeaderFragment() {
   bool closed = false;
   bool close_requested = false;
   bool shown = false;
+  bool framed = true;
   std::string adapter;
   void* host_display = nullptr;
   unsigned long host_window = 0;
   unsigned long host_close_atom = 0;
   int presented_width = 0;
   int presented_height = 0;
+  double target_fps = 60.0;
+  bool render_requested = false;
   std::vector<value> events;
+  event_emitter_ptr event_emitter;
+  value current_canvas;
 };
 
 value window_create(const value& options);
 value window_show(const value& window);
+value window_hide(const value& window);
+value window_frame(const value& window, const value& enabled);
 value window_close(const value& window);
 value window_should_close(const value& window);
 value window_request_close(const value& window);
 value window_poll_events(const value& window);
+value window_add_event_listener(const value& window, const value& name, const value& callback);
+value window_remove_event_listener(const value& window, const value& name, const value& callback);
+value window_dispatch_events(const value& window);
+value window_run(const value& window);
+value window_set_fps(const value& window, const value& fps);
+value window_current_fps(const value& window);
+value window_request_render(const value& window, const value& canvas);
 value window_present(const value& window, const value& canvas);
 value window_width(const value& window);
 value window_height(const value& window);
-value window_set_title(const value& window, const value& title);`;
+value window_set_title(const value& window, const value& title);
+value window_get_property(const value& window, const std::string& key);`;
 }
 
 export function getWindowRuntimeCppFragment() {
@@ -135,6 +150,17 @@ std::string window_option_string(const object_ptr& options, const std::string& k
   return std::get<std::string>(found->second);
 }
 
+bool window_option_bool(const object_ptr& options, const std::string& key, bool fallback, const std::string& message) {
+  const auto found = options->fields.find(key);
+  if (found == options->fields.end() || std::holds_alternative<std::monostate>(found->second)) {
+    return fallback;
+  }
+  if (!std::holds_alternative<bool>(found->second)) {
+    throw std::runtime_error(message);
+  }
+  return std::get<bool>(found->second);
+}
+
 object_ptr require_window_options(const value& input) {
   if (std::holds_alternative<std::monostate>(input)) {
     return std::make_shared<object_value>();
@@ -200,6 +226,10 @@ void window_mark_shown(const window_ptr& window) {
   window->shown = true;
 }
 
+void window_mark_hidden(const window_ptr& window) {
+  window->shown = false;
+}
+
 void window_mark_closed(const window_ptr& window) {
   window->closed = true;
   window->close_requested = true;
@@ -219,6 +249,7 @@ void window_push_close_event(const window_ptr& window) {
 void window_push_resize_event(const window_ptr& window, int width, int height) {
   window->width = width;
   window->height = height;
+  window->render_requested = true;
   window->events.push_back(window_event({
     {"type", std::string("resize")},
     {"width", static_cast<double>(width)},
@@ -293,6 +324,50 @@ window_canvas_pixels require_window_canvas_pixels(const value& canvasValue) {
   const auto image = require_canvas_image_value(canvasValue);
   return window_canvas_pixels{image, image->width, image->height, &image->pixels};
 }
+
+event_emitter_ptr window_event_emitter(const window_ptr& window) {
+  if (!window->event_emitter) {
+    window->event_emitter = std::make_shared<event_emitter>();
+  }
+  return window->event_emitter;
+}
+
+std::string require_window_event_name(const value& nameValue) {
+  if (!std::holds_alternative<std::string>(nameValue)) {
+    throw std::runtime_error("Jayess window event name must be a string");
+  }
+  return std::get<std::string>(nameValue);
+}
+
+std::string window_event_type(const value& eventValue) {
+  if (!std::holds_alternative<object_ptr>(eventValue)) {
+    return "";
+  }
+  const auto event = std::get<object_ptr>(eventValue);
+  const auto found = event->fields.find("type");
+  if (found == event->fields.end() || !std::holds_alternative<std::string>(found->second)) {
+    return "";
+  }
+  return std::get<std::string>(found->second);
+}
+
+double require_window_fps(const value& fpsValue) {
+  if (!std::holds_alternative<double>(fpsValue)) {
+    throw std::runtime_error("Jayess window FPS must be a positive number");
+  }
+  const auto fps = std::get<double>(fpsValue);
+  if (!std::isfinite(fps) || fps <= 0.0 || fps > 1000.0) {
+    throw std::runtime_error("Jayess window FPS must be a positive number up to 1000");
+  }
+  return fps;
+}
+
+bool require_window_frame_enabled(const value& enabledValue) {
+  if (!std::holds_alternative<bool>(enabledValue)) {
+    throw std::runtime_error("Jayess window frame flag must be a boolean");
+  }
+  return std::get<bool>(enabledValue);
+}
 } // namespace
 
 value window_create(const value& optionsValue) {
@@ -301,6 +376,7 @@ value window_create(const value& optionsValue) {
   window->width = window_option_integer(options, "width", 640, "Jayess window width must be a positive integer");
   window->height = window_option_integer(options, "height", 480, "Jayess window height must be a positive integer");
   window->title = window_option_string(options, "title", "", "Jayess window title must be a string");
+  window->framed = window_option_bool(options, "frame", true, "Jayess window frame option must be a boolean");
   if (!window_platform_available()) {
     throw_window_unavailable();
   }
@@ -319,6 +395,32 @@ value window_show(const value& windowValue) {
   }
   window_platform_show(window);
   window_mark_shown(window);
+  if (!std::holds_alternative<std::monostate>(window->current_canvas)) {
+    window_present(windowValue, window->current_canvas);
+  }
+  return windowValue;
+}
+
+value window_hide(const value& windowValue) {
+  auto window = require_window_value(windowValue);
+  if (!window->shown) {
+    return windowValue;
+  }
+  if (!window_platform_available()) {
+    throw_window_unavailable();
+  }
+  window_platform_hide(window);
+  window_mark_hidden(window);
+  return windowValue;
+}
+
+value window_frame(const value& windowValue, const value& enabledValue) {
+  auto window = require_window_value(windowValue);
+  window->framed = require_window_frame_enabled(enabledValue);
+  if (!window_platform_available()) {
+    throw_window_unavailable();
+  }
+  window_platform_frame(window);
   return windowValue;
 }
 
@@ -355,14 +457,94 @@ value window_poll_events(const value& windowValue) {
   return make_array(std::move(events));
 }
 
+value window_add_event_listener(const value& windowValue, const value& nameValue, const value& callbackValue) {
+  auto window = require_window_value(windowValue, true);
+  events_on(value(window_event_emitter(window)), require_window_event_name(nameValue), callbackValue);
+  return windowValue;
+}
+
+value window_remove_event_listener(const value& windowValue, const value& nameValue, const value& callbackValue) {
+  auto window = require_window_value(windowValue, true);
+  return events_off(value(window_event_emitter(window)), require_window_event_name(nameValue), callbackValue);
+}
+
+value window_dispatch_events(const value& windowValue) {
+  auto window = require_window_value(windowValue, true);
+  auto eventsValue = window_poll_events(windowValue);
+  auto events = std::get<array_ptr>(eventsValue);
+  auto emitter = value(window_event_emitter(window));
+  long long lastMouseMoveIndex = -1;
+  for (std::size_t index = 0; index < events->items.size(); ++index) {
+    if (window_event_type(events->items[index]) == "mouseMove") {
+      lastMouseMoveIndex = static_cast<long long>(index);
+    }
+  }
+  auto emitted = std::make_shared<array_value>();
+  for (std::size_t index = 0; index < events->items.size(); ++index) {
+    const auto& event = events->items[index];
+    const auto type = window_event_type(event);
+    if (type == "mouseMove" && static_cast<long long>(index) != lastMouseMoveIndex) {
+      continue;
+    }
+    emitted->items.push_back(event);
+    if (!type.empty()) {
+      events_emit(emitter, type, make_array({event}));
+    }
+  }
+  return emitted;
+}
+
+value window_run(const value& windowValue) {
+  auto window = require_window_value(windowValue);
+  if (!window->shown) {
+    window_show(windowValue);
+  }
+  while (!window->closed && !window->close_requested) {
+    window_dispatch_events(windowValue);
+    if (window->render_requested && !std::holds_alternative<std::monostate>(window->current_canvas) && !window->closed && !window->close_requested && window->shown) {
+      window_present(windowValue, window->current_canvas);
+    }
+    const auto delay = std::chrono::duration<double, std::milli>(1000.0 / window->target_fps);
+    std::this_thread::sleep_for(delay);
+  }
+  if (!window->closed) {
+    window_close(windowValue);
+  }
+  return windowValue;
+}
+
+value window_set_fps(const value& windowValue, const value& fpsValue) {
+  auto window = require_window_value(windowValue, true);
+  window->target_fps = require_window_fps(fpsValue);
+  return windowValue;
+}
+
+value window_current_fps(const value& windowValue) {
+  auto window = require_window_value(windowValue, true);
+  return window->target_fps;
+}
+
+value window_request_render(const value& windowValue, const value& canvasValue) {
+  auto window = require_window_value(windowValue);
+  require_window_canvas_pixels(canvasValue);
+  window->current_canvas = canvasValue;
+  window->render_requested = true;
+  return windowValue;
+}
+
 value window_present(const value& windowValue, const value& canvasValue) {
   auto window = require_window_value(windowValue);
   const auto pixels = require_window_canvas_pixels(canvasValue);
+  window->current_canvas = canvasValue;
   window_record_presented_size(window, pixels.width, pixels.height);
+  if (!window->shown) {
+    return windowValue;
+  }
   if (!window_platform_available()) {
     throw_window_unavailable();
   }
   window_platform_present(window, pixels);
+  window->render_requested = false;
   return windowValue;
 }
 
@@ -385,5 +567,77 @@ value window_set_title(const value& windowValue, const value& titleValue) {
   }
   window_platform_set_title(window);
   return windowValue;
+}
+
+value window_get_property(const value& windowValue, const std::string& key) {
+  if (!std::holds_alternative<window_ptr>(windowValue)) {
+    return value(std::monostate{});
+  }
+  if (key == "show") {
+    return make_callable([windowValue](const std::vector<value>&) -> value {
+      return window_show(windowValue);
+    });
+  }
+  if (key == "hide") {
+    return make_callable([windowValue](const std::vector<value>&) -> value {
+      return window_hide(windowValue);
+    });
+  }
+  if (key == "frame") {
+    return make_callable([windowValue](const std::vector<value>& args) -> value {
+      return window_frame(windowValue, argument_at(args, 0));
+    });
+  }
+  if (key == "close") {
+    return make_callable([windowValue](const std::vector<value>&) -> value {
+      return window_close(windowValue);
+    });
+  }
+  if (key == "renderCanvas" || key == "present") {
+    return make_callable([windowValue](const std::vector<value>& args) -> value {
+      return window_present(windowValue, argument_at(args, 0));
+    });
+  }
+  if (key == "requestRender") {
+    return make_callable([windowValue](const std::vector<value>& args) -> value {
+      return window_request_render(windowValue, argument_at(args, 0));
+    });
+  }
+  if (key == "addEventListener") {
+    return make_callable([windowValue](const std::vector<value>& args) -> value {
+      return window_add_event_listener(windowValue, argument_at(args, 0), argument_at(args, 1));
+    });
+  }
+  if (key == "removeEventListener") {
+    return make_callable([windowValue](const std::vector<value>& args) -> value {
+      return window_remove_event_listener(windowValue, argument_at(args, 0), argument_at(args, 1));
+    });
+  }
+  if (key == "dispatchEvents") {
+    return make_callable([windowValue](const std::vector<value>&) -> value {
+      return window_dispatch_events(windowValue);
+    });
+  }
+  if (key == "run") {
+    return make_callable([windowValue](const std::vector<value>&) -> value {
+      return window_run(windowValue);
+    });
+  }
+  if (key == "setFps") {
+    return make_callable([windowValue](const std::vector<value>& args) -> value {
+      return window_set_fps(windowValue, argument_at(args, 0));
+    });
+  }
+  if (key == "currentFps") {
+    return make_callable([windowValue](const std::vector<value>&) -> value {
+      return window_current_fps(windowValue);
+    });
+  }
+  if (key == "isClosing" || key == "shouldClose") {
+    return make_callable([windowValue](const std::vector<value>&) -> value {
+      return window_should_close(windowValue);
+    });
+  }
+  return value(std::monostate{});
 }`;
 }

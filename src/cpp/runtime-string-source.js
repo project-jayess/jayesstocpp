@@ -6,6 +6,7 @@ value string_starts_with(const value& input, const std::vector<value>& args);
 value string_includes(const value& input, const std::vector<value>& args);
 value string_index_of(const value& input, const std::vector<value>& args);
 value string_ends_with(const value& input, const std::vector<value>& args);
+value string_chars(const value& input);
 value string_split(const value& input, const value& separator);
 value string_replace_first(const value& input, const value& search, const value& replacement);
 value string_replace_all(const value& input, const value& search, const value& replacement);
@@ -65,6 +66,22 @@ std::string repeat_fill_to_size(const std::string& fill, std::size_t size) {
   }
   result.resize(size);
   return result;
+}
+
+std::size_t utf8_character_size(unsigned char first) {
+  if (first < 0x80U) {
+    return 1U;
+  }
+  if ((first & 0xe0U) == 0xc0U) {
+    return 2U;
+  }
+  if ((first & 0xf0U) == 0xe0U) {
+    return 3U;
+  }
+  if ((first & 0xf8U) == 0xf0U) {
+    return 4U;
+  }
+  return 1U;
 }
 } // namespace
 
@@ -169,6 +186,21 @@ value string_split(const value& input, const value& separator) {
     start = found + delimiter.size();
   }
 
+  return make_array(std::move(items));
+}
+
+value string_chars(const value& input) {
+  const auto text = require_string_value(input, "Jayess string chars expects a string input");
+  std::vector<value> items;
+  std::size_t index = 0U;
+  while (index < text.size()) {
+    auto size = utf8_character_size(static_cast<unsigned char>(text[index]));
+    if (index + size > text.size()) {
+      size = 1U;
+    }
+    items.push_back(text.substr(index, size));
+    index += size;
+  }
   return make_array(std::move(items));
 }
 

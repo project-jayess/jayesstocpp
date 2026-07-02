@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { transpileFile } from "../../src/api/transpile-file.js";
-import { JayessError } from "../../src/diagnostics.js";
 import { createManagedTempDir } from "../support/temp-dir.js";
 
 function generatedStdlibCppPath(targetDir, subpath) {
@@ -17,10 +16,6 @@ function assertGeneratedStdlibModule(result, targetDir, subpath) {
   assert.ok(result.files.includes(modulePath));
   assert.ok(fs.existsSync(modulePath));
   return modulePath;
-}
-
-function transpileFileWithFullRuntime(fixture, targetDir) {
-  return transpileFile(fixture, targetDir, { runtimeFragments: "all" });
 }
 
 test("transpileFile writes generated files under target", (t) => {
@@ -59,21 +54,4 @@ test("transpileFile accepts modules that use trailing commas", (t) => {
   const result = transpileFile(fixture, targetDir);
 
   assert.ok(result.files.some((file) => file.endsWith("trailing_commas_main_js.cpp")));
-});
-
-test("transpileFile embeds canvas HTML and CSS assets into generated C++", (t) => {
-  const targetDir = createManagedTempDir(t, "asset-embed-output");
-  const fixture = path.resolve("test/fixtures/modules/asset-embed-main.js");
-  const result = transpileFile(fixture, targetDir);
-
-  const sourcePath = result.files.find((file) => file.endsWith("asset_embed_main_js.cpp"));
-  assert.ok(sourcePath);
-  const source = fs.readFileSync(sourcePath, "utf8");
-  assert.match(source, /Embedded HTML asset/);
-  assert.match(source, /asset-probe/);
-  assert.match(source, /calc\(100% \/ 2\)/);
-  assert.doesNotMatch(source, /packHtml/);
-  assert.doesNotMatch(source, /packCss/);
-  assert.ok(!fs.existsSync(path.join(targetDir, "asset-embed.html")));
-  assert.ok(!fs.existsSync(path.join(targetDir, "asset-embed.css")));
 });

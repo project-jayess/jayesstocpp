@@ -4,6 +4,7 @@ import {
   jayessStringIndexOf,
   jayessStringPadEnd,
   jayessStringPadStart,
+  jayessStringChars,
   jayessStringRepeat,
   jayessStringReplaceAll,
   jayessStringReplaceFirst,
@@ -41,6 +42,10 @@ export function slice(text, start, ...end) {
 
 export function split(text, separator) {
   return jayessStringSplit(text, separator);
+}
+
+export function chars(text) {
+  return jayessStringChars(text);
 }
 
 export function replaceFirst(text, search, replacement) {

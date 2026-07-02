@@ -15,7 +15,12 @@ value image_set_pixel(const value& image, const value& x, const value& y, const 
 value image_fill(const value& image, const value& color);
 value image_fill_rect(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color);
 value image_fill_rect_alpha(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color);
+value image_draw_line(const value& image, const value& x1, const value& y1, const value& x2, const value& y2, const value& color, const value& strokeWidth);
+value image_fill_ellipse(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color);
+value image_fill_capsule(const value& image, const value& x, const value& y, const value& width, const value& height, const value& color);
 value image_copy(const value& image);
+value image_antialias(const value& image, const value& level);
+value image_shadow_mask(const value& image, const value& blurRadius, const value& spreadRadius, const value& color);
 value image_save_ppm(const value& image, const value& path);
 value image_save_bmp(const value& image, const value& path);
 value image_save_pgm(const value& image, const value& path);
@@ -36,6 +41,7 @@ value image_flip_horizontal(const value& image);
 value image_flip_vertical(const value& image);
 value image_rotate_90(const value& image);
 value image_transparent_blit(const value& target, const value& source, const value& x, const value& y);
+value image_transparent_blit_clipped(const value& target, const value& source, const value& x, const value& y, const value& clipX, const value& clipY, const value& clipWidth, const value& clipHeight);
 bool is_image_value(const value& input);`;
 }
 
@@ -219,6 +225,17 @@ std::array<unsigned char, 4> image_alpha_blend(const std::array<unsigned char, 4
     static_cast<unsigned char>((static_cast<int>(source[2]) * alpha + static_cast<int>(destination[2]) * inverse) / 255),
     255
   };
+}
+
+void image_write_pixel_alpha(const image_ptr& image, int x, int y, const std::array<unsigned char, 4>& color) {
+  if (color[3] == 0U) {
+    return;
+  }
+  if (color[3] == 255U) {
+    image_write_pixel(image, x, y, color);
+    return;
+  }
+  image_write_pixel(image, x, y, image_alpha_blend(image_read_pixel(image, x, y), color));
 }
 
 void image_write_u16(std::ostream& output, std::uint16_t value) {
@@ -482,6 +499,197 @@ value image_fill_rect_alpha(const value& input, const value& xValue, const value
   return input;
 }
 
+std::array<unsigned char, 4> image_color_with_coverage(const std::array<unsigned char, 4>& color, double coverage) {
+  const auto clamped = (std::max)(0.0, (std::min)(1.0, coverage));
+  return {
+    color[0],
+    color[1],
+    color[2],
+    static_cast<unsigned char>(std::round(static_cast<double>(color[3]) * clamped))
+  };
+}
+
+bool image_ellipse_point_inside(double px, double py, int x, int y, int width, int height) {
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+  const auto radiusX = static_cast<double>(width) / 2.0;
+  const auto radiusY = static_cast<double>(height) / 2.0;
+  const auto centerX = static_cast<double>(x) + radiusX;
+  const auto centerY = static_cast<double>(y) + radiusY;
+  const auto dx = (px - centerX) / radiusX;
+  const auto dy = (py - centerY) / radiusY;
+  return dx * dx + dy * dy <= 1.0;
+}
+
+double image_ellipse_coverage(int column, int row, int x, int y, int width, int height) {
+  constexpr int samplesPerAxis = 4;
+  int covered = 0;
+  for (int sampleY = 0; sampleY < samplesPerAxis; ++sampleY) {
+    for (int sampleX = 0; sampleX < samplesPerAxis; ++sampleX) {
+      const auto px = static_cast<double>(column) + (static_cast<double>(sampleX) + 0.5) / static_cast<double>(samplesPerAxis);
+      const auto py = static_cast<double>(row) + (static_cast<double>(sampleY) + 0.5) / static_cast<double>(samplesPerAxis);
+      if (image_ellipse_point_inside(px, py, x, y, width, height)) {
+        ++covered;
+      }
+    }
+  }
+  return static_cast<double>(covered) / static_cast<double>(samplesPerAxis * samplesPerAxis);
+}
+
+double image_clamp_double(double value, double minimum, double maximum) {
+  return (std::max)(minimum, (std::min)(maximum, value));
+}
+
+double image_distance_to_segment(double px, double py, double x1, double y1, double x2, double y2) {
+  const auto dx = x2 - x1;
+  const auto dy = y2 - y1;
+  const auto lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared <= 0.0) {
+    const auto pointDx = px - x1;
+    const auto pointDy = py - y1;
+    return std::sqrt(pointDx * pointDx + pointDy * pointDy);
+  }
+  const auto t = image_clamp_double(((px - x1) * dx + (py - y1) * dy) / lengthSquared, 0.0, 1.0);
+  const auto closestX = x1 + t * dx;
+  const auto closestY = y1 + t * dy;
+  const auto pointDx = px - closestX;
+  const auto pointDy = py - closestY;
+  return std::sqrt(pointDx * pointDx + pointDy * pointDy);
+}
+
+double image_line_coverage(int column, int row, double x1, double y1, double x2, double y2, double strokeWidth) {
+  constexpr int samplesPerAxis = 4;
+  const auto radius = (std::max)(0.5, strokeWidth / 2.0);
+  int covered = 0;
+  for (int sampleY = 0; sampleY < samplesPerAxis; ++sampleY) {
+    for (int sampleX = 0; sampleX < samplesPerAxis; ++sampleX) {
+      const auto px = static_cast<double>(column) + (static_cast<double>(sampleX) + 0.5) / static_cast<double>(samplesPerAxis);
+      const auto py = static_cast<double>(row) + (static_cast<double>(sampleY) + 0.5) / static_cast<double>(samplesPerAxis);
+      if (image_distance_to_segment(px, py, x1, y1, x2, y2) <= radius) {
+        ++covered;
+      }
+    }
+  }
+  return static_cast<double>(covered) / static_cast<double>(samplesPerAxis * samplesPerAxis);
+}
+
+value image_draw_line(const value& input, const value& x1Value, const value& y1Value, const value& x2Value, const value& y2Value, const value& colorValue, const value& strokeWidthValue) {
+  const auto image = require_image_value(input);
+  const auto x1 = require_image_number(x1Value, "Jayess image drawLine x1 must be a number");
+  const auto y1 = require_image_number(y1Value, "Jayess image drawLine y1 must be a number");
+  const auto x2 = require_image_number(x2Value, "Jayess image drawLine x2 must be a number");
+  const auto y2 = require_image_number(y2Value, "Jayess image drawLine y2 must be a number");
+  const auto strokeWidth = require_image_number(strokeWidthValue, "Jayess image drawLine strokeWidth must be a number");
+  if (strokeWidth < 1.0) {
+    throw std::runtime_error("Jayess image drawLine strokeWidth must be at least 1");
+  }
+  const auto color = require_image_color(colorValue);
+  const auto padding = strokeWidth / 2.0 + 1.0;
+  const auto left = (std::max)(0, static_cast<int>(std::floor((std::min)(x1, x2) - padding)));
+  const auto top = (std::max)(0, static_cast<int>(std::floor((std::min)(y1, y2) - padding)));
+  const auto right = (std::min)(image->width, static_cast<int>(std::ceil((std::max)(x1, x2) + padding)));
+  const auto bottom = (std::min)(image->height, static_cast<int>(std::ceil((std::max)(y1, y2) + padding)));
+  for (int row = top; row < bottom; ++row) {
+    for (int column = left; column < right; ++column) {
+      const auto coverage = image_line_coverage(column, row, x1, y1, x2, y2, strokeWidth);
+      if (coverage > 0.0) {
+        image_write_pixel_alpha(image, column, row, image_color_with_coverage(color, coverage));
+      }
+    }
+  }
+  return input;
+}
+
+bool image_capsule_point_inside(double px, double py, int x, int y, int width, int height) {
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
+  if (width >= height) {
+    const auto radius = static_cast<double>(height) / 2.0;
+    const auto centerY = static_cast<double>(y) + radius;
+    const auto leftCenterX = static_cast<double>(x) + radius;
+    const auto rightCenterX = static_cast<double>(x + width) - radius;
+    const auto closestX = image_clamp_double(px, leftCenterX, rightCenterX);
+    const auto dx = px - closestX;
+    const auto dy = py - centerY;
+    return dx * dx + dy * dy <= radius * radius;
+  }
+  const auto radius = static_cast<double>(width) / 2.0;
+  const auto centerX = static_cast<double>(x) + radius;
+  const auto topCenterY = static_cast<double>(y) + radius;
+  const auto bottomCenterY = static_cast<double>(y + height) - radius;
+  const auto closestY = image_clamp_double(py, topCenterY, bottomCenterY);
+  const auto dx = px - centerX;
+  const auto dy = py - closestY;
+  return dx * dx + dy * dy <= radius * radius;
+}
+
+double image_capsule_coverage(int column, int row, int x, int y, int width, int height) {
+  constexpr int samplesPerAxis = 4;
+  int covered = 0;
+  for (int sampleY = 0; sampleY < samplesPerAxis; ++sampleY) {
+    for (int sampleX = 0; sampleX < samplesPerAxis; ++sampleX) {
+      const auto px = static_cast<double>(column) + (static_cast<double>(sampleX) + 0.5) / static_cast<double>(samplesPerAxis);
+      const auto py = static_cast<double>(row) + (static_cast<double>(sampleY) + 0.5) / static_cast<double>(samplesPerAxis);
+      if (image_capsule_point_inside(px, py, x, y, width, height)) {
+        ++covered;
+      }
+    }
+  }
+  return static_cast<double>(covered) / static_cast<double>(samplesPerAxis * samplesPerAxis);
+}
+
+value image_fill_ellipse(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue, const value& colorValue) {
+  const auto image = require_image_value(input);
+  const auto x = require_image_offset(xValue, "Jayess image fillEllipse x must be an integer within supported range");
+  const auto y = require_image_offset(yValue, "Jayess image fillEllipse y must be an integer within supported range");
+  const auto width = require_image_span(widthValue, "Jayess image fillEllipse width must be a non-negative integer");
+  const auto height = require_image_span(heightValue, "Jayess image fillEllipse height must be a non-negative integer");
+  const auto color = require_image_color(colorValue);
+  if (width == 0 || height == 0) {
+    return input;
+  }
+  const auto left = (std::max)(x, 0);
+  const auto top = (std::max)(y, 0);
+  const auto right = (std::min)(static_cast<long long>(x) + static_cast<long long>(width), static_cast<long long>(image->width));
+  const auto bottom = (std::min)(static_cast<long long>(y) + static_cast<long long>(height), static_cast<long long>(image->height));
+  for (int row = top; row < bottom; ++row) {
+    for (int column = left; column < right; ++column) {
+      const auto coverage = image_ellipse_coverage(column, row, x, y, width, height);
+      if (coverage > 0.0) {
+        image_write_pixel_alpha(image, column, row, image_color_with_coverage(color, coverage));
+      }
+    }
+  }
+  return input;
+}
+
+value image_fill_capsule(const value& input, const value& xValue, const value& yValue, const value& widthValue, const value& heightValue, const value& colorValue) {
+  const auto image = require_image_value(input);
+  const auto x = require_image_offset(xValue, "Jayess image fillCapsule x must be an integer within supported range");
+  const auto y = require_image_offset(yValue, "Jayess image fillCapsule y must be an integer within supported range");
+  const auto width = require_image_span(widthValue, "Jayess image fillCapsule width must be a non-negative integer");
+  const auto height = require_image_span(heightValue, "Jayess image fillCapsule height must be a non-negative integer");
+  const auto color = require_image_color(colorValue);
+  if (width == 0 || height == 0) {
+    return input;
+  }
+  const auto left = (std::max)(x, 0);
+  const auto top = (std::max)(y, 0);
+  const auto right = (std::min)(static_cast<long long>(x) + static_cast<long long>(width), static_cast<long long>(image->width));
+  const auto bottom = (std::min)(static_cast<long long>(y) + static_cast<long long>(height), static_cast<long long>(image->height));
+  for (int row = top; row < bottom; ++row) {
+    for (int column = left; column < right; ++column) {
+      const auto coverage = image_capsule_coverage(column, row, x, y, width, height);
+      if (coverage > 0.0) {
+        image_write_pixel_alpha(image, column, row, image_color_with_coverage(color, coverage));
+      }
+    }
+  }
+  return input;
+}
+
 value image_copy(const value& input) {
   const auto source = require_image_value(input);
   auto copied = std::make_shared<image_state>();
@@ -489,6 +697,230 @@ value image_copy(const value& input) {
   copied->height = source->height;
   copied->pixels = source->pixels;
   return copied;
+}
+
+int image_color_distance(const std::array<unsigned char, 4>& left, const std::array<unsigned char, 4>& right) {
+  return
+    std::abs(static_cast<int>(left[0]) - static_cast<int>(right[0])) +
+    std::abs(static_cast<int>(left[1]) - static_cast<int>(right[1])) +
+    std::abs(static_cast<int>(left[2]) - static_cast<int>(right[2])) +
+    std::abs(static_cast<int>(left[3]) - static_cast<int>(right[3]));
+}
+
+bool image_similar_color(const std::array<unsigned char, 4>& left, const std::array<unsigned char, 4>& right) {
+  return image_color_distance(left, right) <= 48;
+}
+
+bool image_different_color(const std::array<unsigned char, 4>& left, const std::array<unsigned char, 4>& right) {
+  return image_color_distance(left, right) >= 96;
+}
+
+bool image_diagonal_corner_edge(
+  const std::array<unsigned char, 4>& center,
+  const std::array<unsigned char, 4>& adjacentA,
+  const std::array<unsigned char, 4>& adjacentB,
+  const std::array<unsigned char, 4>& oppositeA,
+  const std::array<unsigned char, 4>& oppositeB
+) {
+  return
+    image_similar_color(center, oppositeA) &&
+    image_similar_color(center, oppositeB) &&
+    image_similar_color(adjacentA, adjacentB) &&
+    image_different_color(center, adjacentA);
+}
+
+std::array<unsigned char, 4> image_blend_edge_pixel(
+  const std::array<unsigned char, 4>& center,
+  const std::array<unsigned char, 4>& adjacentA,
+  const std::array<unsigned char, 4>& adjacentB
+) {
+  int red = static_cast<int>(center[0]) * 6 + adjacentA[0] + adjacentB[0];
+  int green = static_cast<int>(center[1]) * 6 + adjacentA[1] + adjacentB[1];
+  int blue = static_cast<int>(center[2]) * 6 + adjacentA[2] + adjacentB[2];
+  int alpha = static_cast<int>(center[3]) * 6 + adjacentA[3] + adjacentB[3];
+  return {
+    static_cast<unsigned char>(red / 8),
+    static_cast<unsigned char>(green / 8),
+    static_cast<unsigned char>(blue / 8),
+    static_cast<unsigned char>(alpha / 8)
+  };
+}
+
+std::array<unsigned char, 4> image_antialias_pixel(const image_ptr& source, int x, int y) {
+  const auto center = image_read_pixel(source, x, y);
+  if (x <= 0 || y <= 0 || x + 1 >= source->width || y + 1 >= source->height) {
+    return center;
+  }
+  const auto north = image_read_pixel(source, x, y - 1);
+  const auto south = image_read_pixel(source, x, y + 1);
+  const auto west = image_read_pixel(source, x - 1, y);
+  const auto east = image_read_pixel(source, x + 1, y);
+
+  if (image_diagonal_corner_edge(center, north, east, south, west)) {
+    return image_blend_edge_pixel(center, north, east);
+  }
+  if (image_diagonal_corner_edge(center, east, south, west, north)) {
+    return image_blend_edge_pixel(center, east, south);
+  }
+  if (image_diagonal_corner_edge(center, south, west, north, east)) {
+    return image_blend_edge_pixel(center, south, west);
+  }
+  if (image_diagonal_corner_edge(center, west, north, east, south)) {
+    return image_blend_edge_pixel(center, west, north);
+  }
+  return center;
+}
+
+std::vector<unsigned char> image_alpha_channel(const image_ptr& source) {
+  std::vector<unsigned char> alpha(static_cast<std::size_t>(source->width) * static_cast<std::size_t>(source->height));
+  for (int row = 0; row < source->height; ++row) {
+    for (int column = 0; column < source->width; ++column) {
+      alpha[static_cast<std::size_t>(row) * static_cast<std::size_t>(source->width) + static_cast<std::size_t>(column)] =
+        image_read_pixel(source, column, row)[3];
+    }
+  }
+  return alpha;
+}
+
+std::vector<unsigned char> image_max_filter_horizontal(const std::vector<unsigned char>& source, int width, int height, int radius) {
+  std::vector<unsigned char> output(source.size());
+  for (int row = 0; row < height; ++row) {
+    std::deque<int> window;
+    int rightAdded = -1;
+    for (int column = 0; column < width; ++column) {
+      const auto rightLimit = (std::min)(width - 1, column + radius);
+      while (rightAdded < rightLimit) {
+        ++rightAdded;
+        while (!window.empty() && source[static_cast<std::size_t>(row) * width + window.back()] <= source[static_cast<std::size_t>(row) * width + rightAdded]) {
+          window.pop_back();
+        }
+        window.push_back(rightAdded);
+      }
+      const auto leftLimit = column - radius;
+      while (!window.empty() && window.front() < leftLimit) {
+        window.pop_front();
+      }
+      output[static_cast<std::size_t>(row) * width + column] = source[static_cast<std::size_t>(row) * width + window.front()];
+    }
+  }
+  return output;
+}
+
+std::vector<unsigned char> image_max_filter_vertical(const std::vector<unsigned char>& source, int width, int height, int radius) {
+  std::vector<unsigned char> output(source.size());
+  for (int column = 0; column < width; ++column) {
+    std::deque<int> window;
+    int bottomAdded = -1;
+    for (int row = 0; row < height; ++row) {
+      const auto bottomLimit = (std::min)(height - 1, row + radius);
+      while (bottomAdded < bottomLimit) {
+        ++bottomAdded;
+        while (!window.empty() && source[static_cast<std::size_t>(window.back()) * width + column] <= source[static_cast<std::size_t>(bottomAdded) * width + column]) {
+          window.pop_back();
+        }
+        window.push_back(bottomAdded);
+      }
+      const auto topLimit = row - radius;
+      while (!window.empty() && window.front() < topLimit) {
+        window.pop_front();
+      }
+      output[static_cast<std::size_t>(row) * width + column] = source[static_cast<std::size_t>(window.front()) * width + column];
+    }
+  }
+  return output;
+}
+
+std::vector<unsigned char> image_box_blur_horizontal(const std::vector<unsigned char>& source, int width, int height, int radius) {
+  std::vector<unsigned char> output(source.size());
+  for (int row = 0; row < height; ++row) {
+    int sum = 0;
+    for (int index = -radius; index <= radius; ++index) {
+      const auto column = (std::min)((std::max)(index, 0), width - 1);
+      sum += source[static_cast<std::size_t>(row) * width + column];
+    }
+    for (int column = 0; column < width; ++column) {
+      output[static_cast<std::size_t>(row) * width + column] = static_cast<unsigned char>(sum / (radius * 2 + 1));
+      const auto removeColumn = (std::min)((std::max)(column - radius, 0), width - 1);
+      const auto addColumn = (std::min)((std::max)(column + radius + 1, 0), width - 1);
+      sum -= source[static_cast<std::size_t>(row) * width + removeColumn];
+      sum += source[static_cast<std::size_t>(row) * width + addColumn];
+    }
+  }
+  return output;
+}
+
+std::vector<unsigned char> image_box_blur_vertical(const std::vector<unsigned char>& source, int width, int height, int radius) {
+  std::vector<unsigned char> output(source.size());
+  for (int column = 0; column < width; ++column) {
+    int sum = 0;
+    for (int index = -radius; index <= radius; ++index) {
+      const auto row = (std::min)((std::max)(index, 0), height - 1);
+      sum += source[static_cast<std::size_t>(row) * width + column];
+    }
+    for (int row = 0; row < height; ++row) {
+      output[static_cast<std::size_t>(row) * width + column] = static_cast<unsigned char>(sum / (radius * 2 + 1));
+      const auto removeRow = (std::min)((std::max)(row - radius, 0), height - 1);
+      const auto addRow = (std::min)((std::max)(row + radius + 1, 0), height - 1);
+      sum -= source[static_cast<std::size_t>(removeRow) * width + column];
+      sum += source[static_cast<std::size_t>(addRow) * width + column];
+    }
+  }
+  return output;
+}
+
+std::vector<unsigned char> image_spread_alpha(std::vector<unsigned char> alpha, int width, int height, int radius) {
+  if (radius <= 0) {
+    return alpha;
+  }
+  return image_max_filter_vertical(image_max_filter_horizontal(alpha, width, height, radius), width, height, radius);
+}
+
+std::vector<unsigned char> image_blur_alpha(std::vector<unsigned char> alpha, int width, int height, int radius) {
+  if (radius <= 0) {
+    return alpha;
+  }
+  for (int pass = 0; pass < 3; ++pass) {
+    alpha = image_box_blur_vertical(image_box_blur_horizontal(alpha, width, height, radius), width, height, radius);
+  }
+  return alpha;
+}
+
+value image_antialias(const value& input, const value& levelValue) {
+  const auto target = require_image_value(input);
+  const auto level = require_image_span(levelValue, "Jayess image antialias level must be a non-negative integer");
+  if (level <= 1) {
+    return input;
+  }
+  for (int pass = 1; pass < level; ++pass) {
+    auto source = image_allocate(target->width, target->height);
+    source->pixels = target->pixels;
+    for (int row = 0; row < target->height; ++row) {
+      for (int column = 0; column < target->width; ++column) {
+        image_write_pixel(target, column, row, image_antialias_pixel(source, column, row));
+      }
+    }
+  }
+  return input;
+}
+
+value image_shadow_mask(const value& input, const value& blurRadiusValue, const value& spreadRadiusValue, const value& colorValue) {
+  const auto source = require_image_value(input);
+  const auto blurRadius = require_image_span(blurRadiusValue, "Jayess image shadow blur radius must be a non-negative integer");
+  const auto spreadRadius = require_image_span(spreadRadiusValue, "Jayess image shadow spread radius must be a non-negative integer");
+  const auto color = require_image_color(colorValue);
+  auto alpha = image_alpha_channel(source);
+  alpha = image_spread_alpha(std::move(alpha), source->width, source->height, spreadRadius);
+  alpha = image_blur_alpha(std::move(alpha), source->width, source->height, blurRadius);
+
+  auto output = image_allocate(source->width, source->height);
+  for (int row = 0; row < source->height; ++row) {
+    for (int column = 0; column < source->width; ++column) {
+      const auto alphaIndex = static_cast<std::size_t>(row) * static_cast<std::size_t>(source->width) + static_cast<std::size_t>(column);
+      const auto shadowAlpha = static_cast<unsigned char>((static_cast<int>(alpha[alphaIndex]) * static_cast<int>(color[3])) / 255);
+      image_write_pixel(output, column, row, {color[0], color[1], color[2], shadowAlpha});
+    }
+  }
+  return output;
 }
 
 ${getImageFileRuntimeCppFragment()}
@@ -600,8 +1032,43 @@ value image_transparent_blit(const value& targetValue, const value& sourceValue,
         continue;
       }
       const auto sourceColor = image_read_pixel(source, column, row);
-      const auto targetColor = image_read_pixel(target, static_cast<int>(targetX), static_cast<int>(targetY));
-      image_write_pixel(target, static_cast<int>(targetX), static_cast<int>(targetY), image_alpha_blend(targetColor, sourceColor));
+      image_write_pixel_alpha(target, static_cast<int>(targetX), static_cast<int>(targetY), sourceColor);
+    }
+  }
+  return targetValue;
+}
+
+value image_transparent_blit_clipped(const value& targetValue, const value& sourceValue, const value& xValue, const value& yValue, const value& clipXValue, const value& clipYValue, const value& clipWidthValue, const value& clipHeightValue) {
+  const auto target = require_image_value(targetValue);
+  const auto source = require_image_value(sourceValue);
+  const auto x = require_image_offset(xValue, "Jayess image transparentBlitClipped x must be an integer within supported range");
+  const auto y = require_image_offset(yValue, "Jayess image transparentBlitClipped y must be an integer within supported range");
+  const auto clipX = require_image_offset(clipXValue, "Jayess image transparentBlitClipped clip x must be an integer within supported range");
+  const auto clipY = require_image_offset(clipYValue, "Jayess image transparentBlitClipped clip y must be an integer within supported range");
+  const auto clipWidth = require_image_span(clipWidthValue, "Jayess image transparentBlitClipped clip width must be a non-negative integer");
+  const auto clipHeight = require_image_span(clipHeightValue, "Jayess image transparentBlitClipped clip height must be a non-negative integer");
+
+  const auto targetLeft = (std::max<long long>)(x, clipX);
+  const auto targetTop = (std::max<long long>)(y, clipY);
+  const auto targetRight = (std::min<long long>)((std::min<long long>)(static_cast<long long>(x) + source->width, static_cast<long long>(clipX) + clipWidth), target->width);
+  const auto targetBottom = (std::min<long long>)((std::min<long long>)(static_cast<long long>(y) + source->height, static_cast<long long>(clipY) + clipHeight), target->height);
+  const auto clippedLeft = (std::max<long long>)(targetLeft, 0);
+  const auto clippedTop = (std::max<long long>)(targetTop, 0);
+  if (targetRight <= clippedLeft || targetBottom <= clippedTop) {
+    return targetValue;
+  }
+
+  const auto sourceStartX = clippedLeft - static_cast<long long>(x);
+  const auto sourceStartY = clippedTop - static_cast<long long>(y);
+  const auto spanWidth = targetRight - clippedLeft;
+  const auto spanHeight = targetBottom - clippedTop;
+  for (long long row = 0; row < spanHeight; ++row) {
+    const auto sourceY = static_cast<int>(sourceStartY + row);
+    const auto targetY = static_cast<int>(clippedTop + row);
+    for (long long column = 0; column < spanWidth; ++column) {
+      const auto sourceX = static_cast<int>(sourceStartX + column);
+      const auto targetX = static_cast<int>(clippedLeft + column);
+      image_write_pixel_alpha(target, targetX, targetY, image_read_pixel(source, sourceX, sourceY));
     }
   }
   return targetValue;

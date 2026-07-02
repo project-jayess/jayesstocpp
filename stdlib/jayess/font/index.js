@@ -1,7 +1,7 @@
 import { fillRect } from "jayess:canvas";
 import { parse as parseJson } from "jayess:json";
 import { readTextSync } from "jayess:fs";
-import { slice as sliceString } from "jayess:string";
+import { chars as stringChars, slice as sliceString } from "jayess:string";
 import { jayessFontKind, jayessFontLoad, jayessFontSystemDefault } from "./font-primitives.hpp";
 import {
   bitmapFontByName,
@@ -66,6 +66,54 @@ export function loadFont(name, path, options) {
     lineHeight: parsed.lineHeight
   });
   return registerFont(font);
+}
+
+function packFontOption(options, key, fallback) {
+  if (options === null) {
+    return fallback;
+  }
+  var value = options[key];
+  if (value === null) {
+    return fallback;
+  }
+  return value;
+}
+
+export function packFont(name, assetPath, format, options) {
+  var fontName = packFontOption(options, "name", name);
+  var family = packFontOption(options, "family", fontName);
+  var decodedFormat = format === "ttf" || format === "otf" ? "truetype" : format;
+  var charWidth = packFontOption(options, "charWidth", 8);
+  var charHeight = packFontOption(options, "charHeight", 12);
+  var advance = packFontOption(options, "advance", 9);
+  var baseline = packFontOption(options, "baseline", charHeight - 1);
+  var lineHeight = packFontOption(options, "lineHeight", charHeight + 2);
+  var ascent = packFontOption(options, "ascent", baseline);
+  var descent = packFontOption(options, "descent", lineHeight - baseline);
+
+  return {
+    kind: "vector-font",
+    name: fontName,
+    family: family,
+    sourcePath: assetPath,
+    sourceFormat: format,
+    decodedFormat: decodedFormat,
+    outlineFormat: "packed-asset",
+    compressed: format === "woff" || format === "woff2",
+    metricsOnly: format === "woff2",
+    ascent: ascent,
+    descent: descent,
+    charWidth: charWidth,
+    charHeight: charHeight,
+    advance: advance,
+    baseline: baseline,
+    lineHeight: lineHeight,
+    glyphCache: {},
+    glyphs: null,
+    fallbackGlyph: packFontOption(options, "fallbackGlyph", "?"),
+    fallbackGlyphName: "jayess-default-question",
+    packed: true
+  };
 }
 
 function bitmapFallbackFromSystemHandle(name, handle) {
@@ -157,8 +205,9 @@ export function measureText(font, text) {
   var maxWidth = 0;
   var currentWidth = 0;
   var lines = 1;
-  for (var index = 0; index < text.length; index = index + 1) {
-    var char = text[index];
+  var characters = stringChars(text);
+  for (var index = 0; index < characters.length; index = index + 1) {
+    var char = characters[index];
     if (char === "\n") {
       if (currentWidth > maxWidth) {
         maxWidth = currentWidth;
@@ -200,8 +249,9 @@ export function drawText(canvas, font, text, x, y, color) {
   var used = activeFont(font);
   var cursorX = x;
   var cursorY = y;
-  for (var index = 0; index < text.length; index = index + 1) {
-    var char = text[index];
+  var characters = stringChars(text);
+  for (var index = 0; index < characters.length; index = index + 1) {
+    var char = characters[index];
     if (char === "\n") {
       cursorX = x;
       cursorY = cursorY + lineHeight(used);

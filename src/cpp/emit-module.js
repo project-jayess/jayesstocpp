@@ -559,7 +559,13 @@ export function emitModule({
   }
   const globalLines = [];
   const standaloneDeclarations = [];
-  const exportAliasLines = collectExportAliasLines({ ast, analysis, dependencies, standalone });
+  const exportAliasLines = collectExportAliasLines({
+    ast,
+    analysis,
+    dependencies,
+    retainedDeclarationNames: retainedDeclarationSet,
+    standalone
+  });
 
   cppLines.unshift(...dependencyHeaders);
 

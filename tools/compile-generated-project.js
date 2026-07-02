@@ -6,10 +6,13 @@ import path from "node:path";
 
 function usage() {
   return [
-    "Usage: node tools/compile-generated-project.js <generated-cpp-dir> <output-executable>",
+    "Usage: node tools/compile-generated-project.js [--debug] <generated-cpp-dir> <output-executable>",
     "",
     "Developer-only helper for compiling generated Jayess C++ projects.",
-    "This is not a public package CLI and is intentionally not exported as an npm bin."
+    "This is not a public package CLI and is intentionally not exported as an npm bin.",
+    "",
+    "By default this builds a size-oriented release executable.",
+    "Use --debug to keep compiler defaults and symbols for native debugging."
   ].join("\n");
 }
 
@@ -59,7 +62,37 @@ function platformLibraries(targetDir) {
   return [...libraries].sort().map((library) => `-l${library}`);
 }
 
-const [, , generatedDirArg, outputArg] = process.argv;
+function parseArgs(args) {
+  const options = { debug: false };
+  const positional = [];
+
+  for (const arg of args) {
+    if (arg === "--debug") {
+      options.debug = true;
+    } else {
+      positional.push(arg);
+    }
+  }
+
+  return { options, positional };
+}
+
+function sizeFlags() {
+  if (process.platform === "darwin") {
+    return {
+      compile: ["-Os", "-ffunction-sections", "-fdata-sections"],
+      link: ["-Wl,-dead_strip", "-Wl,-x"]
+    };
+  }
+
+  return {
+    compile: ["-Os", "-ffunction-sections", "-fdata-sections"],
+    link: ["-Wl,--gc-sections", "-s"]
+  };
+}
+
+const { options, positional } = parseArgs(process.argv.slice(2));
+const [generatedDirArg, outputArg] = positional;
 
 if (generatedDirArg == null || outputArg == null) {
   console.error(usage());
@@ -86,14 +119,18 @@ if (cppFiles.length === 0) {
 
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 
+const releaseFlags = options.debug ? { compile: [], link: [] } : sizeFlags();
+
 execFileSync(compiler, [
   "-std=c++17",
   "-pthread",
+  ...releaseFlags.compile,
   ...cppFiles,
   "-I",
   generatedDir,
   "-o",
   outputPath,
+  ...releaseFlags.link,
   ...platformLibraries(generatedDir)
 ], {
   stdio: "inherit",
@@ -105,5 +142,8 @@ console.log(JSON.stringify({
   compiler,
   generatedDir,
   outputPath,
+  mode: options.debug ? "debug" : "release-size",
+  compileFlags: releaseFlags.compile,
+  linkFlags: releaseFlags.link,
   files: cppFiles.length
 }, null, 2));

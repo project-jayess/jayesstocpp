@@ -329,6 +329,25 @@ void window_wayland_platform_show(const window_ptr& window) {
   api.display_roundtrip(host->display);
 }
 
+void window_wayland_platform_hide(const window_ptr& window) {
+  auto& api = window_wayland_api();
+  auto* host = static_cast<jayess_wayland_window_host*>(window->host_display);
+  if (host == nullptr || host->display == nullptr || host->xdg_toplevel_object == nullptr) {
+    throw_window_adapter_unavailable("Wayland", "xdg_toplevel handle is not open");
+  }
+  api.proxy_marshal_flags(reinterpret_cast<wl_proxy*>(host->xdg_toplevel_object), 13, nullptr, 0, 0);
+  api.display_flush(host->display);
+}
+
+void window_wayland_platform_frame(const window_ptr& window) {
+  auto& api = window_wayland_api();
+  auto* host = static_cast<jayess_wayland_window_host*>(window->host_display);
+  if (host == nullptr || host->display == nullptr || host->xdg_toplevel_object == nullptr) {
+    throw_window_adapter_unavailable("Wayland", "xdg_toplevel handle is not open");
+  }
+  api.display_flush(host->display);
+}
+
 void window_wayland_platform_close(const window_ptr& window) {
   auto* host = static_cast<jayess_wayland_window_host*>(window->host_display);
   if (host == nullptr) {

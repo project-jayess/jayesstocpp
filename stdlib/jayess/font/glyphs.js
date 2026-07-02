@@ -1,3 +1,5 @@
+import { jayessFontGlyphRows } from "./font-primitives.hpp";
+
 var registeredFonts = null;
 var defaultFontName = "jayess-default-5x7";
 var defaultGlyphCache = null;
@@ -105,7 +107,15 @@ function defaultGlyphs() {
     "w": rows("00000", "00000", "10001", "10101", "10101", "10101", "01010"),
     "x": rows("00000", "00000", "10001", "01010", "00100", "01010", "10001"),
     "y": rows("00000", "00000", "10001", "10001", "01111", "00001", "01110"),
-    "z": rows("00000", "00000", "11111", "00010", "00100", "01000", "11111")
+    "z": rows("00000", "00000", "11111", "00010", "00100", "01000", "11111"),
+    "한": rows("10111", "10101", "11101", "00111", "11101", "00101", "00111"),
+    "국": rows("11111", "10001", "11111", "00100", "11111", "00100", "11111"),
+    "어": rows("11101", "10101", "11101", "00101", "11101", "10101", "11101"),
+    "글": rows("11111", "10000", "11110", "00100", "11111", "00000", "11111"),
+    "꼴": rows("11111", "10100", "11110", "10100", "11111", "00100", "11111"),
+    "테": rows("11101", "00101", "11101", "00101", "11101", "00101", "11101"),
+    "스": rows("10001", "01010", "00100", "01010", "10001", "00000", "11111"),
+    "트": rows("11111", "00100", "00100", "00100", "00100", "00000", "11111")
   };
   return defaultGlyphCache;
 }
@@ -187,6 +197,17 @@ export function glyphRowsForFont(font, char) {
   var normalized = normalizeChar(char);
   var glyphs = font.glyphs;
   if (glyphs === null) {
+    if (font.kind === "vector-font" && font.metricsOnly !== true) {
+      var cached = font.glyphCache[normalized];
+      if (cached !== null) {
+        return cached;
+      }
+      var rendered = jayessFontGlyphRows(font, normalized);
+      if (rendered.length > 0) {
+        font.glyphCache[normalized] = rendered;
+        return rendered;
+      }
+    }
     var defaultRows = defaultGlyphs()[normalized];
     if (defaultRows === null) {
       return fallbackRows();
@@ -200,12 +221,43 @@ export function glyphRowsForFont(font, char) {
   return rows;
 }
 
+export function glyphRowsForFontSize(font, char, size) {
+  if (char === "\n") {
+    return [];
+  }
+  var normalized = normalizeChar(char);
+  if (font.kind === "vector-font" && font.metricsOnly !== true && font.glyphs === null) {
+    var key = normalized + "@" + size.toString();
+    var cached = font.glyphCache[key];
+    if (cached !== null) {
+      return cached;
+    }
+    var rendered = jayessFontGlyphRows(font, normalized, size);
+    if (rendered.length > 0) {
+      font.glyphCache[key] = rendered;
+      return rendered;
+    }
+  }
+  return glyphRowsForFont(font, char);
+}
+
+export function glyphWidthForFontSize(font, char, size) {
+  var rows = glyphRowsForFontSize(font, char, size);
+  if (rows.length === 0) {
+    return 0;
+  }
+  return rows[0].length;
+}
+
 export function glyphExistsForFont(font, char) {
   if (char === "\n") {
     return true;
   }
   var glyphs = font.glyphs;
   if (glyphs === null) {
+    if (font.kind === "vector-font" && font.metricsOnly !== true) {
+      return glyphRowsForFont(font, char) !== fallbackRows();
+    }
     return defaultGlyphs()[normalizeChar(char)] !== null;
   }
   return glyphs[normalizeChar(char)] !== null;

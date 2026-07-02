@@ -97,7 +97,7 @@ export function shouldCopyNativeArtifact(moduleRecord, importRecord, reachableSy
   return importRecord.specifiers.some((specifier) => retained.has(specifier.local));
 }
 
-export function collectForcedRetainedDeclarations(graph, emittedModules) {
+export function collectForcedRetainedDeclarations(graph, emittedModules, reachableSymbols) {
   const forced = new Map();
   const moduleFilenames = new Set(graph.modules.map((moduleRecord) => moduleRecord.filename));
 
@@ -105,12 +105,20 @@ export function collectForcedRetainedDeclarations(graph, emittedModules) {
     if (!emittedModules.has(moduleRecord.filename)) {
       continue;
     }
+    const retainedImportLocals = retainedImportLocalNamesFor(moduleRecord, reachableSymbols);
+    const retainedImports = retainedImportLocals == null ? null : new Set(retainedImportLocals);
     for (const dependency of moduleRecord.dependencies) {
       if (dependency.resolved == null || !moduleFilenames.has(dependency.resolved)) {
         continue;
       }
+      if (!shouldRetainModuleDependency(moduleRecord, dependency, reachableSymbols)) {
+        continue;
+      }
       for (const specifier of dependency.specifiers) {
         if (specifier.kind === "namespace") {
+          continue;
+        }
+        if (retainedImports != null && !retainedImports.has(specifier.local)) {
           continue;
         }
         const imported = specifier.imported === "default" ? "__default_export__" : specifier.imported;

@@ -8,7 +8,11 @@ function explicitExportNamesFor(analysis) {
   );
 }
 
-export function collectExportAliasLines({ ast, analysis, dependencies, standalone }) {
+function shouldRetainAlias(specifier, retainedDeclarationNames) {
+  return retainedDeclarationNames == null || retainedDeclarationNames.has(specifier.localName);
+}
+
+export function collectExportAliasLines({ ast, analysis, dependencies, retainedDeclarationNames = null, standalone }) {
   if (standalone) {
     return [];
   }
@@ -18,6 +22,9 @@ export function collectExportAliasLines({ ast, analysis, dependencies, standalon
   for (const statement of ast.body) {
     if (statement.type === "ExportNamedDeclaration" && statement.declaration == null) {
       for (const specifier of statement.specifiers) {
+        if (!shouldRetainAlias(specifier, retainedDeclarationNames)) {
+          continue;
+        }
         if (statement.source == null) {
           if (specifier.exportedName !== specifier.localName) {
             aliases.push(renderLocalExportAlias(specifier));

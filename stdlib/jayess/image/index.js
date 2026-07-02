@@ -5,6 +5,8 @@ import {
   jayessImageBlit,
   jayessImageCrop,
   jayessImageFill,
+  jayessImageFillCapsule,
+  jayessImageFillEllipse,
   jayessImageFillRect,
   jayessImageFillRectAlpha,
   jayessImageGetPixel,
@@ -16,6 +18,7 @@ import {
   jayessImageDecodePpm,
   jayessImageEncodePgm,
   jayessImageEncodePpm,
+  jayessImageDrawLine,
   jayessImageLoadBmp,
   jayessImageLoadPgm,
   jayessImageLoadPpm,
@@ -28,7 +31,10 @@ import {
   jayessImageSavePpm,
   jayessImageSaveTga,
   jayessImageSetPixel,
+  jayessImageAntialias,
+  jayessImageShadowMask,
   jayessImageTransparentBlit,
+  jayessImageTransparentBlitClipped,
   jayessImageWidth
 } from "./image-primitives.hpp";
 
@@ -75,8 +81,28 @@ export function fillRectAlpha(image, x, y, width, height, color) {
   return jayessImageFillRectAlpha(image, x, y, width, height, normalizeColor(color));
 }
 
+export function drawLine(image, x1, y1, x2, y2, color, strokeWidth) {
+  return jayessImageDrawLine(image, x1, y1, x2, y2, normalizeColor(color), strokeWidth);
+}
+
+export function fillEllipse(image, x, y, width, height, color) {
+  return jayessImageFillEllipse(image, x, y, width, height, normalizeColor(color));
+}
+
+export function fillCapsule(image, x, y, width, height, color) {
+  return jayessImageFillCapsule(image, x, y, width, height, normalizeColor(color));
+}
+
 export function copy(image) {
   return jayessImageCopy(image);
+}
+
+export function antialias(image, level) {
+  return jayessImageAntialias(image, level);
+}
+
+export function shadowMask(image, blurRadius, spreadRadius, color) {
+  return jayessImageShadowMask(image, blurRadius, spreadRadius, normalizeColor(color));
 }
 
 export function savePpm(image, path) {
@@ -161,6 +187,10 @@ export function rotate90(image) {
 
 export function transparentBlit(target, source, x, y) {
   return jayessImageTransparentBlit(target, source, x, y);
+}
+
+export function transparentBlitClipped(target, source, x, y, clipX, clipY, clipWidth, clipHeight) {
+  return jayessImageTransparentBlitClipped(target, source, x, y, clipX, clipY, clipWidth, clipHeight);
 }
 
 export function isImage(value) {

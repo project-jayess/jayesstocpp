@@ -223,7 +223,7 @@ Common shipped module families include:
 - Data and encoding: `jayess:bytes`, `jayess:buffer`, `jayess:encoding`, `jayess:json`, `jayess:csv`, `jayess:ini`, `jayess:toml`, `jayess:yaml`, `jayess:xml`.
 - System and I/O: `jayess:fs`, `jayess:path`, `jayess:os`, `jayess:process`, `jayess:system`, `jayess:stream`, `jayess:subprocess`, `jayess:net`, `jayess:http`.
 - Time and concurrency: `jayess:async`, `jayess:timers`, `jayess:thread`, `jayess:channel`, `jayess:workqueue`.
-- Native UI and rendering: `jayess:color`, `jayess:image`, `jayess:canvas`, `jayess:window`, `jayess:gpu`, `jayess:gui`, `jayess:dialog`.
+- Native UI and rendering: `jayess:color`, `jayess:image`, `jayess:canvas`, `jayess:window`, `jayess:gpu`, `jayess:dialog`.
 - Higher-level utilities: `jayess:config`, `jayess:cookie`, `jayess:form`, `jayess:html`, `jayess:markdown`, `jayess:mime`, `jayess:querystring`, `jayess:url`, `jayess:uuid`, `jayess:validate`, `jayess:log`.
 
 See [standard-library.md](./standard-library.md) for the full export index.
@@ -266,12 +266,12 @@ export function start() {
 
 ```js
 import { rgb } from "jayess:color";
-import { create, fillRect, line, savePpm } from "jayess:canvas";
+import { create, fillRect, drawLine, savePpm } from "jayess:canvas";
 
 export function draw() {
   var canvas = create(160, 90);
   fillRect(canvas, 0, 0, 160, 90, rgb(20, 20, 24));
-  line(canvas, 10, 10, 150, 80, rgb(255, 120, 40), { strokeWidth: 3 });
+  drawLine(canvas, 10, 10, 150, 80, rgb(255, 120, 40), { strokeWidth: 3 });
   savePpm(canvas, "out.ppm");
   return canvas;
 }

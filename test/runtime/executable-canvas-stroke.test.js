@@ -39,9 +39,9 @@ int main() {
   const auto& items = std::get<jayess::array_ptr>(result)->items;
   require(std::get<double>(items[0]) == 30.0, "wide line left pixel");
   require(std::get<double>(items[1]) == 40.0, "wide line right pixel");
-  require(std::get<double>(items[2]) == 30.0, "wide strokeRect pixel");
+  require(std::get<double>(items[2]) == 30.0, "wide drawRect pixel");
   require(std::get<double>(items[3]) == 30.0, "wide quadraticCurve pixel");
-  require(std::get<double>(items[4]) == 40.0, "wide strokePolygon pixel");
+  require(std::get<double>(items[4]) == 40.0, "wide drawPolygon pixel");
 
   auto strokeWidthError = thrown_message(${namespace}::invalidStrokeWidth);
   require(strokeWidthError.find("strokeWidth") != std::string::npos, "invalid strokeWidth diagnostic");

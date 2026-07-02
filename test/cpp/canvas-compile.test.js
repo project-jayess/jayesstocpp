@@ -66,3 +66,23 @@ compileTest("transpileFile built-in canvas drawing state project compiles with t
   compileCppFiles(cppFiles, targetDir);
   assert.ok(true);
 });
+
+compileTest("transpileFile built-in canvas primitive API project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-canvas-primitive-api-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/canvas-primitive-api-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});
+
+compileTest("transpileFile built-in canvas XML render project compiles with the available C++ compiler", (t) => {
+  const targetDir = createManagedTempDir(t, "builtin-canvas-xml-render-project-compile");
+  const fixture = path.resolve("test/fixtures/modules/canvas-xml-render-main.js");
+  const result = transpileFile(fixture, targetDir);
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+
+  compileCppFiles(cppFiles, targetDir);
+  assert.ok(true);
+});

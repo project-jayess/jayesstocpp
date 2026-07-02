@@ -2,11 +2,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { collectBindingIdentifiers } from "../ast/binding-patterns.js";
 import { collectParameterBindingNames } from "../ast/parameters.js";
-import { literal } from "../ast/nodes.js";
+import { importDeclaration, literal } from "../ast/nodes.js";
 import { throwDiagnostics } from "../diagnostics.js";
 import { createModuleDiagnostic } from "../diagnostics/module-diagnostic.js";
 
-const assetImportSource = "jayess:canvas";
+const assetPackersByImportSource = new Map([
+  ["jayess:canvas", ["packHtml", "packCss", "packXml", "packImage"]],
+  ["jayess:font", ["packFont"]]
+]);
 
 function isInsideDirectory(parent, candidate) {
   const relative = path.relative(parent, candidate);
@@ -16,11 +19,15 @@ function isInsideDirectory(parent, candidate) {
 function collectAssetImportLocals(ast) {
   const locals = new Map();
   for (const statement of ast.body) {
-    if (statement.type !== "ImportDeclaration" || statement.source !== assetImportSource) {
+    if (statement.type !== "ImportDeclaration") {
+      continue;
+    }
+    const packers = assetPackersByImportSource.get(statement.source);
+    if (packers == null) {
       continue;
     }
     for (const specifier of statement.specifiers) {
-      if (specifier.kind === "named" && (specifier.imported === "packHtml" || specifier.imported === "packCss")) {
+      if (specifier.kind === "named" && packers.includes(specifier.imported)) {
         locals.set(specifier.local, specifier.imported);
       }
     }
@@ -67,13 +74,43 @@ function childScopeBlockedNames(node, blocked) {
 }
 
 function assetExtension(kind) {
-  return kind === "packHtml" ? ".html" : ".css";
+  if (kind === "packHtml") {
+    return ".html";
+  }
+  if (kind === "packCss") {
+    return ".css";
+  }
+  if (kind === "packXml") {
+    return ".xml";
+  }
+  return null;
 }
 
-function embeddedAssetLiteral(sourceText, node, kind, projectRoot) {
-  if (node.arguments.length !== 1 || node.arguments[0]?.type !== "Literal" || node.arguments[0].kind !== "string") {
+function imageAssetExtension(requested) {
+  const extension = path.extname(requested);
+  if (extension === ".ppm" || extension === ".pgm") {
+    return extension;
+  }
+  return null;
+}
+
+function fontAssetExtension(requested) {
+  const extension = path.extname(requested);
+  if ([".ttf", ".otf", ".woff", ".woff2"].includes(extension)) {
+    return extension;
+  }
+  return null;
+}
+
+function packagedFontPath(requested) {
+  return `assets/fonts/${path.basename(requested)}`;
+}
+
+function embeddedAssetLiteral(sourceText, node, kind, projectRoot, addedAssetImports) {
+  const maximumArguments = kind === "packFont" ? 2 : 1;
+  if (node.arguments.length < 1 || node.arguments.length > maximumArguments || node.arguments[0]?.type !== "Literal" || node.arguments[0].kind !== "string") {
     throwDiagnostics([
-      createModuleDiagnostic(sourceText, node, `${kind}() requires one static string filename`)
+      createModuleDiagnostic(sourceText, node, `${kind}() requires one static string filename${kind === "packFont" ? " and an optional options object" : ""}`)
     ]);
   }
   const requested = node.arguments[0].value;
@@ -82,9 +119,22 @@ function embeddedAssetLiteral(sourceText, node, kind, projectRoot) {
       createModuleDiagnostic(sourceText, node.arguments[0], `${kind}() only embeds relative asset paths`, requested)
     ]);
   }
-  if (path.extname(requested) !== assetExtension(kind)) {
+  const requiredExtension = assetExtension(kind);
+  if (requiredExtension !== null && path.extname(requested) !== requiredExtension) {
     throwDiagnostics([
-      createModuleDiagnostic(sourceText, node.arguments[0], `${kind}() expects a ${assetExtension(kind)} asset`, requested)
+      createModuleDiagnostic(sourceText, node.arguments[0], `${kind}() expects a ${requiredExtension} asset`, requested)
+    ]);
+  }
+  const imageExtension = kind === "packImage" ? imageAssetExtension(requested) : null;
+  if (kind === "packImage" && imageExtension === null) {
+    throwDiagnostics([
+      createModuleDiagnostic(sourceText, node.arguments[0], "packImage() currently embeds .ppm and .pgm assets", requested)
+    ]);
+  }
+  const fontExtension = kind === "packFont" ? fontAssetExtension(requested) : null;
+  if (kind === "packFont" && fontExtension === null) {
+    throwDiagnostics([
+      createModuleDiagnostic(sourceText, node.arguments[0], "packFont() currently packages .ttf, .otf, .woff, and .woff2 assets", requested)
     ]);
   }
   const resolved = path.resolve(path.dirname(sourceText.filename), requested);
@@ -98,10 +148,32 @@ function embeddedAssetLiteral(sourceText, node, kind, projectRoot) {
       createModuleDiagnostic(sourceText, node.arguments[0], `${kind}() asset does not exist`, resolved)
     ]);
   }
-  return literal("string", fs.readFileSync(resolved, "utf8"), node.start, node.end);
+  if (kind === "packFont") {
+    addedAssetImports.add(requested);
+    const start = node.arguments[0].start;
+    const end = node.arguments[0].end;
+    const name = path.basename(requested, fontExtension);
+    const options = node.arguments[1] ?? literal("null", null, start, end);
+    node.arguments = [
+      literal("string", name, start, end),
+      literal("string", packagedFontPath(requested), start, end),
+      literal("string", fontExtension.slice(1), start, end),
+      options
+    ];
+    return node;
+  }
+  const contents = fs.readFileSync(resolved, "utf8");
+  if (kind === "packImage") {
+    node.arguments = [
+      literal("string", contents, node.arguments[0].start, node.arguments[0].end),
+      literal("string", imageExtension, node.arguments[0].start, node.arguments[0].end)
+    ];
+    return node;
+  }
+  return literal("string", contents, node.start, node.end);
 }
 
-function transformNode(sourceText, node, assetLocals, projectRoot, blocked) {
+function transformNode(sourceText, node, assetLocals, projectRoot, blocked, addedAssetImports) {
   if (node == null || typeof node !== "object") {
     return node;
   }
@@ -112,7 +184,7 @@ function transformNode(sourceText, node, assetLocals, projectRoot, blocked) {
     && assetLocals.has(node.callee.name)
     && !blocked.has(node.callee.name)
   ) {
-    return embeddedAssetLiteral(sourceText, node, assetLocals.get(node.callee.name), projectRoot);
+    return embeddedAssetLiteral(sourceText, node, assetLocals.get(node.callee.name), projectRoot, addedAssetImports);
   }
 
   const childBlocked = childScopeBlockedNames(node, blocked);
@@ -121,12 +193,20 @@ function transformNode(sourceText, node, assetLocals, projectRoot, blocked) {
       continue;
     }
     if (Array.isArray(value)) {
-      node[key] = value.map((item) => transformNode(sourceText, item, assetLocals, projectRoot, childBlocked));
+      node[key] = value.map((item) => transformNode(sourceText, item, assetLocals, projectRoot, childBlocked, addedAssetImports));
     } else if (value != null && typeof value === "object") {
-      node[key] = transformNode(sourceText, value, assetLocals, projectRoot, childBlocked);
+      node[key] = transformNode(sourceText, value, assetLocals, projectRoot, childBlocked, addedAssetImports);
     }
   }
   return node;
+}
+
+function existingSideEffectImports(ast) {
+  return new Set(
+    ast.body
+      .filter((statement) => statement.type === "ImportDeclaration" && statement.specifiers.length === 0)
+      .map((statement) => statement.source)
+  );
 }
 
 export function embedCompileTimeAssets(ast, sourceText, projectRoot) {
@@ -134,6 +214,15 @@ export function embedCompileTimeAssets(ast, sourceText, projectRoot) {
   if (assetLocals.size === 0) {
     return ast;
   }
-  transformNode(sourceText, ast, assetLocals, path.resolve(projectRoot), new Set());
+  const addedAssetImports = new Set();
+  transformNode(sourceText, ast, assetLocals, path.resolve(projectRoot), new Set(), addedAssetImports);
+  if (addedAssetImports.size > 0) {
+    const existing = existingSideEffectImports(ast);
+    const imports = [...addedAssetImports]
+      .filter((source) => !existing.has(source))
+      .sort()
+      .map((source) => importDeclaration([], source, 0, 0));
+    ast.body = [...imports, ...ast.body];
+  }
   return ast;
 }

@@ -97,6 +97,9 @@ using jayess_release_dc_fn = int (*)(jayess_hwnd, jayess_hdc);
 using jayess_stretch_dibits_fn = int (*)(jayess_hdc, int, int, int, int, int, int, int, int, const void*, const jayess_bitmapinfo*, unsigned int, unsigned long);
 using jayess_get_client_rect_fn = int (*)(jayess_hwnd, jayess_rect*);
 using jayess_pat_blt_fn = int (*)(jayess_hdc, int, int, int, int, unsigned long);
+using jayess_get_window_long_ptr_a_fn = std::intptr_t (*)(jayess_hwnd, int);
+using jayess_set_window_long_ptr_a_fn = std::intptr_t (*)(jayess_hwnd, int, std::intptr_t);
+using jayess_set_window_pos_fn = int (*)(jayess_hwnd, jayess_hwnd, int, int, int, int, jayess_uint);
 
 struct jayess_windows_window_api {
   jayess_hmodule user32 = nullptr;
@@ -118,6 +121,9 @@ struct jayess_windows_window_api {
   jayess_stretch_dibits_fn stretch_dibits = nullptr;
   jayess_get_client_rect_fn get_client_rect = nullptr;
   jayess_pat_blt_fn pat_blt = nullptr;
+  jayess_get_window_long_ptr_a_fn get_window_long_ptr = nullptr;
+  jayess_set_window_long_ptr_a_fn set_window_long_ptr = nullptr;
+  jayess_set_window_pos_fn set_window_pos = nullptr;
   jayess_hinstance module = nullptr;
   bool attempted = false;
   bool class_registered = false;
@@ -126,7 +132,14 @@ struct jayess_windows_window_api {
 constexpr jayess_uint jayess_cs_hredraw = 0x0002U;
 constexpr jayess_uint jayess_cs_vredraw = 0x0001U;
 constexpr jayess_dword jayess_ws_overlapped_window = 0x00cf0000UL;
+constexpr jayess_dword jayess_ws_popup = 0x80000000UL;
+constexpr int jayess_gwl_style = -16;
+constexpr int jayess_sw_hide = 0;
 constexpr int jayess_sw_show = 5;
+constexpr jayess_uint jayess_swp_nosize = 0x0001U;
+constexpr jayess_uint jayess_swp_nomove = 0x0002U;
+constexpr jayess_uint jayess_swp_nozorder = 0x0004U;
+constexpr jayess_uint jayess_swp_framechanged = 0x0020U;
 constexpr jayess_uint jayess_pm_remove = 0x0001U;
 constexpr jayess_uint jayess_wm_close = 0x0010U;
 constexpr jayess_uint jayess_wm_destroy = 0x0002U;
@@ -323,6 +336,9 @@ jayess_windows_window_api& window_windows_api() {
   api.get_client_rect = reinterpret_cast<jayess_get_client_rect_fn>(GetProcAddress(api.user32, "GetClientRect"));
   api.stretch_dibits = reinterpret_cast<jayess_stretch_dibits_fn>(GetProcAddress(api.gdi32, "StretchDIBits"));
   api.pat_blt = reinterpret_cast<jayess_pat_blt_fn>(GetProcAddress(api.gdi32, "PatBlt"));
+  api.get_window_long_ptr = reinterpret_cast<jayess_get_window_long_ptr_a_fn>(GetProcAddress(api.user32, "GetWindowLongPtrA"));
+  api.set_window_long_ptr = reinterpret_cast<jayess_set_window_long_ptr_a_fn>(GetProcAddress(api.user32, "SetWindowLongPtrA"));
+  api.set_window_pos = reinterpret_cast<jayess_set_window_pos_fn>(GetProcAddress(api.user32, "SetWindowPos"));
   if (api.get_module_handle != nullptr) {
     api.module = api.get_module_handle(nullptr);
   }
@@ -350,6 +366,9 @@ bool window_platform_available() {
     && api.get_client_rect != nullptr
     && api.stretch_dibits != nullptr
     && api.pat_blt != nullptr
+    && api.get_window_long_ptr != nullptr
+    && api.set_window_long_ptr != nullptr
+    && api.set_window_pos != nullptr
     && api.module != nullptr;
 }
 
@@ -370,6 +389,23 @@ void window_windows_ensure_registered() {
   api.class_registered = true;
 }
 
+void window_windows_fill_black(const window_ptr& window) {
+  auto& api = window_windows_api();
+  const auto hwnd = window_windows_handle(window);
+  jayess_rect client{};
+  if (api.get_client_rect(hwnd, &client) == 0) {
+    return;
+  }
+  auto dc = api.get_dc(hwnd);
+  if (dc == nullptr) {
+    return;
+  }
+  const auto width = (std::max)(1, static_cast<int>(client.right - client.left));
+  const auto height = (std::max)(1, static_cast<int>(client.bottom - client.top));
+  api.pat_blt(dc, 0, 0, width, height, jayess_blackness);
+  api.release_dc(hwnd, dc);
+}
+
 void window_platform_create(const window_ptr& window) {
   auto& api = window_windows_api();
   window_windows_ensure_registered();
@@ -377,7 +413,7 @@ void window_platform_create(const window_ptr& window) {
     0UL,
     window_windows_class_name(),
     window->title.c_str(),
-    jayess_ws_overlapped_window,
+    window->framed ? jayess_ws_overlapped_window : jayess_ws_popup,
     0,
     0,
     window->width,
@@ -404,6 +440,21 @@ void window_platform_show(const window_ptr& window) {
   const auto hwnd = window_windows_handle(window);
   api.show_window(hwnd, jayess_sw_show);
   api.update_window(hwnd);
+  window_windows_fill_black(window);
+}
+
+void window_platform_hide(const window_ptr& window) {
+  auto& api = window_windows_api();
+  const auto hwnd = window_windows_handle(window);
+  api.show_window(hwnd, jayess_sw_hide);
+}
+
+void window_platform_frame(const window_ptr& window) {
+  auto& api = window_windows_api();
+  const auto hwnd = window_windows_handle(window);
+  const auto style = static_cast<std::intptr_t>(window->framed ? jayess_ws_overlapped_window : jayess_ws_popup);
+  api.set_window_long_ptr(hwnd, jayess_gwl_style, style);
+  api.set_window_pos(hwnd, nullptr, 0, 0, 0, 0, jayess_swp_nomove | jayess_swp_nosize | jayess_swp_nozorder | jayess_swp_framechanged);
 }
 
 void window_platform_close(const window_ptr& window) {

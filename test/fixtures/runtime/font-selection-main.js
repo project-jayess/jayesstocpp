@@ -1,6 +1,5 @@
-import { create, drawHtml, getPixel, layoutHtml, measureText, text } from "jayess:canvas";
+import { create, getPixel, measureText, text } from "jayess:canvas";
 import { rgb } from "jayess:color";
-import { createHtmlDocument } from "jayess:canvas";
 import { fontMetrics, loadFont, measureGlyph } from "jayess:font";
 
 export function inspectFontSelection(path) {
@@ -43,11 +42,6 @@ export function inspectFontSelection(path) {
   text(vectorCanvas, "N", 1, 1, { fontFamily: "wide-file", fontSize: 20, color: rgb(255, 255, 255) });
   var vectorScaledPixel = getPixel(vectorCanvas, 2, 1);
 
-  var document = createHtmlDocument("<p>NX</p>", "p { font-family: wide-file; font-size: 14px; color: #ffffff; }", null);
-  layoutHtml(document, { x: 0, y: 0, width: 80, height: 24 });
-  drawHtml(canvas, document);
-  var htmlPixel = getPixel(canvas, 0, 0);
-
   return [
     narrow.family,
     wide.family,
@@ -57,7 +51,6 @@ export function inspectFontSelection(path) {
     metrics.descent,
     glyph.advance,
     directPixel.red,
-    htmlPixel.red,
     defaultGapPixel.red,
     vectorScaledPixel.red
   ];
