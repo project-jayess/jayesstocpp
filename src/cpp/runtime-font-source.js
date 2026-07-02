@@ -891,7 +891,8 @@ std::vector<std::string> font_rasterize_rows(
   int pixelHeight,
   double ascender,
   double descender,
-  double advanceWidth
+  double advanceWidth,
+  std::uint32_t codepoint
 ) {
   std::vector<std::string> rows;
   if (pixelHeight <= 0 || polygons.empty()) {
@@ -926,7 +927,10 @@ std::vector<std::string> font_rasterize_rows(
       }
     }
   }
-  return font_preserve_thin_strokes(rows, pixelHeight);
+  if (codepoint >= 0x80U) {
+    return font_preserve_thin_strokes(rows, pixelHeight);
+  }
+  return rows;
 }
 
 value font_rows_value(const std::vector<std::string>& rows) {
@@ -979,7 +983,8 @@ value font_render_glyph_rows(const value& fontValue, const value& charValue) {
     charHeight,
     ascender,
     descender,
-    static_cast<double>(metric.advanceWidth)
+    static_cast<double>(metric.advanceWidth),
+    codepoint
   ));
 }
 
