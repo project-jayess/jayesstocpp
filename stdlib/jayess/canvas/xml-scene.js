@@ -661,6 +661,8 @@ function normalizeShape(node, context) {
     scrollbarColor: shared.scrollbarColor,
     scrollOffsetX: 0,
     scrollOffsetY: 0,
+    textLayoutCache: null,
+    textBitmapCache: null,
     text: textAttribute(node.attributes, "text", childText),
     children: children
   };

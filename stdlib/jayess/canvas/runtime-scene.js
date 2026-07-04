@@ -312,6 +312,8 @@ export function updateElementAttribute(source, id, name, value) {
   } else {
     fail("jayess:canvas XML runtime attribute " + name + " is not supported yet");
   }
+  shape.textLayoutCache = null;
+  shape.textBitmapCache = null;
   return shape;
 }
 

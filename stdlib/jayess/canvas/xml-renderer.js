@@ -1,4 +1,5 @@
 import { rgb, rgba } from "jayess:color";
+import { round } from "jayess:math";
 import { startsWith } from "jayess:string";
 import { parseScene } from "./xml-scene.js";
 import { drawShapeShadow } from "./xml-shadow.js";
@@ -85,7 +86,9 @@ function labelOptions(shape) {
     textOverflow: shape.textOverflow,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
-    overflowY: shape.overflowY
+    overflowY: shape.overflowY,
+    scrollX: shape.scrollOffsetX,
+    scrollY: shape.scrollOffsetY
   };
   if (shape.lineHeight > 0) {
     options.lineHeight = shape.lineHeight;
@@ -111,12 +114,168 @@ function needsHorizontalScrollbar(shape, measured, width, height) {
   return shape.overflowX === "scroll" || (shape.overflowX === "auto" && measured.width > width);
 }
 
-function drawScrollbars(renderer, canvas, shape, x, y, width, height, measured) {
+function textLayoutCacheKey(shape, box, options) {
+  var lineHeight = shape.lineHeight > 0 ? shape.lineHeight : 0;
+  return shape.text + "|" +
+    box.width.toString() + "x" + box.height.toString() + "|" +
+    shape.fontFamily + "|" +
+    shape.fontSize.toString() + "|" +
+    lineHeight.toString() + "|" +
+    shape.letterSpacing.toString() + "|" +
+    shape.wordSpacing.toString() + "|" +
+    shape.textTransform + "|" +
+    shape.textOverflow;
+}
+
+function measureShapeTextBox(renderer, canvas, shape, box, options) {
+  var key = textLayoutCacheKey(shape, box, options);
+  if (shape.textLayoutCache !== null && shape.textLayoutCache.key === key) {
+    return shape.textLayoutCache.measured;
+  }
+  var measured = renderer.measureTextBox(canvas, shape.text, box, options);
+  shape.textLayoutCache = {
+    key: key,
+    measured: measured
+  };
+  return measured;
+}
+
+function bitmapCacheKey(shape, box, measured) {
+  var lineHeight = shape.lineHeight > 0 ? shape.lineHeight : 0;
+  return shape.text + "|" +
+    box.width.toString() + "x" + box.height.toString() + "|" +
+    measured.width.toString() + "x" + measured.height.toString() + "|" +
+    shape.fontFamily + "|" +
+    shape.fontSize.toString() + "|" +
+    lineHeight.toString() + "|" +
+    shape.letterSpacing.toString() + "|" +
+    shape.wordSpacing.toString() + "|" +
+    shape.textTransform + "|" +
+    shape.textDecoration + "|" +
+    shape.textOverflow + "|" +
+    labelColor(shape).red.toString() + "," +
+    labelColor(shape).green.toString() + "," +
+    labelColor(shape).blue.toString() + "," +
+    labelColor(shape).alpha.toString();
+}
+
+function largerSize(left, right) {
+  if (left > right) {
+    return left;
+  }
+  return right;
+}
+
+function layerSize(value) {
+  var rounded = round(value);
+  if (rounded < 1) {
+    return 1;
+  }
+  return rounded;
+}
+
+function textLayerOptions(options) {
+  var layer = {
+    color: options.color,
+    fontFamily: options.fontFamily,
+    fontSize: options.fontSize,
+    horizontal: options.horizontal,
+    vertical: "top",
+    letterSpacing: options.letterSpacing,
+    wordSpacing: options.wordSpacing,
+    textTransform: options.textTransform,
+    textDecoration: options.textDecoration,
+    textOverflow: options.textOverflow,
+    overflow: options.overflow,
+    overflowX: options.overflowX,
+    overflowY: options.overflowY,
+    scrollX: 0,
+    scrollY: 0
+  };
+  if (options.lineHeight !== null) {
+    layer.lineHeight = options.lineHeight;
+  }
+  return layer;
+}
+
+function textLayer(renderer, canvas, shape, box, measured, options) {
+  var width = layerSize(largerSize(measured.width, box.width));
+  var height = layerSize(largerSize(measured.height, box.height));
+  var key = bitmapCacheKey(shape, box, measured);
+  if (
+    shape.textBitmapCache !== null &&
+    shape.textBitmapCache.key === key &&
+    shape.textBitmapCache.width === width &&
+    shape.textBitmapCache.height === height
+  ) {
+    return shape.textBitmapCache.canvas;
+  }
+  var layer = renderer.create(width, height, {
+    background: rgba(0, 0, 0, 0)
+  });
+  renderer.drawTextBox(layer, shape.text, {
+    x: 0,
+    y: 0,
+    width: box.width,
+    height: height
+  }, textLayerOptions(options));
+  shape.textBitmapCache = {
+    key: key,
+    width: width,
+    height: height,
+    canvas: layer
+  };
+  return layer;
+}
+
+function scrollbarLayout(renderer, canvas, shape, x, y, width, height, options) {
+  var contentWidth = width;
+  var contentHeight = height;
+  var box = { x: x, y: y, width: contentWidth, height: contentHeight };
+  var measured = measureShapeTextBox(renderer, canvas, shape, box, options);
+  var vertical = shape.scrollbarWidth > 0 && needsVerticalScrollbar(shape, measured, contentWidth, contentHeight);
+  var horizontal = shape.scrollbarWidth > 0 && needsHorizontalScrollbar(shape, measured, contentWidth, contentHeight);
+  if (vertical) {
+    contentWidth = contentWidth - shape.scrollbarWidth;
+  }
+  if (horizontal) {
+    contentHeight = contentHeight - shape.scrollbarWidth;
+  }
+  if (contentWidth < 1) {
+    contentWidth = 1;
+  }
+  if (contentHeight < 1) {
+    contentHeight = 1;
+  }
+  if (vertical || horizontal) {
+    box = { x: x, y: y, width: contentWidth, height: contentHeight };
+    measured = measureShapeTextBox(renderer, canvas, shape, box, options);
+    vertical = shape.scrollbarWidth > 0 && needsVerticalScrollbar(shape, measured, contentWidth, contentHeight);
+    horizontal = shape.scrollbarWidth > 0 && needsHorizontalScrollbar(shape, measured, contentWidth, contentHeight);
+  }
+  return {
+    contentBox: box,
+    measured: measured,
+    vertical: vertical,
+    horizontal: horizontal
+  };
+}
+
+function drawCachedTextLayer(renderer, canvas, shape, layout, options) {
+  var layer = textLayer(renderer, canvas, shape, layout.contentBox, layout.measured, options);
+  renderer.pushClip(canvas, layout.contentBox.x, layout.contentBox.y, layout.contentBox.width, layout.contentBox.height);
+  renderer.drawImageAlpha(canvas, layer.image, layout.contentBox.x - shape.scrollOffsetX, layout.contentBox.y - shape.scrollOffsetY);
+  renderer.popClip(canvas);
+  return canvas;
+}
+
+function drawScrollbars(renderer, canvas, shape, x, y, width, height, layout) {
   if (shape.scrollbarWidth <= 0) {
     return canvas;
   }
   var colors = scrollbarColors(shape);
-  if (needsVerticalScrollbar(shape, measured, width, height)) {
+  var measured = layout.measured;
+  if (layout.vertical) {
     var barX = x + width - shape.scrollbarWidth;
     renderer.fillRect(canvas, barX, y, shape.scrollbarWidth, height, colors.track);
     var thumbHeight = height;
@@ -133,7 +292,7 @@ function drawScrollbars(renderer, canvas, shape, x, y, width, height, measured) 
     }
     renderer.fillRect(canvas, barX, thumbY, shape.scrollbarWidth, thumbHeight, colors.thumb);
   }
-  if (needsHorizontalScrollbar(shape, measured, width, height)) {
+  if (layout.horizontal) {
     var barY = y + height - shape.scrollbarWidth;
     renderer.fillRect(canvas, x, barY, width, shape.scrollbarWidth, colors.track);
     var thumbWidth = width;
@@ -164,20 +323,13 @@ function drawShapeLabelInBox(renderer, canvas, shape, x, y, width, height) {
     return canvas;
   }
   var options = labelOptions(shape);
-  var textBox = {
-    x: x + padding,
-    y: y + padding,
-    width: innerWidth,
-    height: innerHeight
-  };
-  var measured = renderer.measureTextBox(canvas, shape.text, textBox, options);
-  renderer.drawTextBox(canvas, shape.text, {
-    x: x + padding,
-    y: y + padding,
-    width: innerWidth,
-    height: innerHeight
-  }, options);
-  drawScrollbars(renderer, canvas, shape, x + padding, y + padding, innerWidth, innerHeight, measured);
+  var layout = scrollbarLayout(renderer, canvas, shape, x + padding, y + padding, innerWidth, innerHeight, options);
+  if (layout.vertical || layout.horizontal) {
+    drawCachedTextLayer(renderer, canvas, shape, layout, options);
+  } else {
+    renderer.drawTextBox(canvas, shape.text, layout.contentBox, options);
+  }
+  drawScrollbars(renderer, canvas, shape, x + padding, y + padding, innerWidth, innerHeight, layout);
   return canvas;
 }
 

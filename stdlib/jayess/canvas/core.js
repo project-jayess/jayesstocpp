@@ -1309,27 +1309,79 @@ function pushLayoutLine(lines, widths, line, target, options) {
   widths.push(measureText(target, line, options).width);
 }
 
+function isWrapSpace(char) {
+  return char === " " || char === "\t";
+}
+
+function measuredWidth(target, textValue, options) {
+  return measureText(target, textValue, options).width;
+}
+
+function pushWrappedLongWord(lines, widths, word, target, rect, options) {
+  var current = "";
+  var characters = stringChars(word);
+  for (var index = 0; index < characters.length; index = index + 1) {
+    var candidate = current + characters[index];
+    if (current.length > 0 && measuredWidth(target, candidate, options) > rect.width) {
+      pushLayoutLine(lines, widths, current, target, options);
+      current = characters[index];
+    } else {
+      current = candidate;
+    }
+  }
+  return current;
+}
+
+function pushWrappedWord(lines, widths, state, word, target, rect, options) {
+  if (word.length === 0) {
+    return state;
+  }
+  var separator = "";
+  if (state.line.length > 0 && state.pendingSpace.length > 0) {
+    separator = state.pendingSpace;
+  }
+  var candidate = state.line + separator + word;
+  if (state.line.length === 0) {
+    if (measuredWidth(target, word, options) <= rect.width) {
+      return { line: word, pendingSpace: "" };
+    }
+    return { line: pushWrappedLongWord(lines, widths, word, target, rect, options), pendingSpace: "" };
+  }
+  if (measuredWidth(target, candidate, options) <= rect.width) {
+    return { line: candidate, pendingSpace: "" };
+  }
+  pushLayoutLine(lines, widths, state.line, target, options);
+  if (measuredWidth(target, word, options) <= rect.width) {
+    return { line: word, pendingSpace: "" };
+  }
+  return { line: pushWrappedLongWord(lines, widths, word, target, rect, options), pendingSpace: "" };
+}
+
 function wrapTextByWidth(target, textValue, rect, options) {
   var lines = [];
   var widths = [];
-  var line = "";
+  var state = { line: "", pendingSpace: "" };
+  var word = "";
   var characters = stringChars(textValue);
   for (var index = 0; index < characters.length; index = index + 1) {
     var char = characters[index];
     if (char === "\n") {
-      pushLayoutLine(lines, widths, line, target, options);
-      line = "";
-    } else {
-      var candidate = line + char;
-      if (line.length > 0 && measureText(target, candidate, options).width > rect.width) {
-        pushLayoutLine(lines, widths, line, target, options);
-        line = char;
-      } else {
-        line = candidate;
+      state = pushWrappedWord(lines, widths, state, word, target, rect, options);
+      word = "";
+      pushLayoutLine(lines, widths, state.line, target, options);
+      state = { line: "", pendingSpace: "" };
+    } else if (isWrapSpace(char)) {
+      state = pushWrappedWord(lines, widths, state, word, target, rect, options);
+      word = "";
+      if (state.line.length > 0) {
+        state.pendingSpace = state.pendingSpace + char;
       }
+    } else {
+      word = word + char;
     }
   }
-  pushLayoutLine(lines, widths, line, target, options);
+  state = pushWrappedWord(lines, widths, state, word, target, rect, options);
+  pushLayoutLine(lines, widths, state.line, target, options);
   return { lines: lines, widths: widths };
 }
 
@@ -1718,7 +1770,41 @@ function shapeTextOptions(shape) {
   return options;
 }
 
-function shapeTextRect(shape) {
+function needsVerticalTextScrollbar(shape, measured, rect) {
+  return shape.scrollbarWidth > 0 && (shape.overflowY === "scroll" || (shape.overflowY === "auto" && measured.height > rect.height));
+}
+
+function needsHorizontalTextScrollbar(shape, measured, rect) {
+  return shape.scrollbarWidth > 0 && (shape.overflowX === "scroll" || (shape.overflowX === "auto" && measured.width > rect.width));
+}
+
+function textLayoutCacheKey(shape, rect) {
+  var lineHeight = shape.lineHeight > 0 ? shape.lineHeight : 0;
+  return shape.text + "|" +
+    rect.width.toString() + "x" + rect.height.toString() + "|" +
+    shape.fontFamily + "|" +
+    shape.fontSize.toString() + "|" +
+    lineHeight.toString() + "|" +
+    shape.letterSpacing.toString() + "|" +
+    shape.wordSpacing.toString() + "|" +
+    shape.textTransform + "|" +
+    shape.textOverflow;
+}
+
+function measureShapeTextBox(canvas, shape, rect, options) {
+  var key = textLayoutCacheKey(shape, rect);
+  if (shape.textLayoutCache !== null && shape.textLayoutCache.key === key) {
+    return shape.textLayoutCache.measured;
+  }
+  var measured = measureTextBox(canvas, shape.text, rect, options);
+  shape.textLayoutCache = {
+    key: key,
+    measured: measured
+  };
+  return measured;
+}
+
+function shapeFullTextRect(shape) {
   var padding = shape.padding;
   var width = shape.width - padding * 2;
   var height = shape.height - padding * 2;
@@ -1734,13 +1820,41 @@ function shapeTextRect(shape) {
 }
 
 function shapeTextMeasurement(canvas, shape) {
-  var rect = shapeTextRect(shape);
+  var fullRect = shapeFullTextRect(shape);
+  var rect = fullRect;
   if (rect === null || shape.text.length === 0) {
     return null;
   }
+  var options = shapeTextOptions(shape);
+  var measured = measureShapeTextBox(canvas, shape, rect, options);
+  var vertical = needsVerticalTextScrollbar(shape, measured, rect);
+  var horizontal = needsHorizontalTextScrollbar(shape, measured, rect);
+  if (vertical || horizontal) {
+    var width = fullRect.width;
+    var height = fullRect.height;
+    if (vertical) {
+      width = width - shape.scrollbarWidth;
+    }
+    if (horizontal) {
+      height = height - shape.scrollbarWidth;
+    }
+    if (width < 1) {
+      width = 1;
+    }
+    if (height < 1) {
+      height = 1;
+    }
+    rect = { x: fullRect.x, y: fullRect.y, width: width, height: height };
+    measured = measureShapeTextBox(canvas, shape, rect, options);
+    vertical = needsVerticalTextScrollbar(shape, measured, rect);
+    horizontal = needsHorizontalTextScrollbar(shape, measured, rect);
+  }
   return {
+    fullRect: fullRect,
     rect: rect,
-    measured: measureTextBox(canvas, shape.text, rect, shapeTextOptions(shape))
+    measured: measured,
+    vertical: vertical,
+    horizontal: horizontal
   };
 }
 
@@ -1792,6 +1906,19 @@ function redrawShape(canvas, shape) {
   return redrawAttachedSceneRegion(canvas, shapeRenderBoundsWith(renderer, shape), null);
 }
 
+function redrawShapePaint(canvas, shape) {
+  var renderer = xmlSceneRenderer();
+  return redrawAttachedSceneRegion(canvas, shapePaintBoundsWith(renderer, shape), skipShadowMap(shape.id));
+}
+
+function redrawShapeScrollArea(canvas, shape) {
+  var info = shapeTextMeasurement(canvas, shape);
+  if (info === null) {
+    return redrawShapePaint(canvas, shape);
+  }
+  return redrawAttachedSceneRegion(canvas, info.fullRect, skipShadowMap(shape.id));
+}
+
 function setShapeScroll(canvas, shape, scrollX, scrollY) {
   var maxX = maxScrollXFor(canvas, shape);
   var maxY = maxScrollYFor(canvas, shape);
@@ -1802,7 +1929,7 @@ function setShapeScroll(canvas, shape, scrollX, scrollY) {
   }
   shape.scrollOffsetX = nextX;
   shape.scrollOffsetY = nextY;
-  redrawShape(canvas, shape);
+  redrawShapeScrollArea(canvas, shape);
   return true;
 }
 
@@ -1828,7 +1955,7 @@ function scrollShapeByWheel(canvas, event) {
 
 function scrollbarThumbRect(canvas, shape) {
   var info = shapeTextMeasurement(canvas, shape);
-  if (info === null || shape.scrollbarWidth <= 0 || info.measured.height <= info.rect.height) {
+  if (info === null || shape.scrollbarWidth <= 0 || info.vertical !== true || info.measured.height <= info.rect.height) {
     return null;
   }
   var thumbHeight = info.rect.height * info.rect.height / info.measured.height;
@@ -1841,7 +1968,7 @@ function scrollbarThumbRect(canvas, shape) {
     thumbY = info.rect.y + shape.scrollOffsetY * (info.rect.height - thumbHeight) / maxScrollY;
   }
   return {
-    x: info.rect.x + info.rect.width - shape.scrollbarWidth,
+    x: info.fullRect.x + info.fullRect.width - shape.scrollbarWidth,
     y: thumbY,
     width: shape.scrollbarWidth,
     height: thumbHeight,

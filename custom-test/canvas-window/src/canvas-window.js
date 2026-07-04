@@ -43,7 +43,7 @@ function sceneXml(width, height, antialias) {
         <rectangle width="100%" height="78" corners="14" fill="#e8f3ff" outline="#9ed8ff" outline-thickness="2" padding="12" font-color="#253342" font-family="Noto Sans Mono" font-size="14" text-transform="uppercase" text-decoration="underline">Main column grows to fill remaining space</rectangle>
         <ellipse id="hover-ellipse" width="100%" max-width="320" height="150" fill="#39ff88" outline="#253342" outline-thickness="6" shadow="14 18 10 1 rgba(0,0,0,0.28)" padding="16" font-color="#102015" font-family="Noto Sans Mono" font-size="14">Hover me</ellipse>
         <rectangle width="100%" height="76" corners="10 24" fill="#fff7d6" outline="#ffcc00" outline-thickness="2" padding="10" font-color="#253342" font-family="Noto Sans Mono" font-size="12" line-height="15" overflow="hidden" text-align-x="right" text-align-y="bottom">Hidden overflow keeps this label inside the rounded card.</rectangle>
-        <rectangle width="100%" height="98" corners="10" fill="#eef2ff" outline="#818cf8" outline-thickness="2" padding="10" font-color="#312e81" font-family="Noto Sans Mono" font-size="12" line-height="15" overflow="auto" scrollbar-width="8" scrollbar-color="#6366f1 #c7d2fe" text-align="left top">Vertical scrollbar test: this label wraps into many lines inside a limited panel. Overflow auto should draw a right-side scrollbar indicator when the measured text content is taller than the visible text box. More text keeps the example tall enough to verify the calculation clearly.</rectangle>
+        <rectangle width="100%" height="86" corners="10" fill="#eef2ff" outline="#818cf8" outline-thickness="2" padding="10" font-color="#312e81" font-family="Noto Sans Mono" font-size="15" line-height="19" overflow="auto" scrollbar-width="14" scrollbar-color="#4f46e5 #c7d2fe" text-align="left top">Vertical scrollbar test: this panel is intentionally short and the text is intentionally long. Line one should be visible near the top. Line two should wrap because the panel width is constrained. Line three adds more content so the measured text height exceeds the visible box. Line four should require scrolling to inspect. Line five keeps the scrollbar thumb small enough to notice. Line six confirms wheel or scrollbar movement has room to change the visible text. Line seven is here so the bottom content cannot fit at once.</rectangle>
         <rectangle width="100%" height="72" corners="12" fill="#fce7f3" outline="#f472b6" outline-thickness="2" padding="10" font-color="#831843" font-family="Noto Sans KR" font-size="13" line-height="16" overflow="hidden" text-align="left middle">한국어 글꼴 테스트 Jayess Canvas</rectangle>
       </group>
     </group>
@@ -124,7 +124,7 @@ export function main() {
 
   window.show();
   window.dispatchEvents();
-  window.renderCanvas(canvas);
+  window.requestRender(canvas);
 
   window.addEventListener("mouseMove", function (event) {
     dispatchCanvasEvent(state.canvas, event);
