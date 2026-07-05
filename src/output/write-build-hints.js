@@ -37,6 +37,7 @@ function includeDirectoryDetails(includeDirectories) {
   const rationale = new Map([
     [".", "generated module headers and entry sources"],
     ["native", "copied native bridge headers"],
+    ["native/libwebp", "copied libwebp decoder source root"],
     ["runtime", "Jayess runtime headers"]
   ]);
   return includeDirectories.map((directory) => ({
@@ -66,10 +67,11 @@ function systemFontDiscoveryMetadata(runtimeFeatures) {
 
 export function writeBuildHints(targetDirname, outputs, options = {}) {
   const relativeOutputs = outputs.map((file) => toRelative(targetDirname, file)).sort();
-  const sourceFiles = relativeOutputs.filter((file) => file.endsWith(".cpp"));
+  const sourceFiles = relativeOutputs.filter((file) => file.endsWith(".cpp") || file.endsWith(".c"));
   const includeDirectories = ["."]
     .concat(existingDirectory(targetDirname, "runtime") ? ["runtime"] : [])
     .concat(existingDirectory(targetDirname, "native") ? ["native"] : [])
+    .concat(existingDirectory(targetDirname, "native/libwebp") ? ["native/libwebp"] : [])
     .sort();
   const payload = {
     kind: "jayess-build-hints",
@@ -77,9 +79,11 @@ export function writeBuildHints(targetDirname, outputs, options = {}) {
     sourceFiles,
     includeDirectories,
     includeDirectoryDetails: includeDirectoryDetails(includeDirectories),
+    compileDefinitions: existingDirectory(targetDirname, "native/libwebp") ? ["HAVE_CONFIG_H"] : [],
     runtimeFiles: relativeOutputs.filter((file) => file.startsWith("runtime/")),
     nativeArtifacts: collectFiles(targetDirname, "native"),
     fontArtifacts: collectFiles(targetDirname, "assets/fonts"),
+    licenseArtifacts: collectFiles(targetDirname, "licenses"),
     systemFontDiscovery: systemFontDiscoveryMetadata(options.runtimeFeatures ?? []),
     libraryArtifacts: collectFiles(targetDirname, "libraries"),
     platformAdapters: platformAdapterMetadataForFeatures(options.runtimeFeatures ?? []),

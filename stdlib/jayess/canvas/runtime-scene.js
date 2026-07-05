@@ -245,6 +245,9 @@ export function updateElementAttribute(source, id, name, value) {
 
   if (name === "fill" || name === "outline") {
     applyColorAttribute(shape, name, value);
+    if (name === "fill") {
+      shape.baseFill = shape.fill;
+    }
   } else if (name === "font-color") {
     applyColorAttribute(shape, "fontColor", value);
   } else if (name === "outline-thickness") {
@@ -283,10 +286,43 @@ export function updateElementAttribute(source, id, name, value) {
     shape.overflowX = parseOverflow(value, name);
   } else if (name === "overflow-y") {
     shape.overflowY = parseOverflow(value, name);
+  } else if (name === "color-event-mode") {
+    if (value !== "darker" && value !== "lighter") {
+      fail("jayess:canvas XML runtime attribute color-event-mode must be darker or lighter");
+    }
+    shape.colorEventMode = value;
   } else if (name === "scrollbar-width") {
     shape.scrollbarWidth = parseNumber(value, name);
   } else if (name === "scrollbar-color") {
     shape.scrollbarColor = parseScrollbarColor(value, name);
+  } else if (name === "scrollbar-thumb") {
+    shape.scrollbarStyle.thumb = value;
+  } else if (name === "scrollbar-thumb-width") {
+    shape.scrollbarStyle.thumbWidth = parseNumber(value, name);
+  } else if (name === "scrollbar-thumb-height") {
+    shape.scrollbarStyle.thumbHeight = parseNumber(value, name);
+  } else if (name === "scrollbar-thumb-corners") {
+    if (value === null || value === "none") {
+      shape.scrollbarStyle.thumbCorners = null;
+    } else {
+      shape.scrollbarStyle.thumbCorners = parseCorners(value, name);
+    }
+  } else if (name === "scrollbar-thumb-color") {
+    shape.scrollbarStyle.thumbColor = parseColor(value);
+  } else if (name === "scrollbar-thumb-opacity") {
+    shape.scrollbarStyle.thumbOpacity = parseNumber(value, name);
+  } else if (name === "scrollbar-track") {
+    shape.scrollbarStyle.track = value;
+  } else if (name === "scrollbar-track-corners") {
+    if (value === null || value === "none") {
+      shape.scrollbarStyle.trackCorners = null;
+    } else {
+      shape.scrollbarStyle.trackCorners = parseCorners(value, name);
+    }
+  } else if (name === "scrollbar-track-color") {
+    shape.scrollbarStyle.trackColor = parseColor(value);
+  } else if (name === "scrollbar-track-opacity") {
+    shape.scrollbarStyle.trackOpacity = parseNumber(value, name);
   } else if (name === "text-align") {
     applyTextAlign(shape, value, name);
   } else if (name === "text-align-x") {
@@ -516,6 +552,9 @@ function pointInsideShape(shape, x, y) {
   if (shape.kind === "rectangle") {
     return pointInsideRoundedRect(shape, x, y);
   }
+  if (shape.kind === "button") {
+    return pointInsideRoundedRect(shape, x, y);
+  }
   if (shape.kind === "triangle") {
     return pointInsidePolygon(trianglePoints(shape), x, y);
   }
@@ -525,41 +564,52 @@ function pointInsideShape(shape, x, y) {
   return true;
 }
 
-function collectHitsInShapes(shapes, x, y, hits) {
+function hitTestYForShape(shape, y, scrollY) {
+  if (shape.position === "fixed") {
+    return y;
+  }
+  return y + scrollY;
+}
+
+function collectHitsInShapes(shapes, x, y, scrollY, hits) {
   var ordered = orderedShapes(shapes);
   for (var index = ordered.length - 1; index >= 0; index = index - 1) {
     var shape = ordered[index];
     if (shape.visible !== true) {
       continue;
     }
+    var shapeY = hitTestYForShape(shape, y, scrollY);
     if (shape.kind === "group") {
-      collectHitsInShapes(shape.children, x, y, hits);
+      var childScrollY = shape.position === "fixed" ? 0 : scrollY;
+      collectHitsInShapes(shape.children, x, y, childScrollY, hits);
     }
-    if (shape.id.length > 0 && pointInsideShape(shape, x, y)) {
+    if (shape.id.length > 0 && pointInsideShape(shape, x, shapeY)) {
       hits.push({ id: shape.id, kind: shape.kind, x: x, y: y });
     }
   }
 }
 
-function collectShapeHitsInShapes(shapes, x, y, hits) {
+function collectShapeHitsInShapes(shapes, x, y, scrollY, hits) {
   var ordered = orderedShapes(shapes);
   for (var index = ordered.length - 1; index >= 0; index = index - 1) {
     var shape = ordered[index];
     if (shape.visible !== true) {
       continue;
     }
+    var shapeY = hitTestYForShape(shape, y, scrollY);
     if (shape.kind === "group") {
-      collectShapeHitsInShapes(shape.children, x, y, hits);
+      var childScrollY = shape.position === "fixed" ? 0 : scrollY;
+      collectShapeHitsInShapes(shape.children, x, y, childScrollY, hits);
     }
-    if (pointInsideShape(shape, x, y)) {
+    if (pointInsideShape(shape, x, shapeY)) {
       hits.push(shape);
     }
   }
 }
 
-function hitInShapes(shapes, x, y) {
+function hitInScene(scene, x, y) {
   var hits = [];
-  collectHitsInShapes(shapes, x, y, hits);
+  collectHitsInShapes(scene.shapes, x, y, scene.scrollOffsetY, hits);
   if (hits.length === 0) {
     return null;
   }
@@ -567,18 +617,20 @@ function hitInShapes(shapes, x, y) {
 }
 
 export function hitTest(source, x, y) {
-  return hitInShapes(requireScene(source).shapes, x, y);
+  return hitInScene(requireScene(source), x, y);
 }
 
 export function hitTests(source, x, y) {
+  var scene = requireScene(source);
   var hits = [];
-  collectHitsInShapes(requireScene(source).shapes, x, y, hits);
+  collectHitsInShapes(scene.shapes, x, y, scene.scrollOffsetY, hits);
   return hits;
 }
 
 export function hitShapes(source, x, y) {
+  var scene = requireScene(source);
   var hits = [];
-  collectShapeHitsInShapes(requireScene(source).shapes, x, y, hits);
+  collectShapeHitsInShapes(scene.shapes, x, y, scene.scrollOffsetY, hits);
   return hits;
 }
 
@@ -653,5 +705,27 @@ export function dispatchCanvasEvent(canvas, event) {
   }
 
   canvas.hoveredElementId = nextId;
+  return emitted;
+}
+
+export function dispatchCanvasClickEvent(canvas, event, hit) {
+  var emitted = [];
+  if (hit === null) {
+    return emitted;
+  }
+  var clickEvent = enrichMouseEvent(event, hit, "click");
+  emitted.push(clickEvent);
+  emitCanvasEvent(canvas, clickEvent);
+  return emitted;
+}
+
+export function dispatchCanvasTargetEvent(canvas, event, hit, type) {
+  var emitted = [];
+  if (hit === null) {
+    return emitted;
+  }
+  var targetEvent = enrichMouseEvent(event, hit, type);
+  emitted.push(targetEvent);
+  emitCanvasEvent(canvas, targetEvent);
   return emitted;
 }

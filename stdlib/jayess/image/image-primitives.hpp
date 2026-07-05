@@ -144,6 +144,34 @@ inline jayess::value jayessImageLoadTga(const std::vector<jayess::value>& jayess
   return jayess::image_load_tga(jayess::argument_at(jayessArgs, 0));
 }
 
+inline jayess::value jayessImageLoadPng(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_load_png(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageLoadJpeg(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_load_jpeg(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageLoadJpg(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_load_jpg(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageLoadPsd(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_load_psd(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageLoadGif(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_load_gif(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageLoadWebp(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_load_webp(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageLoadImage(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_load_image(jayess::argument_at(jayessArgs, 0));
+}
+
 inline jayess::value jayessImageMetadataFromFile(const std::vector<jayess::value>& jayessArgs) {
   return jayess::image_metadata_from_file(jayess::argument_at(jayessArgs, 0));
 }
@@ -162,6 +190,30 @@ inline jayess::value jayessImageEncodePgm(const std::vector<jayess::value>& jaye
 
 inline jayess::value jayessImageDecodePgm(const std::vector<jayess::value>& jayessArgs) {
   return jayess::image_decode_pgm(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageDecodePng(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_decode_png(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageDecodeJpeg(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_decode_jpeg(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageDecodePsd(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_decode_psd(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageDecodeGif(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_decode_gif(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageDecodeWebp(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_decode_webp(jayess::argument_at(jayessArgs, 0));
+}
+
+inline jayess::value jayessImageDecodeImage(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_decode_image(jayess::argument_at(jayessArgs, 0));
 }
 
 inline jayess::value jayessImageCrop(const std::vector<jayess::value>& jayessArgs) {

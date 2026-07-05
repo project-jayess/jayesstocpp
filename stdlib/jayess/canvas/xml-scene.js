@@ -38,10 +38,25 @@ const rootAttributes = [
   "gap",
   "padding",
   "align",
-  "justify"
+  "justify",
+  "overflow",
+  "overflow-y",
+  "scrollbar-width",
+  "scrollbar-color",
+  "scrollbar-thumb",
+  "scrollbar-thumb-width",
+  "scrollbar-thumb-height",
+  "scrollbar-thumb-corners",
+  "scrollbar-thumb-color",
+  "scrollbar-thumb-opacity",
+  "scrollbar-track",
+  "scrollbar-track-corners",
+  "scrollbar-track-color",
+  "scrollbar-track-opacity"
 ];
 const sharedAttributes = [
   "id",
+  "color-event-mode",
   "x",
   "y",
   "xy",
@@ -86,6 +101,16 @@ const sharedAttributes = [
   "overflow-y",
   "scrollbar-width",
   "scrollbar-color",
+  "scrollbar-thumb",
+  "scrollbar-thumb-width",
+  "scrollbar-thumb-height",
+  "scrollbar-thumb-corners",
+  "scrollbar-thumb-color",
+  "scrollbar-thumb-opacity",
+  "scrollbar-track",
+  "scrollbar-track-corners",
+  "scrollbar-track-color",
+  "scrollbar-track-opacity",
   "text-align",
   "text-align-x",
   "text-align-y",
@@ -99,6 +124,7 @@ const sharedAttributes = [
 ];
 const shapeNames = [
   "group",
+  "button",
   "rectangle",
   "ellipse",
   "semiellipse",
@@ -126,6 +152,16 @@ const textAttributes = [
   "overflow-y",
   "scrollbar-width",
   "scrollbar-color",
+  "scrollbar-thumb",
+  "scrollbar-thumb-width",
+  "scrollbar-thumb-height",
+  "scrollbar-thumb-corners",
+  "scrollbar-thumb-color",
+  "scrollbar-thumb-opacity",
+  "scrollbar-track",
+  "scrollbar-track-corners",
+  "scrollbar-track-color",
+  "scrollbar-track-opacity",
   "text"
 ];
 
@@ -178,6 +214,50 @@ function requireKnownShape(node) {
 
 function defaultColor() {
   return rgb(0, 0, 0);
+}
+
+function defaultButtonFill() {
+  return rgb(246, 248, 250);
+}
+
+function defaultButtonOutline() {
+  return rgb(209, 217, 224);
+}
+
+function defaultButtonCorners() {
+  return {
+    topLeft: 6,
+    topRight: 6,
+    bottomRight: 6,
+    bottomLeft: 6
+  };
+}
+
+function defaultButtonFontColor() {
+  return rgb(36, 41, 47);
+}
+
+function colorEventModeAttribute(attributes) {
+  var value = textAttribute(attributes, "color-event-mode", "darker");
+  if (value === "darker" || value === "lighter") {
+    return value;
+  }
+  fail("jayess:canvas XML color-event-mode must be darker or lighter");
+}
+
+function scrollbarStyleAttributes(attributes) {
+  return {
+    thumb: textAttribute(attributes, "scrollbar-thumb", ""),
+    thumbWidth: sizeAttribute(attributes, "scrollbar-thumb-width", 0),
+    thumbHeight: sizeAttribute(attributes, "scrollbar-thumb-height", 0),
+    thumbCorners: cornersAttribute(attributes, "scrollbar-thumb-corners", null),
+    thumbColor: colorAttribute(attributes, "scrollbar-thumb-color", null),
+    thumbOpacity: numberAttribute(attributes, "scrollbar-thumb-opacity", 1),
+    track: textAttribute(attributes, "scrollbar-track", ""),
+    trackCorners: cornersAttribute(attributes, "scrollbar-track-corners", null),
+    trackColor: colorAttribute(attributes, "scrollbar-track-color", null),
+    trackOpacity: numberAttribute(attributes, "scrollbar-track-opacity", 1)
+  };
 }
 
 function contentSize(size, padding) {
@@ -327,26 +407,54 @@ function resolveOrigin(attributes, position, context, width, height) {
 
 function normalizeShared(node, context) {
   var attributes = node.attributes;
+  var isButton = node.name === "button";
   var position = positionAttribute(attributes, defaultPositionFor(context.parentLayout));
   var width = resolveWidth(attributes, context.parentWidth);
   var height = resolveHeight(attributes, context.parentHeight);
   var origin = resolveOrigin(attributes, position, context, width, height);
   var x = origin.x;
   var y = origin.y;
+  var fill = colorAttribute(attributes, "fill", null);
+  var outline = colorAttribute(attributes, "outline", null);
+  var corners = cornersAttribute(attributes, "corners", null);
+  var padding = sizeAttribute(attributes, "padding", 0);
+  var fontColor = colorAttribute(attributes, "font-color", null);
+  var fontSize = sizeAttribute(attributes, "font-size", 0);
+  if (isButton) {
+    if (fill === null) {
+      fill = defaultButtonFill();
+    }
+    if (outline === null) {
+      outline = defaultButtonOutline();
+    }
+    if (corners === null) {
+      corners = defaultButtonCorners();
+    }
+    if (padding === 0) {
+      padding = 8;
+    }
+    if (fontColor === null) {
+      fontColor = defaultButtonFontColor();
+    }
+    if (fontSize === 0) {
+      fontSize = 14;
+    }
+  }
   return {
     id: textAttribute(attributes, "id", ""),
+    colorEventMode: colorEventModeAttribute(attributes),
     position: position,
     x: x,
     y: y,
     width: width,
     height: height,
-    fill: colorAttribute(attributes, "fill", null),
-    outline: colorAttribute(attributes, "outline", null),
+    fill: fill,
+    outline: outline,
     outlineThickness: sizeAttribute(attributes, "outline-thickness", 1),
     outlineOpacity: numberAttribute(attributes, "outline-opacity", 1),
-    corners: cornersAttribute(attributes, "corners", null),
+    corners: corners,
     opacity: numberAttribute(attributes, "opacity", 1),
-    padding: sizeAttribute(attributes, "padding", 0),
+    padding: padding,
     layout: layoutAttribute(attributes),
     gap: sizeAttribute(attributes, "gap", 0),
     align: alignAttribute(attributes),
@@ -354,7 +462,8 @@ function normalizeShared(node, context) {
     grow: numberAttribute(attributes, "grow", 0),
     shrink: numberAttribute(attributes, "shrink", 1),
     basis: optionalLengthAttribute(attributes, "basis", context.parentWidth),
-    fontColor: colorAttribute(attributes, "font-color", null),
+    fontColor: fontColor,
+    fontSize: fontSize,
     lineHeight: sizeAttribute(attributes, "line-height", 0),
     letterSpacing: numberAttribute(attributes, "letter-spacing", 0),
     wordSpacing: numberAttribute(attributes, "word-spacing", 0),
@@ -364,8 +473,9 @@ function normalizeShared(node, context) {
     overflow: overflowAttribute(attributes, "overflow", "visible"),
     overflowX: overflowAttribute(attributes, "overflow-x", overflowAttribute(attributes, "overflow", "visible")),
     overflowY: overflowAttribute(attributes, "overflow-y", overflowAttribute(attributes, "overflow", "visible")),
-    scrollbarWidth: sizeAttribute(attributes, "scrollbar-width", 0),
+    scrollbarWidth: sizeAttribute(attributes, "scrollbar-width", 8),
     scrollbarColor: scrollbarColorAttribute(attributes, "scrollbar-color", null),
+    scrollbarStyle: scrollbarStyleAttributes(attributes),
     textAlign: textAlignAttribute(attributes, "center", "middle"),
     rotation: numberAttribute(attributes, "rotation", 0),
     clip: booleanAttribute(attributes, "clip", false),
@@ -617,6 +727,8 @@ function normalizeShape(node, context) {
   var shape = {
     kind: node.name,
     id: shared.id,
+    colorEventMode: shared.colorEventMode,
+    baseFill: shared.fill,
     position: shared.position,
     x: shared.x,
     y: shared.y,
@@ -647,7 +759,7 @@ function normalizeShape(node, context) {
     z: shared.z,
     src: textAttribute(node.attributes, "src", ""),
     fontFamily: textAttribute(node.attributes, "font-family", ""),
-    fontSize: sizeAttribute(node.attributes, "font-size", 0),
+    fontSize: shared.fontSize,
     lineHeight: shared.lineHeight,
     letterSpacing: shared.letterSpacing,
     wordSpacing: shared.wordSpacing,
@@ -659,6 +771,7 @@ function normalizeShape(node, context) {
     overflowY: shared.overflowY,
     scrollbarWidth: shared.scrollbarWidth,
     scrollbarColor: shared.scrollbarColor,
+    scrollbarStyle: shared.scrollbarStyle,
     scrollOffsetX: 0,
     scrollOffsetY: 0,
     textLayoutCache: null,
@@ -691,21 +804,63 @@ function snapShapesToPixels(shapes) {
   return shapes;
 }
 
+function shapeContentBottom(shape) {
+  if (shape.position === "fixed") {
+    return 0;
+  }
+  var bottom = shape.y + shape.height;
+  for (var index = 0; index < shape.children.length; index = index + 1) {
+    var childBottom = shapeContentBottom(shape.children[index]);
+    if (childBottom > bottom) {
+      bottom = childBottom;
+    }
+  }
+  return bottom;
+}
+
+function sceneScrollHeight(shapes, fallback) {
+  var bottom = fallback;
+  for (var index = 0; index < shapes.length; index = index + 1) {
+    var shapeBottom = shapeContentBottom(shapes[index]);
+    if (shapeBottom > bottom) {
+      bottom = shapeBottom;
+    }
+  }
+  return bottom;
+}
+
+function rootScrollbarGutter(overflowY, scrollbarWidth) {
+  if (scrollbarWidth <= 0) {
+    return 0;
+  }
+  if (overflowY === "scroll" || overflowY === "auto") {
+    return scrollbarWidth;
+  }
+  return 0;
+}
+
 function rootLayoutShape(root, width, height, children) {
   var attributes = root.attributes;
+  var overflowY = overflowAttribute(attributes, "overflow-y", overflowAttribute(attributes, "overflow", "visible"));
+  var scrollbarWidth = sizeAttribute(attributes, "scrollbar-width", 8);
+  var gutter = rootScrollbarGutter(overflowY, scrollbarWidth);
   return {
     kind: root.name,
     id: "",
     position: "relative",
     x: 0,
     y: 0,
-    width: width,
+    width: width - gutter,
     height: height,
     padding: sizeAttribute(attributes, "padding", 0),
     layout: layoutAttribute(attributes),
     gap: sizeAttribute(attributes, "gap", 0),
     align: alignAttribute(attributes),
     justify: justifyAttribute(attributes),
+    overflowY: overflowY,
+    scrollbarWidth: scrollbarWidth,
+    scrollbarGutter: gutter,
+    scrollbarStyle: scrollbarStyleAttributes(attributes),
     children: children
   };
 }
@@ -716,9 +871,9 @@ function normalizeChildren(root, width, height) {
   var context = {
     offsetX: rootParent.padding,
     offsetY: rootParent.padding,
-    parentWidth: contentSize(width, rootParent.padding),
+    parentWidth: contentSize(rootParent.width, rootParent.padding),
     parentHeight: contentSize(height, rootParent.padding),
-    viewportWidth: width,
+    viewportWidth: rootParent.width,
     viewportHeight: height,
     parentLayout: rootParent.layout
   };
@@ -735,6 +890,10 @@ export function parseScene(xmlText, options) {
   rejectUnknownAttributes(root.attributes, rootAttributes, root.name);
   var width = rootSizeAttribute(root.attributes, "width", "w");
   var height = rootSizeAttribute(root.attributes, "height", "h");
+  var overflowY = overflowAttribute(root.attributes, "overflow-y", overflowAttribute(root.attributes, "overflow", "visible"));
+  var scrollbarWidth = sizeAttribute(root.attributes, "scrollbar-width", 8);
+  var scrollbarGutter = rootScrollbarGutter(overflowY, scrollbarWidth);
+  var shapes = normalizeChildren(root, width, height);
   return {
     kind: "scene",
     root: root.name,
@@ -743,7 +902,15 @@ export function parseScene(xmlText, options) {
     background: colorAttribute(root.attributes, "background", defaultColor()),
     title: textAttribute(root.attributes, "title", ""),
     antialias: sizeAttribute(root.attributes, "antialias", 0),
-    shapes: normalizeChildren(root, width, height)
+    contentWidth: width - scrollbarGutter,
+    overflowY: overflowY,
+    scrollbarWidth: scrollbarWidth,
+    scrollbarGutter: scrollbarGutter,
+    scrollbarColor: scrollbarColorAttribute(root.attributes, "scrollbar-color", null),
+    scrollbarStyle: scrollbarStyleAttributes(root.attributes),
+    scrollOffsetY: 0,
+    scrollHeight: sceneScrollHeight(shapes, height),
+    shapes: shapes
   };
 }
 

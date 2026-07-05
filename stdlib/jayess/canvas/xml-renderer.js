@@ -35,6 +35,17 @@ function strokeOptions(shape) {
   return { strokeWidth: shape.outlineThickness };
 }
 
+function optionValue(options, key, fallback) {
+  if (options === null) {
+    return fallback;
+  }
+  var value = options[key];
+  if (value === null) {
+    return fallback;
+  }
+  return value;
+}
+
 function semiellipseOptions(shape) {
   return { strokeWidth: shape.outlineThickness };
 }
@@ -104,6 +115,106 @@ function scrollbarColors(shape) {
     thumb: rgb(136, 136, 136),
     track: rgb(241, 241, 241)
   };
+}
+
+function clampUnit(value) {
+  if (value < 0) {
+    return 0;
+  }
+  if (value > 1) {
+    return 1;
+  }
+  return value;
+}
+
+function colorWithOpacity(color, opacity) {
+  return rgba(color.red, color.green, color.blue, color.alpha * clampUnit(opacity));
+}
+
+function scrollbarStyle(shape) {
+  var colors = scrollbarColors(shape);
+  var style = shape.scrollbarStyle;
+  var thumbColor = colors.thumb;
+  var trackColor = colors.track;
+  if (style.thumbColor !== null) {
+    thumbColor = style.thumbColor;
+  }
+  if (style.trackColor !== null) {
+    trackColor = style.trackColor;
+  }
+  return {
+    thumb: style.thumb,
+    thumbWidth: style.thumbWidth,
+    thumbHeight: style.thumbHeight,
+    thumbCorners: style.thumbCorners,
+    thumbColor: colorWithOpacity(thumbColor, style.thumbOpacity),
+    thumbOpacity: style.thumbOpacity,
+    track: style.track,
+    trackCorners: style.trackCorners,
+    trackColor: colorWithOpacity(trackColor, style.trackOpacity),
+    trackOpacity: style.trackOpacity
+  };
+}
+
+function roundedRectFill(renderer, canvas, x, y, width, height, corners, color) {
+  if (corners !== null) {
+    renderer.fillRoundedRect(canvas, x, y, width, height, corners, color);
+  } else {
+    renderer.fillRect(canvas, x, y, width, height, color);
+  }
+  return canvas;
+}
+
+function scrollbarImageFromOptions(renderer, src, options) {
+  if (startsWith(src, "http://") || startsWith(src, "https://")) {
+    fail("jayess:canvas XML scrollbar image network sources must be fetched, decoded, cached, and passed as explicit image handles by application code");
+  }
+  var images = optionValue(options, "images", null);
+  if (images !== null) {
+    var bySource = images[src];
+    if (bySource !== null) {
+      return bySource;
+    }
+  }
+  var optionLoader = optionValue(options, "loadImage", null);
+  if (optionLoader !== null) {
+    return optionLoader(src);
+  }
+  return renderer.loadImage(src);
+}
+
+function drawScrollbarPart(renderer, canvas, source, x, y, width, height, corners, color, opacity, options) {
+  var drawX = round(x);
+  var drawY = round(y);
+  var drawWidth = round(width);
+  var drawHeight = round(height);
+  if (drawWidth <= 0 || drawHeight <= 0 || clampUnit(opacity) <= 0) {
+    return canvas;
+  }
+  if (source.length > 0) {
+    var image = scrollbarImageFromOptions(renderer, source, options);
+    if (!renderer.isImage(image)) {
+      fail("jayess:canvas XML scrollbar image loader must return a jayess:image handle");
+    }
+    var resolved = renderer.resizeNearest(image, drawWidth, drawHeight);
+    renderer.drawImageAlphaOpacity(canvas, resolved, drawX, drawY, opacity);
+    return canvas;
+  }
+  return roundedRectFill(renderer, canvas, drawX, drawY, drawWidth, drawHeight, corners, color);
+}
+
+function resolvedThumbWidth(style, fallback) {
+  if (style.thumb.length > 0 && style.thumbWidth > 0) {
+    return style.thumbWidth;
+  }
+  return fallback;
+}
+
+function resolvedThumbHeight(style, fallback) {
+  if (style.thumb.length > 0 && style.thumbHeight > 0) {
+    return style.thumbHeight;
+  }
+  return fallback;
 }
 
 function needsVerticalScrollbar(shape, measured, width, height) {
@@ -269,15 +380,15 @@ function drawCachedTextLayer(renderer, canvas, shape, layout, options) {
   return canvas;
 }
 
-function drawScrollbars(renderer, canvas, shape, x, y, width, height, layout) {
+function drawScrollbars(renderer, canvas, shape, x, y, width, height, layout, options) {
   if (shape.scrollbarWidth <= 0) {
     return canvas;
   }
-  var colors = scrollbarColors(shape);
+  var style = scrollbarStyle(shape);
   var measured = layout.measured;
   if (layout.vertical) {
     var barX = x + width - shape.scrollbarWidth;
-    renderer.fillRect(canvas, barX, y, shape.scrollbarWidth, height, colors.track);
+    drawScrollbarPart(renderer, canvas, style.track, barX, y, shape.scrollbarWidth, height, style.trackCorners, style.trackColor, style.trackOpacity, options);
     var thumbHeight = height;
     if (measured.height > 0 && measured.height > height) {
       thumbHeight = height * height / measured.height;
@@ -290,11 +401,15 @@ function drawScrollbars(renderer, canvas, shape, x, y, width, height, layout) {
     if (maxScrollY > 0 && height > thumbHeight) {
       thumbY = y + shape.scrollOffsetY * (height - thumbHeight) / maxScrollY;
     }
-    renderer.fillRect(canvas, barX, thumbY, shape.scrollbarWidth, thumbHeight, colors.thumb);
+    var drawThumbWidth = resolvedThumbWidth(style, shape.scrollbarWidth);
+    var drawThumbHeight = resolvedThumbHeight(style, thumbHeight);
+    var drawThumbX = barX + (shape.scrollbarWidth - drawThumbWidth) / 2;
+    var drawThumbY = thumbY + (thumbHeight - drawThumbHeight) / 2;
+    drawScrollbarPart(renderer, canvas, style.thumb, drawThumbX, drawThumbY, drawThumbWidth, drawThumbHeight, style.thumbCorners, style.thumbColor, style.thumbOpacity, options);
   }
   if (layout.horizontal) {
     var barY = y + height - shape.scrollbarWidth;
-    renderer.fillRect(canvas, x, barY, width, shape.scrollbarWidth, colors.track);
+    drawScrollbarPart(renderer, canvas, style.track, x, barY, width, shape.scrollbarWidth, style.trackCorners, style.trackColor, style.trackOpacity, options);
     var thumbWidth = width;
     if (measured.width > 0 && measured.width > width) {
       thumbWidth = width * width / measured.width;
@@ -307,12 +422,16 @@ function drawScrollbars(renderer, canvas, shape, x, y, width, height, layout) {
     if (maxScrollX > 0 && width > thumbWidth) {
       thumbX = x + shape.scrollOffsetX * (width - thumbWidth) / maxScrollX;
     }
-    renderer.fillRect(canvas, thumbX, barY, thumbWidth, shape.scrollbarWidth, colors.thumb);
+    var drawThumbWidth = resolvedThumbWidth(style, thumbWidth);
+    var drawThumbHeight = resolvedThumbHeight(style, shape.scrollbarWidth);
+    var drawThumbX = thumbX + (thumbWidth - drawThumbWidth) / 2;
+    var drawThumbY = barY + (shape.scrollbarWidth - drawThumbHeight) / 2;
+    drawScrollbarPart(renderer, canvas, style.thumb, drawThumbX, drawThumbY, drawThumbWidth, drawThumbHeight, style.thumbCorners, style.thumbColor, style.thumbOpacity, options);
   }
   return canvas;
 }
 
-function drawShapeLabelInBox(renderer, canvas, shape, x, y, width, height) {
+function drawShapeLabelInBox(renderer, canvas, shape, x, y, width, height, renderOptions) {
   if (shape.kind === "text" || shape.text.length === 0) {
     return canvas;
   }
@@ -329,15 +448,15 @@ function drawShapeLabelInBox(renderer, canvas, shape, x, y, width, height) {
   } else {
     renderer.drawTextBox(canvas, shape.text, layout.contentBox, options);
   }
-  drawScrollbars(renderer, canvas, shape, x + padding, y + padding, innerWidth, innerHeight, layout);
+  drawScrollbars(renderer, canvas, shape, x + padding, y + padding, innerWidth, innerHeight, layout, renderOptions);
   return canvas;
 }
 
-function drawShapeLabelInBounds(renderer, canvas, shape, bounds) {
+function drawShapeLabelInBounds(renderer, canvas, shape, bounds, options) {
   if (bounds === null) {
     return canvas;
   }
-  return drawShapeLabelInBox(renderer, canvas, shape, bounds.x, bounds.y, bounds.width, bounds.height);
+  return drawShapeLabelInBox(renderer, canvas, shape, bounds.x, bounds.y, bounds.width, bounds.height, options);
 }
 
 function trianglePoints(shape) {
@@ -411,7 +530,7 @@ function orderedShapes(shapes) {
   return ordered;
 }
 
-function drawRectAt(renderer, canvas, shape, x, y) {
+function drawRectAt(renderer, canvas, shape, x, y, options) {
   if (shape.fill !== null) {
     if (shape.corners !== null) {
       renderer.fillRoundedRect(canvas, x, y, shape.width, shape.height, shape.corners, shape.fill);
@@ -426,68 +545,68 @@ function drawRectAt(renderer, canvas, shape, x, y) {
       renderer.drawRect(canvas, x, y, shape.width, shape.height, shapeOutlineColor(shape), strokeOptions(shape));
     }
   }
-  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height);
+  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height, options);
 }
 
-function drawRectangle(renderer, canvas, shape) {
+function drawRectangle(renderer, canvas, shape, options) {
   var points = anchorPoints(shape);
   for (var index = 0; index < points.length; index = index + 1) {
-    drawRectAt(renderer, canvas, shape, points[index].x, points[index].y);
+    drawRectAt(renderer, canvas, shape, points[index].x, points[index].y, options);
   }
 }
 
-function drawEllipseAt(renderer, canvas, shape, x, y) {
+function drawEllipseAt(renderer, canvas, shape, x, y, options) {
   if (shape.fill !== null) {
     renderer.fillEllipse(canvas, x, y, shape.width, shape.height, shape.fill);
   }
   if (shape.outline !== null) {
     renderer.drawEllipse(canvas, x, y, shape.width, shape.height, shapeOutlineColor(shape), strokeOptions(shape));
   }
-  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height);
+  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height, options);
 }
 
-function drawEllipse(renderer, canvas, shape) {
+function drawEllipse(renderer, canvas, shape, options) {
   var points = anchorPoints(shape);
   for (var index = 0; index < points.length; index = index + 1) {
-    drawEllipseAt(renderer, canvas, shape, points[index].x, points[index].y);
+    drawEllipseAt(renderer, canvas, shape, points[index].x, points[index].y, options);
   }
 }
 
-function drawSemiellipseAt(renderer, canvas, shape, x, y) {
+function drawSemiellipseAt(renderer, canvas, shape, x, y, options) {
   if (shape.fill !== null) {
     renderer.fillSemiellipse(canvas, x, y, shape.width, shape.height, shape.fill, semiellipseOptions(shape));
   }
   if (shape.outline !== null) {
     renderer.drawSemiellipse(canvas, x, y, shape.width, shape.height, shapeOutlineColor(shape), semiellipseOptions(shape));
   }
-  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height);
+  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height, options);
 }
 
-function drawSemiellipse(renderer, canvas, shape) {
+function drawSemiellipse(renderer, canvas, shape, options) {
   var points = anchorPoints(shape);
   for (var index = 0; index < points.length; index = index + 1) {
-    drawSemiellipseAt(renderer, canvas, shape, points[index].x, points[index].y);
+    drawSemiellipseAt(renderer, canvas, shape, points[index].x, points[index].y, options);
   }
 }
 
-function drawCapsuleAt(renderer, canvas, shape, x, y) {
+function drawCapsuleAt(renderer, canvas, shape, x, y, options) {
   if (shape.fill !== null) {
     renderer.fillCapsule(canvas, x, y, shape.width, shape.height, shape.fill);
   }
   if (shape.outline !== null) {
     renderer.drawCapsule(canvas, x, y, shape.width, shape.height, shapeOutlineColor(shape), strokeOptions(shape));
   }
-  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height);
+  drawShapeLabelInBox(renderer, canvas, shape, x, y, shape.width, shape.height, options);
 }
 
-function drawCapsule(renderer, canvas, shape) {
+function drawCapsule(renderer, canvas, shape, options) {
   var points = anchorPoints(shape);
   for (var index = 0; index < points.length; index = index + 1) {
-    drawCapsuleAt(renderer, canvas, shape, points[index].x, points[index].y);
+    drawCapsuleAt(renderer, canvas, shape, points[index].x, points[index].y, options);
   }
 }
 
-function drawTriangleShape(renderer, canvas, shape) {
+function drawTriangleShape(renderer, canvas, shape, options) {
   var points = trianglePoints(shape);
   if (shape.fill !== null) {
     renderer.fillTriangle(canvas, points, shape.fill);
@@ -495,10 +614,10 @@ function drawTriangleShape(renderer, canvas, shape) {
   if (shape.outline !== null) {
     renderer.drawTriangle(canvas, points, shapeOutlineColor(shape), strokeOptions(shape));
   }
-  drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(points));
+  drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(points), options);
 }
 
-function drawPolygonShape(renderer, canvas, shape) {
+function drawPolygonShape(renderer, canvas, shape, options) {
   requireMinimumPointCount(shape, 3);
   if (shape.fill !== null) {
     renderer.fillPolygon(canvas, shape.points, shape.fill);
@@ -506,18 +625,7 @@ function drawPolygonShape(renderer, canvas, shape) {
   if (shape.outline !== null) {
     renderer.drawPolygon(canvas, shape.points, shapeOutlineColor(shape), strokeOptions(shape));
   }
-  drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(shape.points));
-}
-
-function optionValue(options, key, fallback) {
-  if (options === null) {
-    return fallback;
-  }
-  var value = options[key];
-  if (value === null) {
-    return fallback;
-  }
-  return value;
+  drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(shape.points), options);
 }
 
 function antialiasScale(scene, options) {
@@ -577,7 +685,7 @@ function drawImageShape(renderer, canvas, shape, options) {
     resolved = renderer.resizeNearest(image, shape.width, shape.height);
   }
   renderer.drawImage(canvas, resolved, shape.x, shape.y);
-  drawShapeLabelInBox(renderer, canvas, shape, shape.x, shape.y, shape.width, shape.height);
+  drawShapeLabelInBox(renderer, canvas, shape, shape.x, shape.y, shape.width, shape.height, options);
 }
 
 function minPointX(points) {
@@ -730,6 +838,26 @@ function boundsIntersect(left, right) {
     left.y + left.height > right.y;
 }
 
+function offsetBounds(bounds, deltaY) {
+  if (bounds === null || deltaY === 0) {
+    return bounds;
+  }
+  return {
+    x: bounds.x,
+    y: bounds.y + deltaY,
+    width: bounds.width,
+    height: bounds.height
+  };
+}
+
+function shapeViewportRenderBoundsWith(renderer, shape, deltaY) {
+  var bounds = shapeRenderBoundsWith(renderer, shape);
+  if (shape.position === "fixed") {
+    return bounds;
+  }
+  return offsetBounds(bounds, deltaY);
+}
+
 function drawShape(renderer, canvas, shape, options) {
   if (shape.visible !== true) {
     return canvas;
@@ -739,37 +867,37 @@ function drawShape(renderer, canvas, shape, options) {
     for (var index = 0; index < children.length; index = index + 1) {
       drawShape(renderer, canvas, children[index], options);
     }
-  } else if (shape.kind === "rectangle") {
+  } else if (shape.kind === "rectangle" || shape.kind === "button") {
     drawShapeShadow(renderer, canvas, shape);
-    drawRectangle(renderer, canvas, shape);
+    drawRectangle(renderer, canvas, shape, options);
   } else if (shape.kind === "line") {
     requirePointCount(shape, 2);
     drawShapeShadow(renderer, canvas, shape);
     renderer.drawLine(canvas, shape.points[0].x, shape.points[0].y, shape.points[1].x, shape.points[1].y, shapeOutlineColor(shape), strokeOptions(shape));
-    drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(shape.points));
+    drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(shape.points), options);
   } else if (shape.kind === "pixel") {
     drawShapeShadow(renderer, canvas, shape);
     renderer.drawPixel(canvas, shape.x, shape.y, shapeFill(shape));
   } else if (shape.kind === "ellipse") {
     drawShapeShadow(renderer, canvas, shape);
-    drawEllipse(renderer, canvas, shape);
+    drawEllipse(renderer, canvas, shape, options);
   } else if (shape.kind === "semiellipse") {
     drawShapeShadow(renderer, canvas, shape);
-    drawSemiellipse(renderer, canvas, shape);
+    drawSemiellipse(renderer, canvas, shape, options);
   } else if (shape.kind === "triangle") {
     drawShapeShadow(renderer, canvas, shape);
-    drawTriangleShape(renderer, canvas, shape);
+    drawTriangleShape(renderer, canvas, shape, options);
   } else if (shape.kind === "polygon") {
     drawShapeShadow(renderer, canvas, shape);
-    drawPolygonShape(renderer, canvas, shape);
+    drawPolygonShape(renderer, canvas, shape, options);
   } else if (shape.kind === "polyline") {
     requireMinimumPointCount(shape, 2);
     drawShapeShadow(renderer, canvas, shape);
     renderer.drawPolyline(canvas, shape.points, shapeOutlineColor(shape), strokeOptions(shape));
-    drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(shape.points));
+    drawShapeLabelInBounds(renderer, canvas, shape, labelPointBounds(shape.points), options);
   } else if (shape.kind === "capsule") {
     drawShapeShadow(renderer, canvas, shape);
-    drawCapsule(renderer, canvas, shape);
+    drawCapsule(renderer, canvas, shape, options);
   } else if (shape.kind === "text") {
     drawShapeShadow(renderer, canvas, shape);
     renderer.text(canvas, shape.text, shape.x, shape.y, textOptions(shape));
@@ -780,28 +908,104 @@ function drawShape(renderer, canvas, shape, options) {
   return canvas;
 }
 
-function drawShapeInRegion(renderer, canvas, shape, options, region) {
+function translateShape(shape, deltaX, deltaY) {
+  shape.x = shape.x + deltaX;
+  shape.y = shape.y + deltaY;
+  for (var pointIndex = 0; pointIndex < shape.points.length; pointIndex = pointIndex + 1) {
+    shape.points[pointIndex].x = shape.points[pointIndex].x + deltaX;
+    shape.points[pointIndex].y = shape.points[pointIndex].y + deltaY;
+  }
+  for (var childIndex = 0; childIndex < shape.children.length; childIndex = childIndex + 1) {
+    translateShape(shape.children[childIndex], deltaX, deltaY);
+  }
+}
+
+function drawTranslatedShape(renderer, canvas, shape, options, deltaY) {
+  if (shape.position === "fixed" || deltaY === 0) {
+    return drawShape(renderer, canvas, shape, options);
+  }
+  translateShape(shape, 0, deltaY);
+  drawShape(renderer, canvas, shape, options);
+  translateShape(shape, 0, 0 - deltaY);
+  return canvas;
+}
+
+function drawShapeInRegion(renderer, canvas, shape, options, region, deltaY) {
   if (shape.visible !== true) {
     return canvas;
   }
   if (shape.kind === "group") {
     var children = orderedShapes(shape.children);
+    var childDeltaY = shape.position === "fixed" ? 0 : deltaY;
     for (var index = 0; index < children.length; index = index + 1) {
-      drawShapeInRegion(renderer, canvas, children[index], options, region);
+      drawShapeInRegion(renderer, canvas, children[index], options, region, childDeltaY);
     }
     return canvas;
   }
-  if (boundsIntersect(shapeRenderBoundsWith(renderer, shape), region)) {
-    drawShape(renderer, canvas, shape, options);
+  if (boundsIntersect(shapeViewportRenderBoundsWith(renderer, shape, deltaY), region)) {
+    drawTranslatedShape(renderer, canvas, shape, options, deltaY);
   }
+  return canvas;
+}
+
+function sceneNeedsVerticalScrollbar(scene) {
+  return scene.scrollbarWidth > 0 &&
+    (scene.overflowY === "scroll" || (scene.overflowY === "auto" && scene.scrollHeight > scene.height));
+}
+
+function sceneScrollbarColors(scene) {
+  if (scene.scrollbarColor !== null) {
+    return scene.scrollbarColor;
+  }
+  return {
+    thumb: rgb(136, 136, 136),
+    track: rgb(241, 241, 241)
+  };
+}
+
+function sceneScrollbarStyle(scene) {
+  return scrollbarStyle({
+    scrollbarColor: scene.scrollbarColor,
+    scrollbarStyle: scene.scrollbarStyle
+  });
+}
+
+function drawSceneVerticalScrollbar(renderer, canvas, scene, options) {
+  if (!sceneNeedsVerticalScrollbar(scene)) {
+    return canvas;
+  }
+  var style = sceneScrollbarStyle(scene);
+  var x = scene.contentWidth;
+  drawScrollbarPart(renderer, canvas, style.track, x, 0, scene.scrollbarWidth, scene.height, style.trackCorners, style.trackColor, style.trackOpacity, options);
+  var thumbHeight = scene.height;
+  if (scene.scrollHeight > scene.height) {
+    thumbHeight = scene.height * scene.height / scene.scrollHeight;
+    if (thumbHeight < scene.scrollbarWidth) {
+      thumbHeight = scene.scrollbarWidth;
+    }
+  }
+  var maxScrollY = scene.scrollHeight - scene.height;
+  var thumbY = 0;
+  if (maxScrollY > 0 && scene.height > thumbHeight) {
+    thumbY = scene.scrollOffsetY * (scene.height - thumbHeight) / maxScrollY;
+  }
+  var drawThumbWidth = resolvedThumbWidth(style, scene.scrollbarWidth);
+  var drawThumbHeight = resolvedThumbHeight(style, thumbHeight);
+  var drawThumbX = x + (scene.scrollbarWidth - drawThumbWidth) / 2;
+  var drawThumbY = thumbY + (thumbHeight - drawThumbHeight) / 2;
+  drawScrollbarPart(renderer, canvas, style.thumb, drawThumbX, drawThumbY, drawThumbWidth, drawThumbHeight, style.thumbCorners, style.thumbColor, style.thumbOpacity, options);
   return canvas;
 }
 
 export function drawSceneWith(renderer, canvas, scene, options) {
   var shapes = orderedShapes(scene.shapes);
+  var offsetY = 0 - scene.scrollOffsetY;
+  renderer.pushClip(canvas, 0, 0, scene.contentWidth, scene.height);
   for (var index = 0; index < shapes.length; index = index + 1) {
-    drawShape(renderer, canvas, shapes[index], options);
+    drawTranslatedShape(renderer, canvas, shapes[index], options, offsetY);
   }
+  renderer.popClip(canvas);
+  drawSceneVerticalScrollbar(renderer, canvas, scene, options);
   if (renderer.attachScene !== null) {
     renderer.attachScene(canvas, scene, options);
   }
@@ -810,11 +1014,15 @@ export function drawSceneWith(renderer, canvas, scene, options) {
 
 export function drawSceneRegionWith(renderer, canvas, scene, options, region) {
   var shapes = orderedShapes(scene.shapes);
+  var offsetY = 0 - scene.scrollOffsetY;
   renderer.pushClip(canvas, region.x, region.y, region.width, region.height);
+  renderer.pushClip(canvas, 0, 0, scene.contentWidth, scene.height);
   for (var index = 0; index < shapes.length; index = index + 1) {
-    drawShapeInRegion(renderer, canvas, shapes[index], options, region);
+    drawShapeInRegion(renderer, canvas, shapes[index], options, region, offsetY);
   }
   renderer.popClip(canvas);
+  renderer.popClip(canvas);
+  drawSceneVerticalScrollbar(renderer, canvas, scene, options);
   if (renderer.attachScene !== null) {
     renderer.attachScene(canvas, scene, options);
   }

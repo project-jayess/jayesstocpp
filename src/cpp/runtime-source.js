@@ -170,9 +170,15 @@ inline value call(const value& callable, Args&&... args) {
 export function getRuntimeCppSource(options = {}) {
   const features = options.features ?? "all";
   const hasWindowRuntime = resolveRuntimeFragmentKeys(features).includes("window");
+  const hasImageRuntime = resolveRuntimeFragmentKeys(features).includes("image");
   return `#include "jayess_runtime.hpp"
 
 ${renderRuntimeCppIncludes()}
+${hasImageRuntime ? `
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_NO_STDIO
+#include "../native/stb_image.h"
+#include "../native/libwebp/src/webp/decode.h"` : ""}
 
 namespace jayess {
 ${renderRuntimeCppFragments(features, "early")}

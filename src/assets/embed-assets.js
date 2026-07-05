@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { collectBindingIdentifiers } from "../ast/binding-patterns.js";
 import { collectParameterBindingNames } from "../ast/parameters.js";
-import { importDeclaration, literal } from "../ast/nodes.js";
+import { arrayExpression, importDeclaration, literal } from "../ast/nodes.js";
 import { throwDiagnostics } from "../diagnostics.js";
 import { createModuleDiagnostic } from "../diagnostics/module-diagnostic.js";
 
@@ -87,8 +87,8 @@ function assetExtension(kind) {
 }
 
 function imageAssetExtension(requested) {
-  const extension = path.extname(requested);
-  if (extension === ".ppm" || extension === ".pgm") {
+  const extension = path.extname(requested).toLowerCase();
+  if ([".ppm", ".pgm", ".bmp", ".png", ".jpeg", ".jpg", ".psd", ".gif", ".webp"].includes(extension)) {
     return extension;
   }
   return null;
@@ -128,7 +128,7 @@ function embeddedAssetLiteral(sourceText, node, kind, projectRoot, addedAssetImp
   const imageExtension = kind === "packImage" ? imageAssetExtension(requested) : null;
   if (kind === "packImage" && imageExtension === null) {
     throwDiagnostics([
-      createModuleDiagnostic(sourceText, node.arguments[0], "packImage() currently embeds .ppm and .pgm assets", requested)
+      createModuleDiagnostic(sourceText, node.arguments[0], "packImage() embeds .ppm, .pgm, .bmp, .png, .jpeg, .jpg, .psd, .gif, and .webp assets", requested)
     ]);
   }
   const fontExtension = kind === "packFont" ? fontAssetExtension(requested) : null;
@@ -162,14 +162,16 @@ function embeddedAssetLiteral(sourceText, node, kind, projectRoot, addedAssetImp
     ];
     return node;
   }
-  const contents = fs.readFileSync(resolved, "utf8");
   if (kind === "packImage") {
+    const contents = fs.readFileSync(resolved);
+    const elements = [...contents].map((byte) => literal("number", byte, node.arguments[0].start, node.arguments[0].end));
     node.arguments = [
-      literal("string", contents, node.arguments[0].start, node.arguments[0].end),
+      arrayExpression(elements, node.arguments[0].start, node.arguments[0].end),
       literal("string", imageExtension, node.arguments[0].start, node.arguments[0].end)
     ];
     return node;
   }
+  const contents = fs.readFileSync(resolved, "utf8");
   return literal("string", contents, node.start, node.end);
 }
 

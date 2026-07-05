@@ -35,6 +35,7 @@ export function renderRuntimeCppIncludes() {
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <iterator>
 #include <limits>
 #include <mutex>
 #include <random>

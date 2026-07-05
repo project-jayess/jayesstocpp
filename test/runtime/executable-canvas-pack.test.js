@@ -25,7 +25,8 @@ int main() {
   ${namespace}::jayess_module_init();
   auto value = ${namespace}::packedAssets(std::vector<jayess::value>{});
   const auto& items = std::get<jayess::array_ptr>(value)->items;
-  require(std::get<std::string>(items[0]).find("<scene width=\\"4\\"") != std::string::npos, "packed xml");
+  require(std::get<std::string>(items[0]).find("<scene") != std::string::npos, "packed xml scene");
+  require(std::get<std::string>(items[0]).find("width=\\"4\\"") != std::string::npos, "packed xml width");
   require(color_channel(items[1], "red") == 255.0, "packed image red");
   require(color_channel(items[1], "green") == 0.0, "packed image green");
   require(color_channel(items[2], "red") == 255.0, "packed scene red");

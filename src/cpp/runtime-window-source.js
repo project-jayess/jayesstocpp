@@ -65,6 +65,7 @@ void window_push_text_input_event(const window_ptr& window, const std::string& t
 void window_push_mouse_move_event(const window_ptr& window, int x, int y);
 void window_push_mouse_button_event(const window_ptr& window, const std::string& type, int button, int x, int y);
 void window_push_wheel_event(const window_ptr& window, double delta_x, double delta_y, int x, int y);
+std::string window_event_type(const value& eventValue);
 
 ${getWindowWindowsAdapterCppFragment()}
 ${getWindowMacosAdapterCppFragment()}
@@ -250,6 +251,14 @@ void window_push_resize_event(const window_ptr& window, int width, int height) {
   window->width = width;
   window->height = height;
   window->render_requested = true;
+  for (auto item = window->events.rbegin(); item != window->events.rend(); ++item) {
+    if (window_event_type(*item) == "resize" && std::holds_alternative<object_ptr>(*item)) {
+      auto event = std::get<object_ptr>(*item);
+      event->fields["width"] = static_cast<double>(width);
+      event->fields["height"] = static_cast<double>(height);
+      return;
+    }
+  }
   window->events.push_back(window_event({
     {"type", std::string("resize")},
     {"width", static_cast<double>(width)},
@@ -474,9 +483,13 @@ value window_dispatch_events(const value& windowValue) {
   auto events = std::get<array_ptr>(eventsValue);
   auto emitter = value(window_event_emitter(window));
   long long lastMouseMoveIndex = -1;
+  long long lastResizeIndex = -1;
   for (std::size_t index = 0; index < events->items.size(); ++index) {
-    if (window_event_type(events->items[index]) == "mouseMove") {
+    const auto type = window_event_type(events->items[index]);
+    if (type == "mouseMove") {
       lastMouseMoveIndex = static_cast<long long>(index);
+    } else if (type == "resize") {
+      lastResizeIndex = static_cast<long long>(index);
     }
   }
   auto emitted = std::make_shared<array_value>();
@@ -484,6 +497,9 @@ value window_dispatch_events(const value& windowValue) {
     const auto& event = events->items[index];
     const auto type = window_event_type(event);
     if (type == "mouseMove" && static_cast<long long>(index) != lastMouseMoveIndex) {
+      continue;
+    }
+    if (type == "resize" && static_cast<long long>(index) != lastResizeIndex) {
       continue;
     }
     emitted->items.push_back(event);

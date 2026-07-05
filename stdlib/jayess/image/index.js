@@ -14,15 +14,28 @@ import {
   jayessImageIsImage,
   jayessImageFlipHorizontal,
   jayessImageFlipVertical,
+  jayessImageDecodeGif,
+  jayessImageDecodeImage,
+  jayessImageDecodeJpeg,
   jayessImageDecodePgm,
+  jayessImageDecodePng,
   jayessImageDecodePpm,
+  jayessImageDecodePsd,
+  jayessImageDecodeWebp,
   jayessImageEncodePgm,
   jayessImageEncodePpm,
   jayessImageDrawLine,
   jayessImageLoadBmp,
+  jayessImageLoadGif,
+  jayessImageLoadImage,
+  jayessImageLoadJpeg,
+  jayessImageLoadJpg,
   jayessImageLoadPgm,
+  jayessImageLoadPng,
   jayessImageLoadPpm,
+  jayessImageLoadPsd,
   jayessImageLoadTga,
+  jayessImageLoadWebp,
   jayessImageMetadataFromFile,
   jayessImageRotate90,
   jayessImageResizeNearest,
@@ -137,6 +150,34 @@ export function loadTga(path) {
   return jayessImageLoadTga(path);
 }
 
+export function loadPng(path) {
+  return jayessImageLoadPng(path);
+}
+
+export function loadJpeg(path) {
+  return jayessImageLoadJpeg(path);
+}
+
+export function loadJpg(path) {
+  return jayessImageLoadJpg(path);
+}
+
+export function loadPsd(path) {
+  return jayessImageLoadPsd(path);
+}
+
+export function loadGif(path) {
+  return jayessImageLoadGif(path);
+}
+
+export function loadWebp(path) {
+  return jayessImageLoadWebp(path);
+}
+
+export function loadImage(path) {
+  return jayessImageLoadImage(path);
+}
+
 export function metadataFromFile(path) {
   return jayessImageMetadataFromFile(path);
 }
@@ -155,6 +196,30 @@ export function encodePgm(image) {
 
 export function decodePgm(bytes) {
   return jayessImageDecodePgm(bytes);
+}
+
+export function decodePng(bytes) {
+  return jayessImageDecodePng(bytes);
+}
+
+export function decodeJpeg(bytes) {
+  return jayessImageDecodeJpeg(bytes);
+}
+
+export function decodePsd(bytes) {
+  return jayessImageDecodePsd(bytes);
+}
+
+export function decodeGif(bytes) {
+  return jayessImageDecodeGif(bytes);
+}
+
+export function decodeWebp(bytes) {
+  return jayessImageDecodeWebp(bytes);
+}
+
+export function decodeImage(bytes) {
+  return jayessImageDecodeImage(bytes);
 }
 
 export function crop(image, x, y, width, height) {

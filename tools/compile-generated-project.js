@@ -28,18 +28,37 @@ function findCompiler() {
   return null;
 }
 
-function collectCppFiles(dir) {
+function collectSourceFiles(dir) {
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      files.push(...collectCppFiles(fullPath));
-    } else if (entry.isFile() && entry.name.endsWith(".cpp")) {
+      files.push(...collectSourceFiles(fullPath));
+    } else if (entry.isFile() && (entry.name.endsWith(".cpp") || entry.name.endsWith(".c"))) {
       files.push(fullPath);
     }
   }
   return files.sort();
+}
+
+function includeDirectories(targetDir) {
+  const hintsPath = path.join(targetDir, "jayess_build_hints.json");
+  if (!fs.existsSync(hintsPath)) {
+    return [targetDir];
+  }
+  const hints = JSON.parse(fs.readFileSync(hintsPath, "utf8"));
+  return (hints.includeDirectories ?? ["."])
+    .map((directory) => path.resolve(targetDir, directory));
+}
+
+function compileDefinitions(targetDir) {
+  const hintsPath = path.join(targetDir, "jayess_build_hints.json");
+  if (!fs.existsSync(hintsPath)) {
+    return [];
+  }
+  const hints = JSON.parse(fs.readFileSync(hintsPath, "utf8"));
+  return (hints.compileDefinitions ?? []).map((definition) => `-D${definition}`);
 }
 
 function platformLibraries(targetDir) {
@@ -111,9 +130,9 @@ if (compiler == null) {
   process.exit(1);
 }
 
-const cppFiles = collectCppFiles(generatedDir);
-if (cppFiles.length === 0) {
-  console.error(`No .cpp files found under ${generatedDir}`);
+const sourceFiles = collectSourceFiles(generatedDir);
+if (sourceFiles.length === 0) {
+  console.error(`No C/C++ source files found under ${generatedDir}`);
   process.exit(1);
 }
 
@@ -125,9 +144,9 @@ execFileSync(compiler, [
   "-std=c++17",
   "-pthread",
   ...releaseFlags.compile,
-  ...cppFiles,
-  "-I",
-  generatedDir,
+  ...sourceFiles,
+  ...compileDefinitions(generatedDir),
+  ...includeDirectories(generatedDir).flatMap((directory) => ["-I", directory]),
   "-o",
   outputPath,
   ...releaseFlags.link,
@@ -145,5 +164,5 @@ console.log(JSON.stringify({
   mode: options.debug ? "debug" : "release-size",
   compileFlags: releaseFlags.compile,
   linkFlags: releaseFlags.link,
-  files: cppFiles.length
+  files: sourceFiles.length
 }, null, 2));

@@ -45,6 +45,8 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   assert.match(cppSource, /gdi32\.dll/);
   assert.match(cppSource, /RegisterClassExA/);
   assert.match(cppSource, /CreateWindowExA/);
+  assert.match(cppSource, /LoadCursorA/);
+  assert.match(cppSource, /jayess_idc_arrow/);
   assert.match(cppSource, /StretchDIBits/);
   assert.match(cppSource, /PatBlt/);
   assert.match(cppSource, /jayess_blackness/);
@@ -92,6 +94,9 @@ test("transpileFile emits window module runtime and native bridge output", (t) =
   assert.match(cppSource, /window_push_text_input_event/);
   assert.match(cppSource, /window_push_mouse_move_event/);
   assert.match(cppSource, /window_push_mouse_button_event/);
+  assert.match(cppSource, /window->events\.rbegin\(\)/);
+  assert.match(cppSource, /lastResizeIndex/);
+  assert.match(cppSource, /type == "resize"/);
   assert.match(cppSource, /window_mark_shown/);
   assert.match(cppSource, /window_mark_closed/);
   assert.match(cppSource, /window_record_presented_size/);

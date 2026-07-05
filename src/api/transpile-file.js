@@ -17,6 +17,7 @@ import {
 } from "../output/emitted-module-plan.js";
 import { planEmittedModuleMetadata } from "../output/module-metadata-plan.js";
 import { copyNativeArtifact, nativeArtifactMetadata } from "../output/native-artifacts.js";
+import { copyExternalDecoderArtifacts } from "../output/external-decoders.js";
 import { ensureInsideTarget, planModulePaths } from "../output/path-plan.js";
 import { analyzeRuntimeFeatures } from "../output/runtime-feature-analysis.js";
 import { writeBuildHints } from "../output/write-build-hints.js";
@@ -45,7 +46,10 @@ export function transpileFile(entryFilename, targetDirname, options = {}) {
   const runtimeFeatures = options.runtimeFeatures ?? analyzeRuntimeFeatures(graph, { reachableSymbols, emittedModules });
   const runtimeFragmentInput = options.runtimeFragments === "all" ? "all" : runtimeFeatures;
   const runtimeFragmentKeys = resolveRuntimeFragmentKeys(runtimeFragmentInput);
-  const outputs = [...writeRuntime(resolvedTargetDir, { features: runtimeFragmentInput })];
+  const outputs = [
+    ...writeRuntime(resolvedTargetDir, { features: runtimeFragmentInput }),
+    ...copyExternalDecoderArtifacts(resolvedTargetDir, runtimeFragmentKeys)
+  ];
   const forcedRetainedDeclarations = collectForcedRetainedDeclarations(graph, emittedModules, reachableSymbols);
   const forcedRetainedImportLocals = collectForcedRetainedImportLocals(graph, forcedRetainedDeclarations);
   const { metadata } = planEmittedModuleMetadata(graph, resolvedTargetDir, reachableSymbols);

@@ -286,12 +286,19 @@ test("canvas pack helpers embed XML and image assets into generated output", (t)
   assert.match(entrySource, /<scene/);
   assert.match(entrySource, /width=\\"4\\"/);
   assert.match(entrySource, /height=\\"4\\"/);
-  assert.match(entrySource, /P3\\n2 1\\n255/);
+  assert.match(entrySource, /static_cast<double>\(137\)/);
+  assert.match(entrySource, /std::string\("\.png"\)/);
   assert.doesNotMatch(entrySource, /packed-scene\.xml/);
-  assert.doesNotMatch(entrySource, /packed-icon\.ppm/);
+  assert.doesNotMatch(entrySource, /packed-icon\.png/);
   assert.match(canvasSource, /packImage/);
-  assert.match(canvasSource, /decodePpm/);
-  assert.match(canvasSource, /fromUtf8/);
+  assert.match(canvasSource, /decodePng/);
+  assert.match(canvasSource, /fromArray/);
+  assert.ok(fs.existsSync(path.join(targetDir, "native", "stb_image.h")));
+  assert.ok(fs.existsSync(path.join(targetDir, "native", "libwebp", "src", "webp", "decode.h")));
+  assert.ok(fs.existsSync(path.join(targetDir, "native", "libwebp", "src", "dec", "webp_dec.c")));
+  assert.ok(fs.existsSync(path.join(targetDir, "licenses", "stb", "LICENSE")));
+  assert.ok(fs.existsSync(path.join(targetDir, "licenses", "libwebp", "COPYING")));
+  assert.ok(fs.existsSync(path.join(targetDir, "licenses", "libwebp", "PATENTS")));
 
   const entryModule = metadata.modules.find((moduleRecord) => moduleRecord.moduleStem === "canvas_pack_main_js");
   const canvasDependency = entryModule.dependencies.find((dependency) => dependency.source === "jayess:canvas");

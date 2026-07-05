@@ -123,7 +123,7 @@ function drawMaskShape(renderer, mask, shape, bounds, padding) {
   var color = maskColor();
   var x = shape.x - bounds.x + padding;
   var y = shape.y - bounds.y + padding;
-  if (shape.kind === "rectangle") {
+  if (shape.kind === "rectangle" || shape.kind === "button") {
     if (shape.corners !== null) {
       renderer.fillRoundedRect(mask, x, y, shape.width, shape.height, shape.corners, color);
     } else {

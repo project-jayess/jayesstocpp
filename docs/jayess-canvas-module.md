@@ -85,7 +85,7 @@ Canvas drawing helpers use one explicit compositing rule: partially transparent 
 
 Ellipse and capsule primitives use pixel-center coverage over their requested bounding boxes. This avoids single-pixel point artifacts at ellipse extrema and keeps `drawCapsule` outlines as one continuous capsule boundary rather than a rectangle outline plus two ellipse outlines.
 
-`packXml("./scene.xml")` embeds a static relative XML file into generated C++ as a string at transpile time. `packImage("./icon.ppm")` embeds a static relative image file into generated C++ and returns a decoded image object at runtime. The first image-packing slice supports `.ppm` and `.pgm`, matching the image formats that can be decoded directly from embedded bytes without runtime temp files.
+`packXml("./scene.xml")` embeds a static relative XML file into generated C++ as a string at transpile time. `packImage("./icon.png")` embeds a static relative image file into generated C++ as encoded bytes and returns a decoded image object at runtime. The current image-packing slice supports `.ppm`, `.pgm`, `.bmp`, `.png`, `.jpeg`, `.jpg`, `.psd`, `.gif`, and `.webp`. The external decoder boundary is documented in [jayess-image-decoder-externals.md](./jayess-image-decoder-externals.md).
 
 ## Runtime XML Updates
 

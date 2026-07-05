@@ -16,7 +16,7 @@ export function generatedEntryForFixture(fixturePath) {
 export function transpileAndRunFixture(t, fixturePath, tempName, mainSource) {
   const targetDir = createManagedTempDir(t, tempName);
   const result = transpileFile(path.resolve(fixturePath), targetDir);
-  const cppFiles = result.files.filter((file) => file.endsWith(".cpp"));
+  const cppFiles = result.files.filter((file) => file.endsWith(".cpp") || file.endsWith(".c"));
 
   return compileAndRunCppExecutable(cppFiles, targetDir, mainSource(targetDir, generatedEntryForFixture(fixturePath)));
 }

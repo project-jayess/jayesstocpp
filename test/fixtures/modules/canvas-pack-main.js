@@ -3,7 +3,7 @@ import { getPixel as getImagePixel } from "jayess:image";
 
 export function packedAssets() {
   var xml = packXml("./packed-scene.xml");
-  var image = packImage("./packed-icon.ppm");
+  var image = packImage("./packed-icon.png");
   var canvas = renderScene(xml, {
     images: {
       icon: image

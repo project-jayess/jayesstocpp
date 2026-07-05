@@ -8,13 +8,19 @@ import {
   glyphRowsForFont
 } from "../font/glyphs.js";
 import { chars as stringChars, slice as sliceString, toLower, toUpper } from "jayess:string";
-import { fromUtf8 } from "jayess:bytes";
+import { fromArray } from "jayess:bytes";
 import { keys } from "jayess:object";
 import {
   copy as copyImage,
   create as createImage,
+  decodeGif,
+  decodeImage,
+  decodeJpeg,
   decodePgm,
+  decodePng,
   decodePpm,
+  decodePsd,
+  decodeWebp,
   drawLine as drawImageLine,
   fill as fillImage,
   fillCapsule as fillImageCapsule,
@@ -24,10 +30,7 @@ import {
   getPixel as getImagePixel,
   height as imageHeight,
   isImage,
-  loadBmp,
-  loadPgm,
-  loadPpm,
-  loadTga,
+  loadImage as loadGenericImage,
   resizeNearest,
   antialias as antialiasImage,
   savePpm as saveImagePpm,
@@ -43,7 +46,9 @@ import {
 } from "./polygon-helpers.js";
 import {
   addCanvasEventListener,
+  dispatchCanvasClickEvent,
   dispatchCanvasEvent,
+  dispatchCanvasTargetEvent,
   getElementById,
   hitTest,
   hitTests,
@@ -90,7 +95,7 @@ function fail(message) {
   throw message;
 }
 
-function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, requestedBackend, actualBackend) {
+function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, clickStartElementId, requestedBackend, actualBackend) {
   return {
     image: image,
     title: title,
@@ -102,6 +107,7 @@ function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOpti
     hoveredElementId: hoveredElementId,
     canvasListeners: canvasListeners,
     scrollDragState: scrollDragState,
+    clickStartElementId: clickStartElementId,
     requestedBackend: requestedBackend,
     actualBackend: actualBackend
   };
@@ -392,7 +398,7 @@ export function create(width, height, options) {
   var title = optionValue(options, "title", "");
   var requestedBackend = requestedBackendValue(options);
   var actualBackend = actualBackendValue(requestedBackend);
-  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, requestedBackend, actualBackend);
+  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, "", requestedBackend, actualBackend);
 }
 
 export function clear(canvas, color) {
@@ -414,7 +420,7 @@ export function getPixel(canvas, x, y) {
 
 export function copy(canvas) {
   var source = requireCanvas(canvas);
-  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.requestedBackend, source.actualBackend);
+  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.clickStartElementId, source.requestedBackend, source.actualBackend);
 }
 
 export function requestedBackend(canvas) {
@@ -734,6 +740,33 @@ export function drawImageAlpha(canvas, image, x, y) {
   }
   var region = currentClipRegion(checkedCanvas);
   transparentBlitClipped(checkedCanvas.image, image, x, y, region.x, region.y, region.width, region.height);
+  return canvas;
+}
+
+function imageOpacityValue(opacity) {
+  if (opacity < 0) {
+    return 0;
+  }
+  if (opacity > 1) {
+    return 1;
+  }
+  return opacity;
+}
+
+export function drawImageAlphaOpacity(canvas, image, x, y, opacity) {
+  var resolvedOpacity = imageOpacityValue(opacity);
+  if (resolvedOpacity <= 0) {
+    return canvas;
+  }
+  if (resolvedOpacity >= 1) {
+    return drawImageAlpha(canvas, image, x, y);
+  }
+  for (var row = 0; row < imageHeight(image); row = row + 1) {
+    for (var column = 0; column < imageWidth(image); column = column + 1) {
+      var color = getImagePixel(image, column, row);
+      drawPixel(canvas, x + column, y + row, rgba(color.red, color.green, color.blue, color.alpha * resolvedOpacity));
+    }
+  }
   return canvas;
 }
 
@@ -1580,19 +1613,7 @@ export function saveImage(canvas, path) {
 }
 
 function loadSceneImage(src) {
-  if (src.endsWith(".ppm")) {
-    return loadPpm(src);
-  }
-  if (src.endsWith(".bmp")) {
-    return loadBmp(src);
-  }
-  if (src.endsWith(".pgm")) {
-    return loadPgm(src);
-  }
-  if (src.endsWith(".tga")) {
-    return loadTga(src);
-  }
-  fail("jayess:canvas XML <image> supports explicit image handles or local .ppm, .bmp, .pgm, and .tga files");
+  return loadGenericImage(src);
 }
 
 function attachScene(canvas, scene, options) {
@@ -1626,6 +1647,7 @@ function xmlSceneRenderer(skipShadowIds) {
     fillPolygon: fillPolygon,
     drawImage: drawImage,
     drawImageAlpha: drawImageAlpha,
+    drawImageAlphaOpacity: drawImageAlphaOpacity,
     drawTextBox: drawTextBox,
     isImage: isImage,
     loadImage: loadSceneImage,
@@ -1679,6 +1701,41 @@ function unionRegion(left, right) {
   return { x: x, y: y, width: rightEdge - x, height: bottomEdge - y };
 }
 
+function paddedRegion(region, padding) {
+  if (!validRegion(region)) {
+    return region;
+  }
+  return {
+    x: region.x - padding,
+    y: region.y - padding,
+    width: region.width + padding * 2,
+    height: region.height + padding * 2
+  };
+}
+
+function viewportRegionForShape(canvas, shape, region) {
+  if (!validRegion(region)) {
+    return region;
+  }
+  if (canvas.scene === null || shape.position === "fixed") {
+    return region;
+  }
+  return {
+    x: region.x,
+    y: region.y - canvas.scene.scrollOffsetY,
+    width: region.width,
+    height: region.height
+  };
+}
+
+function shapeRenderViewportBoundsWith(canvas, renderer, shape) {
+  return viewportRegionForShape(canvas, shape, shapeRenderBoundsWith(renderer, shape));
+}
+
+function shapePaintViewportBoundsWith(canvas, renderer, shape) {
+  return viewportRegionForShape(canvas, shape, shapePaintBoundsWith(renderer, shape));
+}
+
 function clampRegionToCanvas(canvas, region) {
   if (!validRegion(region)) {
     return null;
@@ -1708,37 +1765,13 @@ function redrawAttachedSceneRegion(canvas, region, skipShadowIds) {
   if (scene === null) {
     fail("jayess:canvas expected a canvas rendered from an XML scene");
   }
-  var dirty = clampRegionToCanvas(target, region);
+  var dirty = clampRegionToCanvas(target, paddedRegion(region, 2));
   if (!validRegion(dirty)) {
     return target;
   }
   fillImageRectByAlpha(target.image, dirty.x, dirty.y, dirty.width, dirty.height, scene.background);
   drawSceneRegionWith(xmlSceneRenderer(skipShadowIds), target, scene, target.sceneOptions, dirty);
   return target;
-}
-
-function isPaintOnlyAttribute(name) {
-  return name === "fill" ||
-    name === "outline" ||
-    name === "outline-opacity" ||
-    name === "opacity" ||
-    name === "font-color" ||
-    name === "text-align" ||
-    name === "text-align-x" ||
-    name === "text-align-y";
-}
-
-function arePaintOnlyAttributes(attributes) {
-  var names = keys(attributes);
-  if (names.length === 0) {
-    return false;
-  }
-  for (var index = 0; index < names.length; index = index + 1) {
-    if (isPaintOnlyAttribute(names[index]) !== true) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function skipShadowMap(id) {
@@ -1903,12 +1936,12 @@ function topScrollableShapeAt(canvas, x, y) {
 
 function redrawShape(canvas, shape) {
   var renderer = xmlSceneRenderer();
-  return redrawAttachedSceneRegion(canvas, shapeRenderBoundsWith(renderer, shape), null);
+  return redrawAttachedSceneRegion(canvas, shapeRenderViewportBoundsWith(canvas, renderer, shape), null);
 }
 
 function redrawShapePaint(canvas, shape) {
   var renderer = xmlSceneRenderer();
-  return redrawAttachedSceneRegion(canvas, shapePaintBoundsWith(renderer, shape), skipShadowMap(shape.id));
+  return redrawAttachedSceneRegion(canvas, shapePaintViewportBoundsWith(canvas, renderer, shape), skipShadowMap(shape.id));
 }
 
 function redrawShapeScrollArea(canvas, shape) {
@@ -1916,7 +1949,7 @@ function redrawShapeScrollArea(canvas, shape) {
   if (info === null) {
     return redrawShapePaint(canvas, shape);
   }
-  return redrawAttachedSceneRegion(canvas, info.fullRect, skipShadowMap(shape.id));
+  return redrawAttachedSceneRegion(canvas, viewportRegionForShape(canvas, shape, info.fullRect), skipShadowMap(shape.id));
 }
 
 function setShapeScroll(canvas, shape, scrollX, scrollY) {
@@ -1951,6 +1984,34 @@ function scrollShapeByWheel(canvas, event) {
     shape.scrollOffsetX + wheelDelta(event.deltaX) * 32,
     shape.scrollOffsetY + wheelDelta(event.deltaY) * 32
   );
+}
+
+function maxSceneScrollY(canvas) {
+  if (canvas.scene === null || canvas.scene.scrollbarWidth <= 0) {
+    return 0;
+  }
+  if (canvas.scene.overflowY !== "scroll" && canvas.scene.overflowY !== "auto") {
+    return 0;
+  }
+  return maxValue(0, canvas.scene.scrollHeight - canvas.scene.height);
+}
+
+function setSceneScrollY(canvas, scrollY) {
+  var maxY = maxSceneScrollY(canvas);
+  var nextY = clamp(scrollY, 0, maxY);
+  if (canvas.scene === null || nextY === canvas.scene.scrollOffsetY) {
+    return false;
+  }
+  canvas.scene.scrollOffsetY = nextY;
+  redrawAttachedScene(canvas);
+  return true;
+}
+
+function scrollSceneByWheel(canvas, event) {
+  if (canvas.scene === null) {
+    return false;
+  }
+  return setSceneScrollY(canvas, canvas.scene.scrollOffsetY + wheelDelta(event.deltaY) * 48);
 }
 
 function scrollbarThumbRect(canvas, shape) {
@@ -2018,6 +2079,81 @@ function updateScrollDrag(canvas, event) {
   return setShapeScroll(canvas, drag.shape, drag.shape.scrollOffsetX, nextY);
 }
 
+function mixChannel(value, target, amount) {
+  return round(value + (target - value) * amount);
+}
+
+function buttonEventFill(shape, amount) {
+  var base = shape.baseFill;
+  if (base === null) {
+    base = shape.fill;
+  }
+  if (base === null) {
+    return null;
+  }
+  var target = shape.colorEventMode === "lighter" ? 255 : 0;
+  return rgba(
+    mixChannel(base.red, target, amount),
+    mixChannel(base.green, target, amount),
+    mixChannel(base.blue, target, amount),
+    base.alpha
+  );
+}
+
+function buttonStateFill(shape, state) {
+  if (state === "normal") {
+    return shape.baseFill;
+  }
+  if (state === "pressed") {
+    return buttonEventFill(shape, 0.18);
+  }
+  if (state === "hover") {
+    return buttonEventFill(shape, 0.12);
+  }
+  return shape.baseFill;
+}
+
+function setButtonState(canvas, shape, state) {
+  if (shape === null || shape.kind !== "button") {
+    return false;
+  }
+  var nextFill = buttonStateFill(shape, state);
+  if (nextFill === null) {
+    return false;
+  }
+  if (shape.fill !== null &&
+      shape.fill.red === nextFill.red &&
+      shape.fill.green === nextFill.green &&
+      shape.fill.blue === nextFill.blue &&
+      shape.fill.alpha === nextFill.alpha) {
+    return false;
+  }
+  shape.fill = nextFill;
+  redrawAttachedSceneRegion(canvas, shapeRenderViewportBoundsWith(canvas, xmlSceneRenderer(), shape), null);
+  return true;
+}
+
+function applyButtonHoverTransition(canvas, event) {
+  var changed = false;
+  var nextHit = hitTest(canvas, event.x, event.y);
+  var nextId = nextHit === null ? "" : nextHit.id;
+  var previousId = canvas.hoveredElementId;
+  if (previousId === null) {
+    previousId = "";
+  }
+  if (previousId.length > 0 && previousId !== nextId) {
+    if (setButtonState(canvas, getElementById(canvas, previousId), "normal")) {
+      changed = true;
+    }
+  }
+  if (nextHit !== null && previousId !== nextId) {
+    if (setButtonState(canvas, getElementById(canvas, nextHit.id), "hover")) {
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 export function findElement(canvas, id) {
   return getElementById(canvas, id);
 }
@@ -2029,10 +2165,9 @@ export function setAttribute(canvas, id, name, value) {
     updateElementAttribute(target, id, name, value);
   }
   var renderer = xmlSceneRenderer();
-  var paintOnly = isPaintOnlyAttribute(name);
-  var oldBounds = paintOnly ? shapePaintBoundsWith(renderer, shape) : shapeRenderBoundsWith(renderer, shape);
+  var oldBounds = shapeRenderViewportBoundsWith(target, renderer, shape);
   var updated = updateElementAttribute(target, id, name, value);
-  var newBounds = paintOnly ? shapePaintBoundsWith(renderer, updated) : shapeRenderBoundsWith(renderer, updated);
+  var newBounds = shapeRenderViewportBoundsWith(target, renderer, updated);
   return redrawAttachedSceneRegion(target, unionRegion(oldBounds, newBounds), null);
 }
 
@@ -2043,15 +2178,14 @@ export function setAttributes(canvas, id, attributes) {
     updateElementAttribute(target, id, "", null);
   }
   var renderer = xmlSceneRenderer();
-  var paintOnly = arePaintOnlyAttributes(attributes);
-  var oldBounds = paintOnly ? shapePaintBoundsWith(renderer, shape) : shapeRenderBoundsWith(renderer, shape);
+  var oldBounds = shapeRenderViewportBoundsWith(target, renderer, shape);
   var names = keys(attributes);
   for (var index = 0; index < names.length; index = index + 1) {
     var name = names[index];
     updateElementAttribute(target, id, name, attributes[name]);
   }
   var updated = getElementById(target, id);
-  var newBounds = paintOnly ? shapePaintBoundsWith(renderer, updated) : shapeRenderBoundsWith(renderer, updated);
+  var newBounds = shapeRenderViewportBoundsWith(target, renderer, updated);
   return redrawAttachedSceneRegion(target, unionRegion(oldBounds, newBounds), null);
 }
 
@@ -2070,20 +2204,75 @@ export function addEventListener(canvas, name, callback) {
 export function dispatchEvent(canvas, event) {
   var target = requireCanvas(canvas);
   if (event.type === "wheel") {
-    scrollShapeByWheel(target, event);
+    if (!scrollShapeByWheel(target, event)) {
+      scrollSceneByWheel(target, event);
+    }
     return [];
   }
   if (event.type === "mouseDown") {
-    beginScrollDrag(target, event);
-    return [];
+    if (beginScrollDrag(target, event)) {
+      target.clickStartElementId = "";
+      return [];
+    }
+    var downHit = hitTest(target, event.x, event.y);
+    target.clickStartElementId = downHit === null ? "" : downHit.id;
+    if (downHit !== null) {
+      setButtonState(target, getElementById(target, downHit.id), "pressed");
+    }
+    return dispatchCanvasTargetEvent(target, event, downHit, "mouseDown");
   }
   if (event.type === "mouseUp") {
-    target.scrollDragState = null;
-    return [];
+    if (target.scrollDragState !== null) {
+      target.scrollDragState = null;
+      target.clickStartElementId = "";
+      return [];
+    }
+    var upHit = hitTest(target, event.x, event.y);
+    var startId = target.clickStartElementId;
+    target.clickStartElementId = "";
+    var releaseHit = upHit;
+    if (startId.length > 0 && (upHit === null || upHit.id !== startId)) {
+      var startShape = getElementById(target, startId);
+      if (startShape !== null) {
+        releaseHit = {
+          id: startShape.id,
+          kind: startShape.kind,
+          x: event.x,
+          y: event.y
+        };
+      }
+    }
+    if (releaseHit !== null) {
+      var releaseState = upHit !== null && releaseHit.id === upHit.id ? "hover" : "normal";
+      setButtonState(target, getElementById(target, releaseHit.id), releaseState);
+    }
+    var emitted = dispatchCanvasTargetEvent(target, event, releaseHit, "mouseUp");
+    if (upHit !== null && startId === upHit.id) {
+      var clickEvents = dispatchCanvasClickEvent(target, event, upHit);
+      for (var index = 0; index < clickEvents.length; index = index + 1) {
+        emitted.push(clickEvents[index]);
+      }
+    }
+    return emitted;
   }
   if (event.type === "mouseMove" && target.scrollDragState !== null) {
     updateScrollDrag(target, event);
     return [];
+  }
+  if (event.type === "mouseMove") {
+    var buttonChanged = applyButtonHoverTransition(target, event);
+    var emitted = dispatchCanvasEvent(target, event);
+    if (buttonChanged && emitted.length === 0) {
+      emitted.push({
+        type: "statechange",
+        targetId: "",
+        targetKind: "",
+        x: event.x,
+        y: event.y,
+        sourceEvent: event
+      });
+    }
+    return emitted;
   }
   return dispatchCanvasEvent(target, event);
 }
@@ -2093,11 +2282,30 @@ export function packXml(path) {
 }
 
 export function packImage(data, format) {
+  var bytes = fromArray(data);
   if (format === ".ppm") {
-    return decodePpm(fromUtf8(data));
+    return decodePpm(bytes);
   }
   if (format === ".pgm") {
-    return decodePgm(fromUtf8(data));
+    return decodePgm(bytes);
   }
-  fail("jayess:canvas packImage() requires a static relative .ppm or .pgm path during transpilation");
+  if (format === ".png") {
+    return decodePng(bytes);
+  }
+  if (format === ".jpeg" || format === ".jpg") {
+    return decodeJpeg(bytes);
+  }
+  if (format === ".bmp") {
+    return decodeImage(bytes);
+  }
+  if (format === ".psd") {
+    return decodePsd(bytes);
+  }
+  if (format === ".gif") {
+    return decodeGif(bytes);
+  }
+  if (format === ".webp") {
+    return decodeWebp(bytes);
+  }
+  fail("jayess:canvas packImage() requires a static relative .ppm, .pgm, .bmp, .png, .jpeg, .jpg, .psd, .gif, or .webp path during transpilation");
 }

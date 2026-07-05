@@ -1,4 +1,5 @@
 import { getImageFileRuntimeCppFragment } from "./runtime-image-file-source.js";
+import { getImageDecodeRuntimeCppFragment } from "./runtime-image-decode-source.js";
 
 export function getImageRuntimeHeaderFragment() {
   return `struct image_state {
@@ -29,11 +30,24 @@ value image_load_ppm(const value& path);
 value image_load_bmp(const value& path);
 value image_load_pgm(const value& path);
 value image_load_tga(const value& path);
+value image_load_png(const value& path);
+value image_load_jpeg(const value& path);
+value image_load_jpg(const value& path);
+value image_load_psd(const value& path);
+value image_load_gif(const value& path);
+value image_load_webp(const value& path);
+value image_load_image(const value& path);
 value image_metadata_from_file(const value& path);
 value image_encode_ppm(const value& image);
 value image_decode_ppm(const value& bytes);
 value image_encode_pgm(const value& image);
 value image_decode_pgm(const value& bytes);
+value image_decode_png(const value& bytes);
+value image_decode_jpeg(const value& bytes);
+value image_decode_psd(const value& bytes);
+value image_decode_gif(const value& bytes);
+value image_decode_webp(const value& bytes);
+value image_decode_image(const value& bytes);
 value image_crop(const value& image, const value& x, const value& y, const value& width, const value& height);
 value image_resize_nearest(const value& image, const value& width, const value& height);
 value image_blit(const value& target, const value& source, const value& x, const value& y);
@@ -922,6 +936,8 @@ value image_shadow_mask(const value& input, const value& blurRadiusValue, const 
   }
   return output;
 }
+
+${getImageDecodeRuntimeCppFragment()}
 
 ${getImageFileRuntimeCppFragment()}
 

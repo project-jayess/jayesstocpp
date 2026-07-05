@@ -22,6 +22,25 @@ function platformLibrariesForTarget(targetDir) {
   return [...libraries].filter((library) => requiredAtLinkTime.has(library)).sort();
 }
 
+function includeDirectoriesForTarget(targetDir) {
+  const hintsPath = path.join(targetDir, "jayess_build_hints.json");
+  if (!fs.existsSync(hintsPath)) {
+    return [targetDir];
+  }
+  const hints = JSON.parse(fs.readFileSync(hintsPath, "utf8"));
+  return (hints.includeDirectories ?? ["."])
+    .map((directory) => path.resolve(targetDir, directory));
+}
+
+function compileDefinitionsForTarget(targetDir) {
+  const hintsPath = path.join(targetDir, "jayess_build_hints.json");
+  if (!fs.existsSync(hintsPath)) {
+    return [];
+  }
+  const hints = JSON.parse(fs.readFileSync(hintsPath, "utf8"));
+  return (hints.compileDefinitions ?? []).map((definition) => `-D${definition}`);
+}
+
 export function findAvailableCompiler() {
   for (const command of ["clang++", "c++", "g++"]) {
     try {
@@ -52,12 +71,14 @@ export function compileCppFiles(files, includeDir) {
     throw new Error("No supported C++ compiler found. Install clang++, c++, or g++ to run compile-validation tests.");
   }
 
+  const includeArgs = includeDirectoriesForTarget(includeDir).flatMap((directory) => ["-I", directory]);
+  const definitionArgs = compileDefinitionsForTarget(includeDir);
   const args = [
     "-std=c++17",
     "-c",
     ...files,
-    "-I",
-    includeDir
+    ...definitionArgs,
+    ...includeArgs
   ];
 
   execFileSync(compiler, args, {
@@ -77,6 +98,8 @@ export function compileAndRunCppExecutable(files, includeDir, mainSource, execut
   const mainPath = path.join(includeDir, `${executableName}.cpp`);
   const executablePath = path.join(includeDir, process.platform === "win32" ? `${executableName}.exe` : executableName);
   const platformLibraries = platformLibrariesForTarget(includeDir).map((library) => `-l${library}`);
+  const includeArgs = includeDirectoriesForTarget(includeDir).flatMap((directory) => ["-I", directory]);
+  const definitionArgs = compileDefinitionsForTarget(includeDir);
   fs.writeFileSync(mainPath, mainSource, "utf8");
 
   execFileSync(compiler, [
@@ -84,8 +107,8 @@ export function compileAndRunCppExecutable(files, includeDir, mainSource, execut
     "-pthread",
     ...files,
     mainPath,
-    "-I",
-    includeDir,
+    ...definitionArgs,
+    ...includeArgs,
     "-o",
     executablePath,
     ...platformLibraries

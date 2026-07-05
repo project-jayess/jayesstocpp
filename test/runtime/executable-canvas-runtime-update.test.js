@@ -36,6 +36,36 @@ int main() {
   require(std::get<double>(items[13]) == 1.0, "runtime xy mutation moves element");
   require(std::get<double>(items[14]) == 1.0, "runtime w/h mutation resizes element");
   require(std::get<double>(items[15]) > 100.0 && std::get<double>(items[15]) < 160.0, "runtime outline opacity blends");
+
+  auto scrolledValue = ${namespace}::scrolledHoverSummary(std::vector<jayess::value>{});
+  const auto& scrolled = std::get<jayess::array_ptr>(scrolledValue)->items;
+  require(std::get<double>(scrolled[0]) == 1.0, "root scroll hit maps viewport to document y");
+  require(std::get<double>(scrolled[1]) == 1.0, "fixed hit remains viewport relative");
+  require(std::get<double>(scrolled[2]) == 1.0, "scrolled mouseover event count");
+  require(std::get<double>(scrolled[3]) == 1.0, "scrolled mouseover target");
+  require(std::get<double>(scrolled[4]) == 255.0, "scrolled hover redraws viewport pixel");
+
+  auto clickValue = ${namespace}::clickSummary(std::vector<jayess::value>{});
+  const auto& click = std::get<jayess::array_ptr>(clickValue)->items;
+  require(std::get<double>(click[0]) == 1.0, "mouseDown event count");
+  require(std::get<double>(click[1]) == 1.0, "mouseDown event type");
+  require(std::get<double>(click[2]) == 2.0, "mouseUp and click event count");
+  require(std::get<double>(click[3]) == 1.0, "mouseUp event type");
+  require(std::get<double>(click[4]) == 1.0, "click event type");
+  require(std::get<double>(click[5]) == 1.0, "click event target");
+  require(std::get<double>(click[6]) == 255.0, "click event redraw");
+  require(std::get<double>(click[7]) == 1.0, "mismatched release emits mouseUp only");
+  require(std::get<double>(click[8]) == 1.0, "mismatched release mouseUp type");
+  require(std::get<double>(click[9]) == 1.0, "mismatched release resets pressed target");
+
+  auto buttonValue = ${namespace}::buttonEventSummary(std::vector<jayess::value>{});
+  const auto& button = std::get<jayess::array_ptr>(buttonValue)->items;
+  require(std::get<double>(button[0]) == 246.0, "button default fill before events");
+  require(std::get<double>(button[1]) < std::get<double>(button[0]), "button hover darkens");
+  require(std::get<double>(button[2]) < std::get<double>(button[1]), "button press darkens more");
+  require(std::get<double>(button[3]) == std::get<double>(button[1]), "button release returns to hover");
+  require(std::get<double>(button[4]) == 255.0, "button user handler overrides event fill");
+  require(std::get<double>(button[5]) == 0.0, "button user handler override green");
   std::cout << "ok\\n";
   return 0;
 }

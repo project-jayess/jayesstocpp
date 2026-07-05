@@ -23,10 +23,23 @@
 - `loadBmp(path)`
 - `loadPgm(path)`
 - `loadTga(path)`
+- `loadPng(path)`
+- `loadJpeg(path)`
+- `loadJpg(path)`
+- `loadPsd(path)`
+- `loadGif(path)`
+- `loadWebp(path)`
+- `loadImage(path)`
 - `encodePpm(image)`
 - `decodePpm(bytes)`
 - `encodePgm(image)`
 - `decodePgm(bytes)`
+- `decodePng(bytes)`
+- `decodeJpeg(bytes)`
+- `decodePsd(bytes)`
+- `decodeGif(bytes)`
+- `decodeWebp(bytes)`
+- `decodeImage(bytes)`
 - `crop(image, x, y, width, height)`
 - `subimage(image, x, y, width, height)`
 - `resizeNearest(image, width, height)`
@@ -49,10 +62,15 @@ The current shipped file formats are intentionally small and explicit:
 | --- | --- | --- | --- | --- | --- |
 | ASCII PPM (`P3`) | `savePpm` | `loadPpm` | `metadataFromFile` | `encodePpm` / `decodePpm` | Text-based RGB format, deterministic and easy to inspect in tests |
 | ASCII PGM (`P2`) | `savePgm` | `loadPgm` | `metadataFromFile` | `encodePgm` / `decodePgm` | Grayscale file format expanded to RGB in memory on load |
-| Uncompressed 24-bit BMP | `saveBmp` | `loadBmp` | `metadataFromFile` | no | File output ignores alpha; load path accepts only the focused uncompressed 24-bit slice |
+| BMP | `saveBmp` | `loadBmp`, `loadImage` | `metadataFromFile` | `decodeImage` | File output ignores alpha; STB-backed load/decode returns RGBA pixels |
 | Uncompressed 24-bit TGA | `saveTga` | `loadTga` | `metadataFromFile` | no | File output ignores alpha; load path accepts only the focused uncompressed 24-bit slice |
+| PNG | no | `loadPng`, `loadImage` | no | `decodePng`, `decodeImage` | STB-backed RGBA decode, including transparent pixels |
+| JPEG/JPG | no | `loadJpeg`, `loadJpg`, `loadImage` | no | `decodeJpeg`, `decodeImage` | STB-backed RGB decode expanded to RGBA |
+| PSD | no | `loadPsd`, `loadImage` | no | `decodePsd`, `decodeImage` | STB-backed RGBA decode |
+| GIF | no | `loadGif`, `loadImage` | no | `decodeGif`, `decodeImage` | STB-backed first-frame RGBA decode |
+| WebP | no | `loadWebp`, `loadImage` | no | `decodeWebp` | libwebp-backed RGBA decode |
 
-PPM and PGM keep rendering testable and easy to inspect. BMP and TGA provide dependency-free files that common image viewers can open. The current bytes-first helpers are limited to those deterministic text formats: `encodePpm` / `decodePpm` and `encodePgm` / `decodePgm`. BMP and TGA remain filesystem-only in the current slice.
+PPM and PGM keep rendering testable and easy to inspect. BMP and TGA provide dependency-free files that common image viewers can open. PNG, JPEG/JPG, PSD, and GIF decode through `stb_image.h`, which is copied from `externals/stb` into generated projects that retain the image runtime. WebP decodes through the focused portable libwebp decoder source copied from `externals/libwebp`. These decoders normalize loaded pixels to RGBA, so transparent pixels stay transparent in memory.
 
 ## Role
 
@@ -60,9 +78,11 @@ This module should own pixel buffers and deterministic image output. It sits abo
 
 The current implementation stores RGBA pixels in a focused runtime handle. `savePpm`, `saveBmp`, `savePgm`, and `saveTga` write deterministic file data. Alpha stays part of the in-memory image buffer and is used by operations such as `transparentBlit`, but the shipped file writers save RGB/grayscale output only.
 
-`loadPpm` supports focused ASCII P3 PPM input with max value `255`. `loadPgm` supports focused ASCII P2 PGM input with max value `255` and expands grayscale pixels to RGB. `loadBmp` supports focused uncompressed 24-bit BMP input with positive dimensions. `loadTga` supports focused uncompressed 24-bit TGA input. `metadataFromFile(path)` reads the same shipped format set; it is not a general-purpose image sniffing layer.
+`loadPpm` supports focused ASCII P3 PPM input with max value `255`. `loadPgm` supports focused ASCII P2 PGM input with max value `255` and expands grayscale pixels to RGB. `loadBmp` and `decodeImage` use the STB-backed decoder path for BMP input. `loadTga` supports focused uncompressed 24-bit TGA input. `loadImage(path)` dispatches by extension across the shipped file loaders. `metadataFromFile(path)` reads the original dependency-free header set; it is not a general-purpose image sniffing layer.
 
 Malformed or incomplete image files are rejected deliberately. The current loaders fail on truncated headers, zero or unsupported dimensions, unsupported BMP/TGA format variants outside the shipped 24-bit uncompressed slice, invalid channel values, and image dimensions that would exceed the supported in-memory storage size. The in-memory image buffer is intentionally capped to a bounded storage size so hostile width/height values fail before very large allocations.
+
+See [jayess-image-decoder-externals.md](./jayess-image-decoder-externals.md) for the decoder adapter boundary and generated-project license packaging.
 
 `fillRect` writes one clipped solid-color rectangle into the target image and returns the same image. `fillRectAlpha` does the same but blends one source color over the destination rectangle using the source alpha channel. Both helpers accept non-negative integer widths and heights, clip against the image bounds, and treat zero-sized rectangles as no-ops.
 

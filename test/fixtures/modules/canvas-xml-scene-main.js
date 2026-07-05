@@ -6,7 +6,7 @@ import {
 } from "jayess:canvas";
 
 export function sceneSummary() {
-  var scene = parseScene("<canvas w=\"120\" h=\"80\" background=\"#112233\" title=\"Shapes\" layout=\"none\"><group id=\"layer\" position=\"absolute\" layout=\"none\" xy=\"(100,50)\" visible=\"true\"><rectangle id=\"box\" position=\"absolute\" xy=\"(10,20)\" w=\"30\" h=\"40\" fill=\"#ff0000\" outline=\"#00ff00\" outline-thickness=\"2\" outline-opacity=\"0.25\" corners=\"4 5 6 7\" opacity=\"0.5\" padding=\"3\" font-color=\"#abcdef\" font-family=\"default\" font-size=\"7\" line-height=\"9\" letter-spacing=\"1\" word-spacing=\"2\" text-transform=\"uppercase\" text-decoration=\"underline\" text-overflow=\"ellipsis\" overflow=\"auto\" overflow-x=\"hidden\" scrollbar-width=\"3\" scrollbar-color=\"#888888 #f1f1f1\" text-align=\"left top\" rotation=\"0\" clip=\"false\" points=\"(1,2)\" shadow=\"4 5 6 2 rgba(1,2,3,0.5)\" z=\"3\">Jayess</rectangle><ellipse position=\"absolute\" id=\"oval\" xy=\"(1,2)\" w=\"8\" h=\"6\"/><semiellipse position=\"absolute\" x=\"2\" y=\"3\" width=\"8\" height=\"6\"/><triangle position=\"absolute\" x=\"3\" y=\"4\" width=\"10\" height=\"10\" points=\"(0,0), (5,10), (10,0)\"/><capsule position=\"absolute\" x=\"4\" y=\"5\" width=\"12\" height=\"6\"/><line position=\"absolute\" x=\"5\" y=\"6\" points=\"(0,0), (10,10)\" outline=\"#ffffff\"/><pixel position=\"absolute\" x=\"6\" y=\"7\" fill=\"#010203\"/><polyline position=\"absolute\" x=\"7\" y=\"8\" points=\"(0,0), (5,5)\"/><polygon position=\"absolute\" x=\"8\" y=\"9\" points=\"(0,0), (6,0), (3,6)\"/><image position=\"absolute\" x=\"9\" y=\"10\" width=\"16\" height=\"16\" src=\"local.ppm\"/><text position=\"absolute\" x=\"10\" y=\"11\" text=\"Hi\" font-family=\"default\" font-size=\"7\"/></group></canvas>");
+  var scene = parseScene("<canvas w=\"120\" h=\"80\" background=\"#112233\" title=\"Shapes\" layout=\"none\"><group id=\"layer\" position=\"absolute\" layout=\"none\" xy=\"(100,50)\" visible=\"true\"><rectangle id=\"box\" position=\"absolute\" xy=\"(10,20)\" w=\"30\" h=\"40\" fill=\"#ff0000\" outline=\"#00ff00\" outline-thickness=\"2\" outline-opacity=\"0.25\" corners=\"4 5 6 7\" opacity=\"0.5\" padding=\"3\" font-color=\"#abcdef\" font-family=\"default\" font-size=\"7\" line-height=\"9\" letter-spacing=\"1\" word-spacing=\"2\" text-transform=\"uppercase\" text-decoration=\"underline\" text-overflow=\"ellipsis\" overflow=\"auto\" overflow-x=\"hidden\" scrollbar-width=\"3\" scrollbar-color=\"#888888 #f1f1f1\" scrollbar-thumb=\"thumb.ppm\" scrollbar-thumb-width=\"11\" scrollbar-thumb-height=\"12\" scrollbar-thumb-corners=\"2\" scrollbar-thumb-color=\"#112233\" scrollbar-thumb-opacity=\"0.75\" scrollbar-track=\"track.ppm\" scrollbar-track-corners=\"3\" scrollbar-track-color=\"#445566\" scrollbar-track-opacity=\"0.5\" text-align=\"left top\" rotation=\"0\" clip=\"false\" points=\"(1,2)\" shadow=\"4 5 6 2 rgba(1,2,3,0.5)\" z=\"3\">Jayess</rectangle><ellipse position=\"absolute\" id=\"oval\" xy=\"(1,2)\" w=\"8\" h=\"6\"/><semiellipse position=\"absolute\" x=\"2\" y=\"3\" width=\"8\" height=\"6\"/><triangle position=\"absolute\" x=\"3\" y=\"4\" width=\"10\" height=\"10\" points=\"(0,0), (5,10), (10,0)\"/><capsule position=\"absolute\" x=\"4\" y=\"5\" width=\"12\" height=\"6\"/><line position=\"absolute\" x=\"5\" y=\"6\" points=\"(0,0), (10,10)\" outline=\"#ffffff\"/><pixel position=\"absolute\" x=\"6\" y=\"7\" fill=\"#010203\"/><polyline position=\"absolute\" x=\"7\" y=\"8\" points=\"(0,0), (5,5)\"/><polygon position=\"absolute\" x=\"8\" y=\"9\" points=\"(0,0), (6,0), (3,6)\"/><image position=\"absolute\" x=\"9\" y=\"10\" width=\"16\" height=\"16\" src=\"local.ppm\"/><text position=\"absolute\" x=\"10\" y=\"11\" text=\"Hi\" font-family=\"default\" font-size=\"7\"/></group></canvas>");
   var size = sceneSize(scene);
   var background = sceneBackground(scene);
   var group = scene.shapes[0];
@@ -88,7 +88,17 @@ export function sceneSummary() {
     rectangle.overflowY,
     rectangle.scrollbarWidth,
     rectangle.scrollbarColor.thumb.red,
-    rectangle.scrollbarColor.track.red
+    rectangle.scrollbarColor.track.red,
+    rectangle.scrollbarStyle.thumb,
+    rectangle.scrollbarStyle.thumbWidth,
+    rectangle.scrollbarStyle.thumbHeight,
+    rectangle.scrollbarStyle.thumbCorners.topLeft,
+    rectangle.scrollbarStyle.thumbColor.red,
+    rectangle.scrollbarStyle.thumbOpacity,
+    rectangle.scrollbarStyle.track,
+    rectangle.scrollbarStyle.trackCorners.topLeft,
+    rectangle.scrollbarStyle.trackColor.red,
+    rectangle.scrollbarStyle.trackOpacity
   ];
 }
 
@@ -101,7 +111,7 @@ export function invalidPoints() {
 }
 
 export function invalidUnknownElement() {
-  return parseScene("<scene width=\"10\" height=\"10\"><button /></scene>");
+  return parseScene("<scene width=\"10\" height=\"10\"><widget /></scene>");
 }
 
 export function invalidUnknownAttribute() {
@@ -166,4 +176,56 @@ export function defaultFlowSummary() {
 export function defaultTextOverflowSummary() {
   var scene = parseScene("<scene width=\"80\" height=\"40\"><rectangle width=\"20\" height=\"10\">Long text</rectangle></scene>");
   return scene.shapes[0].textOverflow;
+}
+
+export function rootScrollbarSummary() {
+  var scene = parseScene("<scene width=\"100\" height=\"80\" padding=\"10\" overflow-y=\"auto\" scrollbar-width=\"12\"><rectangle width=\"100%\" height=\"120\" shrink=\"0\"/><rectangle position=\"fixed\" right=\"5\" bottom=\"6\" width=\"10\" height=\"8\"/></scene>");
+  return [
+    scene.contentWidth,
+    scene.scrollbarGutter,
+    scene.scrollbarWidth,
+    scene.scrollHeight,
+    scene.shapes[0].width,
+    scene.shapes[1].x
+  ];
+}
+
+export function defaultScrollbarSummary() {
+  var scene = parseScene("<scene width=\"100\" height=\"80\" overflow-y=\"auto\"><rectangle width=\"100\" height=\"120\" overflow=\"auto\">Long text for default scrollbar width.</rectangle></scene>");
+  return [
+    scene.scrollbarWidth,
+    scene.scrollbarGutter,
+    scene.contentWidth,
+    scene.shapes[0].scrollbarWidth
+  ];
+}
+
+export function buttonSummary() {
+  var scene = parseScene("<scene width=\"120\" height=\"60\"><button id=\"ok\" width=\"80\" height=\"24\">OK</button><button id=\"light\" width=\"80\" height=\"24\" fill=\"#203040\" color-event-mode=\"lighter\">Light</button></scene>");
+  var button = scene.shapes[0];
+  var light = scene.shapes[1];
+  return [
+    button.kind,
+    button.fill.red,
+    button.fill.green,
+    button.fill.blue,
+    button.outline.red,
+    button.outline.green,
+    button.outline.blue,
+    button.outlineThickness,
+    button.corners.topLeft,
+    button.colorEventMode,
+    button.baseFill.red,
+    button.padding,
+    button.fontSize,
+    button.fontColor.red,
+    button.fontColor.green,
+    button.fontColor.blue,
+    light.colorEventMode,
+    light.baseFill.red
+  ];
+}
+
+export function invalidButtonColorEventMode() {
+  return parseScene("<scene width=\"10\" height=\"10\"><button color-event-mode=\"blue\" width=\"1\" height=\"1\" /></scene>");
 }

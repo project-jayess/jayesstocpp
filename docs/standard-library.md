@@ -241,7 +241,7 @@ See [jayess-http-module.md](./jayess-http-module.md) and [jayess-https-transport
 
 ### `jayess:image`
 
-Exports: `create`, `width`, `height`, `metadata`, `metadataFromFile`, `getPixel`, `setPixel`, `fill`, `copy`, `savePpm`, `saveBmp`, `savePgm`, `saveTga`, `loadPpm`, `loadBmp`, `loadPgm`, `loadTga`, `encodePpm`, `decodePpm`, `crop`, `resizeNearest`, `blit`, `flipHorizontal`, `flipVertical`, `rotate90`, `transparentBlit`, `isImage`. See [jayess-image-module.md](./jayess-image-module.md).
+Exports: `create`, `width`, `height`, `metadata`, `metadataFromFile`, `getPixel`, `setPixel`, `fill`, `copy`, `savePpm`, `saveBmp`, `savePgm`, `saveTga`, `loadPpm`, `loadBmp`, `loadPgm`, `loadTga`, `loadPng`, `loadJpeg`, `loadJpg`, `loadPsd`, `loadGif`, `loadWebp`, `loadImage`, `encodePpm`, `decodePpm`, `encodePgm`, `decodePgm`, `decodePng`, `decodeJpeg`, `decodePsd`, `decodeGif`, `decodeWebp`, `decodeImage`, `crop`, `resizeNearest`, `blit`, `flipHorizontal`, `flipVertical`, `rotate90`, `transparentBlit`, `isImage`. See [jayess-image-module.md](./jayess-image-module.md).
 
 ### `jayess:iter`
 

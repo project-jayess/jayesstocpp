@@ -83,6 +83,7 @@ struct jayess_bitmapinfo {
 using jayess_get_module_handle_a_fn = jayess_hinstance (*)(const char*);
 using jayess_register_class_ex_a_fn = jayess_atom (*)(const jayess_wnd_classa*);
 using jayess_create_window_ex_a_fn = jayess_hwnd (*)(jayess_dword, const char*, const char*, jayess_dword, int, int, int, int, jayess_hwnd, void*, jayess_hinstance, void*);
+using jayess_load_cursor_a_fn = jayess_hcursor (*)(jayess_hinstance, const char*);
 using jayess_destroy_window_fn = int (*)(jayess_hwnd);
 using jayess_show_window_fn = int (*)(jayess_hwnd, int);
 using jayess_update_window_fn = int (*)(jayess_hwnd);
@@ -107,6 +108,7 @@ struct jayess_windows_window_api {
   jayess_get_module_handle_a_fn get_module_handle = nullptr;
   jayess_register_class_ex_a_fn register_class = nullptr;
   jayess_create_window_ex_a_fn create_window = nullptr;
+  jayess_load_cursor_a_fn load_cursor = nullptr;
   jayess_destroy_window_fn destroy_window = nullptr;
   jayess_show_window_fn show_window = nullptr;
   jayess_update_window_fn update_window = nullptr;
@@ -158,6 +160,7 @@ constexpr jayess_uint jayess_wm_mbuttonup = 0x0208U;
 constexpr jayess_uint jayess_wm_mousewheel = 0x020aU;
 constexpr jayess_uint jayess_wm_mousehwheel = 0x020eU;
 constexpr double jayess_wheel_delta = 120.0;
+constexpr std::uintptr_t jayess_idc_arrow = 32512U;
 constexpr jayess_dword jayess_bi_rgb = 0UL;
 constexpr unsigned int jayess_dib_rgb_colors = 0U;
 constexpr unsigned long jayess_srccopy = 0x00cc0020UL;
@@ -322,6 +325,7 @@ jayess_windows_window_api& window_windows_api() {
   api.get_module_handle = reinterpret_cast<jayess_get_module_handle_a_fn>(GetProcAddress(LoadLibraryA("kernel32.dll"), "GetModuleHandleA"));
   api.register_class = reinterpret_cast<jayess_register_class_ex_a_fn>(GetProcAddress(api.user32, "RegisterClassExA"));
   api.create_window = reinterpret_cast<jayess_create_window_ex_a_fn>(GetProcAddress(api.user32, "CreateWindowExA"));
+  api.load_cursor = reinterpret_cast<jayess_load_cursor_a_fn>(GetProcAddress(api.user32, "LoadCursorA"));
   api.destroy_window = reinterpret_cast<jayess_destroy_window_fn>(GetProcAddress(api.user32, "DestroyWindow"));
   api.show_window = reinterpret_cast<jayess_show_window_fn>(GetProcAddress(api.user32, "ShowWindow"));
   api.update_window = reinterpret_cast<jayess_update_window_fn>(GetProcAddress(api.user32, "UpdateWindow"));
@@ -352,6 +356,7 @@ bool window_platform_available() {
     && api.get_module_handle != nullptr
     && api.register_class != nullptr
     && api.create_window != nullptr
+    && api.load_cursor != nullptr
     && api.destroy_window != nullptr
     && api.show_window != nullptr
     && api.update_window != nullptr
@@ -382,6 +387,7 @@ void window_windows_ensure_registered() {
   klass.style = jayess_cs_hredraw | jayess_cs_vredraw;
   klass.lpfnWndProc = &window_windows_wnd_proc;
   klass.hInstance = api.module;
+  klass.hCursor = api.load_cursor(nullptr, reinterpret_cast<const char*>(jayess_idc_arrow));
   klass.lpszClassName = window_windows_class_name();
   if (api.register_class(&klass) == 0) {
     throw_window_adapter_unavailable("Win32", "RegisterClassExA failed");

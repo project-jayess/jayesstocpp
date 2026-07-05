@@ -20,6 +20,7 @@ The first shape elements are:
 
 - `<group>`
 - `<rectangle>`
+- `<button>`
 - `<ellipse>`
 - `<semiellipse>`
 - `<triangle>`
@@ -34,6 +35,7 @@ The first shape elements are:
 Shared attributes should stay explicit:
 
 - `id`
+- `color-event-mode`
 - `x`
 - `y`
 - `xy`
@@ -76,6 +78,16 @@ Shared attributes should stay explicit:
 - `overflow-y`
 - `scrollbar-width`
 - `scrollbar-color`
+- `scrollbar-thumb`
+- `scrollbar-thumb-width`
+- `scrollbar-thumb-height`
+- `scrollbar-thumb-corners`
+- `scrollbar-thumb-color`
+- `scrollbar-thumb-opacity`
+- `scrollbar-track`
+- `scrollbar-track-corners`
+- `scrollbar-track-color`
+- `scrollbar-track-opacity`
 - `rotation`
 - `clip`
 - `text-align`
@@ -102,6 +114,15 @@ Rectangles can use `corners` for CSS-like border radius:
 ```
 
 The values map like CSS shorthand: one value applies to all corners; two values apply top-left/bottom-right and top-right/bottom-left; three values apply top-left, top-right/bottom-left, and bottom-right; four values apply top-left, top-right, bottom-right, and bottom-left. Values are numeric pixels. Oversized radii are scaled down to fit the rectangle. Rectangle fill, outline, hit testing, and shadow masks all use the same rounded shape.
+
+`<button>` uses the same geometry, label, layout, and drawing behavior as `<rectangle>`, but it has button-oriented defaults and automatic pointer-state fill changes:
+
+```xml
+<button width="96" height="32">Save</button>
+<button width="96" height="32" fill="#203040" color-event-mode="lighter">Save</button>
+```
+
+Button defaults are `fill="rgb(246,248,250)"`, `outline="rgb(209,217,224)"`, `outline-thickness="1"`, `corners="6"`, `padding="8"`, `font-size="14"`, and `font-color="rgb(36,41,47)"`. `color-event-mode` accepts only `darker` or `lighter`; the default is `darker`. The canvas event layer derives hover and pressed fill colors from the button's current base fill; pressed is intentionally stronger than hover. Application event handlers still run after the automatic state update, so manual `setAttribute` or `setAttributes` calls can override the calculated fill.
 
 Responsive bounds use numeric or percentage lengths:
 
@@ -174,7 +195,7 @@ Use scrollbars as a visual overflow indicator for element text:
   scrollbar-color="#888888 #f1f1f1">Long label text...</rectangle>
 ```
 
-`scrollbar-color` uses `thumb track` order. This first slice draws deterministic scrollbar tracks/thumbs when text content overflows or `overflow-x` / `overflow-y` is `scroll`. It does not yet implement interactive scroll offsets, wheel scrolling inside individual elements, or child-subtree scrolling.
+`scrollbar-color` uses `thumb track` order. `scrollbar-thumb` and `scrollbar-track` may name image handles supplied through render options or local image paths. Image thumbs can use `scrollbar-thumb-width` and `scrollbar-thumb-height` to draw custom artwork at a fixed size while the computed thumb position still follows the scroll range.
 
 `<group>` is a deterministic container for nested shape elements. A group can use shared attributes such as `id`, `x`, `y`, `xy`, and `visible`. Its resolved `x` and `y` are added to descendant shape coordinates during scene normalization; it does not introduce CSS inheritance, transforms, or browser-style DOM behavior.
 
@@ -255,7 +276,7 @@ Scene helpers should be layered over those primitives:
 
 `renderScene` also attaches the normalized scene tree to the returned canvas for runtime updates. `setAttribute(canvas, id, name, value)` mutates one existing element attribute by `id` and redraws the canvas buffer immediately. `setAttributes(canvas, id, attributes)` batches several attribute updates into one redraw and is the preferred event-handler path. `hitElement(canvas, x, y)` returns the topmost visible ID-bearing element at a canvas coordinate, using shape-aware geometry for ellipses, capsules, triangles, and polygons. `hitElements(canvas, x, y)` returns all visible ID-bearing elements at that coordinate, ordered topmost first. `dispatchEvent(canvas, windowEvent)` derives first-slice canvas events from window input; currently `mouseMove` can emit `mouseover` and `mouseout`. Apps still decide when to feed window events into canvas and when to present the updated canvas.
 
-Use `packXml("./scene.xml")` when a scene should be embedded into the generated C++ instead of read from disk at runtime. Use `packImage("./icon.ppm")` or `packImage("./icon.pgm")` to embed small local image assets for XML `<image>` maps or direct drawing code.
+Use `packXml("./scene.xml")` when a scene should be embedded into the generated C++ instead of read from disk at runtime. Use `packImage("./icon.png")` or another supported local image path to embed small local image assets for XML `<image>` maps or direct drawing code. Packed `.ppm`, `.pgm`, `.bmp`, `.png`, `.jpeg`, `.jpg`, `.psd`, `.gif`, and `.webp` assets decode at runtime from embedded bytes.
 
 First-slice rendering supports:
 
@@ -273,7 +294,7 @@ First-slice rendering supports:
 - `<text>` through the existing canvas text/font helpers
 - `<image>` through explicit image handles supplied as `renderScene(xml, { images: { name: image } })`, keyed by `src` first and then by `id`
 
-When no explicit handle is supplied, the default canvas loader supports local `.ppm`, `.bmp`, `.pgm`, and `.tga` paths through `jayess:image`. A caller can supply `loadImage(src)` in render options to integrate a project-owned local asset policy. Hidden network fetching is not part of the canvas renderer; developers should fetch, decode, cache, and pass remote image handles explicitly in application code.
+When no explicit handle is supplied, the default canvas loader supports local `.ppm`, `.pgm`, `.bmp`, `.tga`, `.png`, `.jpeg`, `.jpg`, `.psd`, `.gif`, and `.webp` paths through `jayess:image`. A caller can supply `loadImage(src)` in render options to integrate a project-owned local asset policy. Hidden network fetching is not part of the canvas renderer; developers should fetch, decode, cache, and pass remote image handles explicitly in application code.
 
 Example:
 

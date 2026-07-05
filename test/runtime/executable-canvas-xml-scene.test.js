@@ -110,6 +110,16 @@ int main() {
   require(std::get<double>(items[71]) == 3.0, "scrollbar width");
   require(std::get<double>(items[72]) == 136.0, "scrollbar thumb red");
   require(std::get<double>(items[73]) == 241.0, "scrollbar track red");
+  require(std::get<std::string>(items[74]) == "thumb.ppm", "scrollbar thumb image");
+  require(std::get<double>(items[75]) == 11.0, "scrollbar thumb width");
+  require(std::get<double>(items[76]) == 12.0, "scrollbar thumb height");
+  require(std::get<double>(items[77]) == 2.0, "scrollbar thumb corners");
+  require(std::get<double>(items[78]) == 17.0, "scrollbar thumb color");
+  require(std::get<double>(items[79]) == 0.75, "scrollbar thumb opacity");
+  require(std::get<std::string>(items[80]) == "track.ppm", "scrollbar track image");
+  require(std::get<double>(items[81]) == 3.0, "scrollbar track corners");
+  require(std::get<double>(items[82]) == 68.0, "scrollbar track color");
+  require(std::get<double>(items[83]) == 0.5, "scrollbar track opacity");
 
   auto responsiveValue = ${namespace}::responsiveSummary(std::vector<jayess::value>{});
   const auto& responsive = std::get<jayess::array_ptr>(responsiveValue)->items;
@@ -145,13 +155,51 @@ int main() {
   auto defaultOverflowValue = ${namespace}::defaultTextOverflowSummary(std::vector<jayess::value>{});
   require(std::get<std::string>(defaultOverflowValue) == "overflow", "default text overflow");
 
+  auto rootScrollbarValue = ${namespace}::rootScrollbarSummary(std::vector<jayess::value>{});
+  const auto& rootScrollbar = std::get<jayess::array_ptr>(rootScrollbarValue)->items;
+  require(std::get<double>(rootScrollbar[0]) == 88.0, "root scrollbar content width");
+  require(std::get<double>(rootScrollbar[1]) == 12.0, "root scrollbar gutter");
+  require(std::get<double>(rootScrollbar[2]) == 12.0, "root scrollbar width");
+  require(std::get<double>(rootScrollbar[3]) == 130.0, "root scrollbar scroll height");
+  require(std::get<double>(rootScrollbar[4]) == 68.0, "root child width reserves gutter");
+  require(std::get<double>(rootScrollbar[5]) == 73.0, "fixed child x reserves gutter");
+
+  auto defaultScrollbarValue = ${namespace}::defaultScrollbarSummary(std::vector<jayess::value>{});
+  const auto& defaultScrollbar = std::get<jayess::array_ptr>(defaultScrollbarValue)->items;
+  require(std::get<double>(defaultScrollbar[0]) == 8.0, "default root scrollbar width");
+  require(std::get<double>(defaultScrollbar[1]) == 8.0, "default root scrollbar gutter");
+  require(std::get<double>(defaultScrollbar[2]) == 92.0, "default root content width");
+  require(std::get<double>(defaultScrollbar[3]) == 8.0, "default shape scrollbar width");
+
+  auto buttonValue = ${namespace}::buttonSummary(std::vector<jayess::value>{});
+  const auto& button = std::get<jayess::array_ptr>(buttonValue)->items;
+  require(std::get<std::string>(button[0]) == "button", "button kind");
+  require(std::get<double>(button[1]) == 246.0, "button default fill red");
+  require(std::get<double>(button[2]) == 248.0, "button default fill green");
+  require(std::get<double>(button[3]) == 250.0, "button default fill blue");
+  require(std::get<double>(button[4]) == 209.0, "button default outline red");
+  require(std::get<double>(button[5]) == 217.0, "button default outline green");
+  require(std::get<double>(button[6]) == 224.0, "button default outline blue");
+  require(std::get<double>(button[7]) == 1.0, "button default outline thickness");
+  require(std::get<double>(button[8]) == 6.0, "button default corners");
+  require(std::get<std::string>(button[9]) == "darker", "button default color event mode");
+  require(std::get<double>(button[10]) == 246.0, "button base fill");
+  require(std::get<double>(button[11]) == 8.0, "button default padding");
+  require(std::get<double>(button[12]) == 14.0, "button default font size");
+  require(std::get<double>(button[13]) == 36.0, "button default font red");
+  require(std::get<double>(button[14]) == 41.0, "button default font green");
+  require(std::get<double>(button[15]) == 47.0, "button default font blue");
+  require(std::get<std::string>(button[16]) == "lighter", "button lighter color event mode");
+  require(std::get<double>(button[17]) == 32.0, "button custom base fill");
+
   require(thrown_message(${namespace}::invalidForbiddenGeometry).find("radius-x") != std::string::npos, "forbidden geometry diagnostic");
   require(thrown_message(${namespace}::invalidPoints).find("points must use tuples") != std::string::npos, "points diagnostic");
-  require(thrown_message(${namespace}::invalidUnknownElement).find("unknown element <button>") != std::string::npos, "unknown element diagnostic");
+  require(thrown_message(${namespace}::invalidUnknownElement).find("unknown element <widget>") != std::string::npos, "unknown element diagnostic");
   require(thrown_message(${namespace}::invalidUnknownAttribute).find("unknown attribute radius-top") != std::string::npos, "unknown attribute diagnostic");
   require(thrown_message(${namespace}::invalidMissingRootSize).find("missing required attribute width") != std::string::npos, "missing root size diagnostic");
   require(thrown_message(${namespace}::invalidShadowAttribute).find("shadow must be") != std::string::npos, "shadow diagnostic");
   require(thrown_message(${namespace}::invalidXyAttribute).find("tuples") != std::string::npos, "xy diagnostic");
+  require(thrown_message(${namespace}::invalidButtonColorEventMode).find("color-event-mode") != std::string::npos, "button color event mode diagnostic");
   std::cout << "ok\\n";
   return 0;
 }
