@@ -3,7 +3,6 @@ import
   {
     addEventListener as addCanvasEventListener,
     dispatchEvent as dispatchCanvasEvent,
-    packImage,
     renderScene,
     setAttributes,
   } from "jayess:canvas";
@@ -43,7 +42,7 @@ function sceneXml(width, height, antialias)
   var sceneHeightText = textOf(sceneHeight);
   var bodyHeightText = textOf(bodyHeight);
   var antialiasText = textOf(antialias);
-  return `<scene width="${ sceneWidthText }" height="${ sceneHeightText }" background="#f6f8fb" padding="32" gap="18" antialias="${ antialiasText }" overflow-y="auto" scrollbar-width="80" scrollbar-thumb="girl" scrollbar-thumb-width="72" scrollbar-thumb-height="96" scrollbar-thumb-corners="4" scrollbar-thumb-opacity="1" scrollbar-track-color="#dbeafe" scrollbar-track-opacity="0.85" scrollbar-track-corners="4">
+  return `<scene width="${ sceneWidthText }" height="${ sceneHeightText }" background="#f6f8fb" padding="32" gap="18" antialias="${ antialiasText }" overflow-y="auto" scrollbar-width="80" scrollbar-track-color="#dbeafe" scrollbar-track-opacity="0.85" scrollbar-track-corners="4">
     <rectangle width="100%" height="80" shrink="0" corners="18" fill="#253342" outline="#6de7ff" outline-thickness="2" shadow="8 12 8 1 rgba(0,0,0,0.35)" padding="18" font-color="#f2f7ff" font-family="Noto Sans KR" font-size="22" text-align="center middle">Responsive column root</rectangle>
     <group width="100%" height="${ bodyHeightText }" shrink="0" layout="row" gap="20" align="stretch">
       <rectangle width="28%" min-width="220" max-width="420" height="100%" corners="16 28 16 28" fill="#ffffff" outline="#d5e2f0" outline-thickness="2" shadow="8 12 8 1 rgba(0,0,0,0.18)" padding="16" font-color="#253342" font-family="Noto Sans Mono" font-size="14" line-height="18" letter-spacing="1" overflow="auto" scrollbar-width="10" scrollbar-thumb-color="#2563eb" scrollbar-thumb-opacity="0.9" scrollbar-thumb-corners="5" scrollbar-track-color="#f1f5f9" scrollbar-track-opacity="0.8" scrollbar-track-corners="5" text-align="left top">Sidebar uses 28% with min/max width and overflow scrollbars when text becomes taller than the panel.</rectangle>
@@ -61,18 +60,9 @@ function sceneXml(width, height, antialias)
   </scene>`;
 }
 
-function scrollbarImages()
+function buildCanvas(width, height, antialias)
 {
-  return {
-    girl: packImage("./high_school_girl_100x100.png")
-  };
-}
-
-function buildCanvas(width, height, antialias, images)
-{
-  return renderScene(sceneXml(width, height, antialias), {
-    images: images
-  });
+  return renderScene(sceneXml(width, height, antialias), null);
 }
 
 function registerPackedFonts()
@@ -171,14 +161,13 @@ export function main()
     height: initialHeight
   });
   window.setFps(60);
-  var images = scrollbarImages();
-  var canvas = buildCanvas(initialWidth, initialHeight, 0, images);
+  var canvas = buildCanvas(initialWidth, initialHeight, 0);
   var state = { canvas: canvas };
   attachCanvasEvents(canvas, window);
 
   function replaceCanvas(width, height, antialias)
   {
-    canvas = buildCanvas(width, height, antialias, images);
+    canvas = buildCanvas(width, height, antialias);
     state.canvas = canvas;
     attachCanvasEvents(canvas, window);
     window.requestRender(canvas);

@@ -8,7 +8,7 @@ const builtinRuntimeFeatures = new Map([
   ["jayess:async", ["async-helpers"]],
   ["jayess:buffer", ["bytes"]],
   ["jayess:bytes", ["bytes"]],
-  ["jayess:canvas", ["font", "image"]],
+  ["jayess:canvas", ["bytes", "font", "image"]],
   ["jayess:channel", ["channel"]],
   ["jayess:clipboard", ["clipboard"]],
   ["jayess:compress", ["compress"]],
