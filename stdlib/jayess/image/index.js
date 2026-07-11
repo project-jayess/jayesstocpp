@@ -3,6 +3,7 @@ import {
   jayessImageCopy,
   jayessImageCreate,
   jayessImageBlit,
+  jayessImageCopyRect,
   jayessImageCrop,
   jayessImageFill,
   jayessImageFillCapsule,
@@ -236,6 +237,10 @@ export function resizeNearest(image, width, height) {
 
 export function blit(target, source, x, y) {
   return jayessImageBlit(target, source, x, y);
+}
+
+export function copyRect(image, sourceX, sourceY, width, height, targetX, targetY) {
+  return jayessImageCopyRect(image, sourceX, sourceY, width, height, targetX, targetY);
 }
 
 export function flipHorizontal(image) {

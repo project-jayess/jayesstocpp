@@ -3,10 +3,15 @@ import
   {
     addEventListener as addCanvasEventListener,
     dispatchEvent as dispatchCanvasEvent,
+    findElement,
+    hitElement,
+    packImage,
     renderScene,
+    renderStats,
     setAttributes,
   } from "jayess:canvas";
 import { packFont, registerFont } from "jayess:font";
+import { hasEnv } from "jayess:process";
 import { create } from "jayess:window";
 
 function positiveSize(value, fallback)
@@ -45,13 +50,13 @@ function sceneXml(width, height, antialias)
   return `<scene width="${ sceneWidthText }" height="${ sceneHeightText }" background="#f6f8fb" padding="32" gap="18" antialias="${ antialiasText }" overflow-y="auto" scrollbar-width="80" scrollbar-track-color="#dbeafe" scrollbar-track-opacity="0.85" scrollbar-track-corners="4">
     <rectangle width="100%" height="80" shrink="0" corners="18" fill="#253342" outline="#6de7ff" outline-thickness="2" shadow="8 12 8 1 rgba(0,0,0,0.35)" padding="18" font-color="#f2f7ff" font-family="Noto Sans KR" font-size="22" text-align="center middle">Responsive column root</rectangle>
     <group width="100%" height="${ bodyHeightText }" shrink="0" layout="row" gap="20" align="stretch">
-      <rectangle width="28%" min-width="220" max-width="420" height="100%" corners="16 28 16 28" fill="#ffffff" outline="#d5e2f0" outline-thickness="2" shadow="8 12 8 1 rgba(0,0,0,0.18)" padding="16" font-color="#253342" font-family="Noto Sans Mono" font-size="14" line-height="18" letter-spacing="1" overflow="auto" scrollbar-width="10" scrollbar-thumb-color="#2563eb" scrollbar-thumb-opacity="0.9" scrollbar-thumb-corners="5" scrollbar-track-color="#f1f5f9" scrollbar-track-opacity="0.8" scrollbar-track-corners="5" text-align="left top">Sidebar uses 28% with min/max width and overflow scrollbars when text becomes taller than the panel.</rectangle>
+      <rectangle width="28%" min-width="220" max-width="420" height="100%" corners="16 28 16 28" fill="#ffffff" outline="#d5e2f0" outline-thickness="2" shadow="8 12 8 1 rgba(0,0,0,0.18)" padding="16" font-color="#253342" font-family="Noto Sans Mono" font-size="14" line-height="18" letter-spacing="1" overflow="auto" scrollbar-width="18" scrollbar-thumb="girl-thumb" scrollbar-thumb-width="18" scrollbar-thumb-height="18" scrollbar-thumb-corners="9" scrollbar-track-color="#f1f5f9" scrollbar-track-opacity="0.8" scrollbar-track-corners="5" text-align="left top">Sidebar uses 28% with min/max width and overflow scrollbars when text becomes taller than the panel.</rectangle>
       <group width="400" grow="1" height="100%" layout="column" gap="14">
         <rectangle width="100%" height="78" corners="14" fill="#e8f3ff" outline="#9ed8ff" outline-thickness="2" padding="12" font-color="#253342" font-family="Noto Sans Mono" font-size="14" text-transform="uppercase" text-decoration="underline">Main column grows to fill remaining space</rectangle>
         <button id="auto-button" width="220" height="42">Default button</button>
         <ellipse id="hover-ellipse" width="100%" max-width="320" height="150" fill="#39ff88" outline="#253342" outline-thickness="6" shadow="14 18 10 1 rgba(0,0,0,0.28)" padding="16" font-color="#102015" font-family="Noto Sans Mono" font-size="14">Hover me</ellipse>
         <rectangle width="100%" height="76" corners="10 24" fill="#fff7d6" outline="#ffcc00" outline-thickness="2" padding="10" font-color="#253342" font-family="Noto Sans Mono" font-size="12" line-height="15" overflow="hidden" text-align-x="right" text-align-y="bottom">Hidden overflow keeps this label inside the rounded card.</rectangle>
-        <rectangle width="100%" height="86" corners="10" fill="#eef2ff" outline="#818cf8" outline-thickness="2" padding="10" font-color="#312e81" font-family="Noto Sans Mono" font-size="15" line-height="19" overflow="auto" scrollbar-width="14" scrollbar-thumb-corners="7" scrollbar-thumb-opacity="1" scrollbar-track-color="#c7d2fe" scrollbar-track-opacity="0.7" scrollbar-track-corners="7" text-align="left top">Vertical scrollbar test: this panel is intentionally short and the text is intentionally long. Line one should be visible near the top. Line two should wrap because the panel width is constrained. Line three adds more content so the measured text height exceeds the visible box. Line four should require scrolling to inspect. Line five keeps the scrollbar thumb small enough to notice. Line six confirms wheel or scrollbar movement has room to change the visible text. Line seven is here so the bottom content cannot fit at once.</rectangle>
+        <rectangle id="nested-panel" width="100%" height="86" corners="10" fill="#eef2ff" outline="#818cf8" outline-thickness="2" padding="10" font-color="#312e81" font-family="Noto Sans Mono" font-size="15" line-height="19" overflow="auto" scrollbar-width="22" scrollbar-thumb="girl-thumb" scrollbar-thumb-width="22" scrollbar-thumb-height="22" scrollbar-thumb-corners="11" scrollbar-track-color="#c7d2fe" scrollbar-track-opacity="0.7" scrollbar-track-corners="7" text-align="left top">Vertical scrollbar test: this panel is intentionally short and the text is intentionally long. Line one should be visible near the top. Line two should wrap because the panel width is constrained. Line three adds more content so the measured text height exceeds the visible box. Line four should require scrolling to inspect. Line five keeps the scrollbar thumb small enough to notice. Line six confirms wheel or scrollbar movement has room to change the visible text. Line seven is here so the bottom content cannot fit at once.</rectangle>
         <rectangle width="100%" height="72" corners="12" fill="#fce7f3" outline="#f472b6" outline-thickness="2" padding="10" font-color="#831843" font-family="Noto Sans KR" font-size="13" line-height="16" overflow="hidden" text-align="left middle">한국어 글꼴 테스트 Jayess Canvas</rectangle>
         <rectangle width="100%" height="380" corners="12" fill="#ecfdf5" outline="#10b981" outline-thickness="2" padding="14" font-color="#064e3b" font-family="Noto Sans Mono" font-size="14" line-height="18" text-align="left top">Extra root-scroll content. Use the mouse wheel outside the nested text scroller to move the scene. The fixed bottom-right badge should stay pinned to the viewport while this card moves underneath it.</rectangle>
       </group>
@@ -60,9 +65,13 @@ function sceneXml(width, height, antialias)
   </scene>`;
 }
 
-function buildCanvas(width, height, antialias)
+function buildCanvas(width, height, antialias, scrollbarThumb)
 {
-  return renderScene(sceneXml(width, height, antialias), null);
+  return renderScene(sceneXml(width, height, antialias), {
+    images: {
+      "girl-thumb": scrollbarThumb
+    }
+  });
 }
 
 function registerPackedFonts()
@@ -148,29 +157,115 @@ function attachCanvasEvents(canvas, window)
   });
 }
 
+function requireSmoke(condition, message)
+{
+  if (!condition)
+  {
+    throw message;
+  }
+}
+
+function runSmokeProbe(scrollbarThumb)
+{
+  var canvas = buildCanvas(960, 540, 0, scrollbarThumb);
+  dispatchCanvasEvent(canvas, {
+    type: "wheel",
+    x: 880,
+    y: 480,
+    deltaX: 0,
+    deltaY: 1
+  });
+  var fixedHit = hitElement(canvas, 760, 490);
+  requireSmoke(fixedHit !== null && fixedHit.id === "fixed-badge", "canvas-window smoke fixed overlay hit failed after root scroll");
+
+  dispatchCanvasEvent(canvas, {
+    type: "wheel",
+    x: 360,
+    y: 505,
+    deltaX: 0,
+    deltaY: 1
+  });
+  var root = canvas.scene;
+  var nestedPanel = findElement(canvas, "nested-panel");
+  requireSmoke(root.scrollOffsetY > 0, "canvas-window smoke root scroll did not move");
+  requireSmoke(nestedPanel !== null && nestedPanel.scrollOffsetY > 0, "canvas-window smoke nested scroll did not move");
+
+  var hoverHit = hitElement(canvas, 520, 255);
+  dispatchCanvasEvent(canvas, {
+    type: "mouseMove",
+    x: 520,
+    y: 255
+  });
+  dispatchCanvasEvent(canvas, {
+    type: "mouseDown",
+    x: 760,
+    y: 490
+  });
+  dispatchCanvasEvent(canvas, {
+    type: "mouseUp",
+    x: 760,
+    y: 490
+  });
+  requireSmoke(hoverHit !== null, "canvas-window smoke hover hit did not resolve");
+
+  var button = findElement(canvas, "auto-button");
+  requireSmoke(button !== null, "canvas-window smoke button is missing");
+
+  var stats = renderStats(canvas);
+  requireSmoke(stats.cachePresents > 0, "canvas-window smoke root scroll did not use cache-present path");
+  requireSmoke(stats.copyRectScrolls > 0, "canvas-window smoke nested scroll did not use copy-rect path");
+  writeLine("canvas-window smoke stats fullRedraws=" + stats.fullRedraws.toString() +
+    " dirtyRegionRedraws=" + stats.dirtyRegionRedraws.toString() +
+    " copyRectScrolls=" + stats.copyRectScrolls.toString() +
+    " cachePresents=" + stats.cachePresents.toString());
+  writeLine("canvas-window smoke ok");
+  return 0;
+}
+
 export function main()
 {
   registerPackedFonts();
+  var scrollbarThumb = packImage("./high_school_girl_100x100.png");
+  if (hasEnv("JAYESS_CANVAS_WINDOW_SMOKE"))
+  {
+    return runSmokeProbe(scrollbarThumb);
+  }
   var initialWidth = 1280;
   var initialHeight = 720;
   var latestWidth = initialWidth;
   var latestHeight = initialHeight;
+  var eventStats = {
+    mouseMove: 0,
+    wheel: 0,
+    mouseDown: 0,
+    mouseUp: 0,
+    resize: 0,
+    renderRequests: 0,
+    replacements: 0
+  };
   var window = create({
     title: "Jayess Canvas Window",
     width: initialWidth,
     height: initialHeight
   });
   window.setFps(60);
-  var canvas = buildCanvas(initialWidth, initialHeight, 0);
+  var canvas = buildCanvas(initialWidth, initialHeight, 0, scrollbarThumb);
   var state = { canvas: canvas };
   attachCanvasEvents(canvas, window);
 
+  function requestProbeRender(currentCanvas)
+  {
+    eventStats.renderRequests = eventStats.renderRequests + 1;
+    window.requestRender(currentCanvas);
+  }
+
   function replaceCanvas(width, height, antialias)
   {
-    canvas = buildCanvas(width, height, antialias);
+    eventStats.replacements = eventStats.replacements + 1;
+    canvas = buildCanvas(width, height, antialias, scrollbarThumb);
     state.canvas = canvas;
     attachCanvasEvents(canvas, window);
-    window.requestRender(canvas);
+    requestProbeRender(canvas);
   }
 
   function renderResponsiveCanvas(width, height)
@@ -188,51 +283,68 @@ export function main()
 
   window.addEventListener("mouseMove", function (event)
   {
+    eventStats.mouseMove = eventStats.mouseMove + 1;
     var emitted = dispatchCanvasEvent(state.canvas, event);
     if (emitted.length > 0)
     {
-      window.requestRender(state.canvas);
+      requestProbeRender(state.canvas);
     }
   });
 
   window.addEventListener("wheel", function (event)
   {
+    eventStats.wheel = eventStats.wheel + 1;
     dispatchCanvasEvent(state.canvas, event);
-    window.requestRender(state.canvas);
+    requestProbeRender(state.canvas);
   });
 
   window.addEventListener("mouseDown", function (event)
   {
+    eventStats.mouseDown = eventStats.mouseDown + 1;
     var emitted = dispatchCanvasEvent(state.canvas, event);
     if (emitted.length > 0)
     {
-      window.requestRender(state.canvas);
+      requestProbeRender(state.canvas);
     }
   });
 
   window.addEventListener("mouseUp", function (event)
   {
+    eventStats.mouseUp = eventStats.mouseUp + 1;
     var emitted = dispatchCanvasEvent(state.canvas, event);
     if (emitted.length > 0)
     {
-      window.requestRender(state.canvas);
+      requestProbeRender(state.canvas);
     }
   });
 
   window.addEventListener("resize", function (event)
   {
+    eventStats.resize = eventStats.resize + 1;
     renderResponsiveCanvas(event.width, event.height);
   });
 
   window.addEventListener("close", function ()
   {
+    var stats = renderStats(state.canvas);
     window.close();
+    writeLine("canvas-window event stats mouseMove=" + eventStats.mouseMove.toString() +
+      " wheel=" + eventStats.wheel.toString() +
+      " mouseDown=" + eventStats.mouseDown.toString() +
+      " mouseUp=" + eventStats.mouseUp.toString() +
+      " resize=" + eventStats.resize.toString() +
+      " renderRequests=" + eventStats.renderRequests.toString() +
+      " replacements=" + eventStats.replacements.toString());
+    writeLine("canvas-window render stats fullRedraws=" + stats.fullRedraws.toString() +
+      " dirtyRegionRedraws=" + stats.dirtyRegionRedraws.toString() +
+      " copyRectScrolls=" + stats.copyRectScrolls.toString() +
+      " cachePresents=" + stats.cachePresents.toString());
     writeLine("canvas-window is closed");
   });
 
   window.show();
   window.dispatchEvents();
-  window.requestRender(canvas);
+  requestProbeRender(canvas);
 
   window.run();
   return 0;

@@ -12,6 +12,7 @@ import { fromArray } from "jayess:bytes";
 import { keys } from "jayess:object";
 import {
   copy as copyImage,
+  copyRect as copyImageRect,
   create as createImage,
   decodeGif,
   decodeImage,
@@ -62,6 +63,13 @@ import {
   sign
 } from "./scalar-helpers.js";
 import {
+  clampedScrollOffset,
+  scrollbarThumbOffset,
+  scrollbarThumbSize,
+  wheelDelta,
+  wheelScrollOffset
+} from "./scroll-helpers.js";
+import {
   boxCenterX,
   boxCenterY,
   boxRadiusX,
@@ -78,6 +86,8 @@ import {
   transformedPoint
 } from "./state.js";
 import {
+  drawSceneFixedLayerWith,
+  drawSceneScrollableLayerWith,
   drawSceneRegionWith,
   drawSceneWith,
   renderSceneWith,
@@ -95,7 +105,16 @@ function fail(message) {
   throw message;
 }
 
-function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, clickStartElementId, requestedBackend, actualBackend) {
+function defaultRenderStats() {
+  return {
+    fullRedraws: 0,
+    dirtyRegionRedraws: 0,
+    copyRectScrolls: 0,
+    cachePresents: 0
+  };
+}
+
+function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, clickStartElementId, rootScrollCache, renderStats, requestedBackend, actualBackend) {
   return {
     image: image,
     title: title,
@@ -108,6 +127,8 @@ function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOpti
     canvasListeners: canvasListeners,
     scrollDragState: scrollDragState,
     clickStartElementId: clickStartElementId,
+    rootScrollCache: rootScrollCache,
+    renderStats: renderStats,
     requestedBackend: requestedBackend,
     actualBackend: actualBackend
   };
@@ -398,7 +419,7 @@ export function create(width, height, options) {
   var title = optionValue(options, "title", "");
   var requestedBackend = requestedBackendValue(options);
   var actualBackend = actualBackendValue(requestedBackend);
-  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, "", requestedBackend, actualBackend);
+  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, "", null, defaultRenderStats(), requestedBackend, actualBackend);
 }
 
 export function clear(canvas, color) {
@@ -420,7 +441,17 @@ export function getPixel(canvas, x, y) {
 
 export function copy(canvas) {
   var source = requireCanvas(canvas);
-  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.clickStartElementId, source.requestedBackend, source.actualBackend);
+  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.clickStartElementId, null, defaultRenderStats(), source.requestedBackend, source.actualBackend);
+}
+
+export function renderStats(canvas) {
+  var stats = requireCanvas(canvas).renderStats;
+  return {
+    fullRedraws: stats.fullRedraws,
+    dirtyRegionRedraws: stats.dirtyRegionRedraws,
+    copyRectScrolls: stats.copyRectScrolls,
+    cachePresents: stats.cachePresents
+  };
 }
 
 export function requestedBackend(canvas) {
@@ -1391,6 +1422,22 @@ function pushWrappedWord(lines, widths, state, word, target, rect, options) {
 }
 
 function wrapTextByWidth(target, textValue, rect, options) {
+  if (optionValue(options, "textWrap", "wrap") === "nowrap") {
+    var nowrapLines = [];
+    var nowrapWidths = [];
+    var start = 0;
+    var nowrapCharacters = stringChars(textValue);
+    for (var nowrapIndex = 0; nowrapIndex < nowrapCharacters.length; nowrapIndex = nowrapIndex + 1) {
+      if (nowrapCharacters[nowrapIndex] === "\n") {
+        var line = sliceString(textValue, start, nowrapIndex);
+        pushLayoutLine(nowrapLines, nowrapWidths, line, target, options);
+        start = nowrapIndex + 1;
+      }
+    }
+    var lastLine = sliceString(textValue, start, textValue.length);
+    pushLayoutLine(nowrapLines, nowrapWidths, lastLine, target, options);
+    return { lines: nowrapLines, widths: nowrapWidths };
+  }
   var lines = [];
   var widths = [];
   var state = { line: "", pendingSpace: "" };
@@ -1678,6 +1725,8 @@ function redrawAttachedScene(canvas) {
   if (scene === null) {
     fail("jayess:canvas expected a canvas rendered from an XML scene");
   }
+  target.rootScrollCache = null;
+  target.renderStats.fullRedraws = target.renderStats.fullRedraws + 1;
   clear(target, scene.background);
   drawSceneWith(xmlSceneRenderer(), target, scene, target.sceneOptions);
   return target;
@@ -1765,12 +1814,57 @@ function redrawAttachedSceneRegion(canvas, region, skipShadowIds) {
   if (scene === null) {
     fail("jayess:canvas expected a canvas rendered from an XML scene");
   }
+  target.rootScrollCache = null;
+  target.renderStats.dirtyRegionRedraws = target.renderStats.dirtyRegionRedraws + 1;
   var dirty = clampRegionToCanvas(target, paddedRegion(region, 2));
   if (!validRegion(dirty)) {
     return target;
   }
   fillImageRectByAlpha(target.image, dirty.x, dirty.y, dirty.width, dirty.height, scene.background);
   drawSceneRegionWith(xmlSceneRenderer(skipShadowIds), target, scene, target.sceneOptions, dirty);
+  return target;
+}
+
+function rootScrollCacheKey(scene) {
+  return scene.contentWidth.toString() + "x" + scene.scrollHeight.toString() + "|" +
+    scene.width.toString() + "x" + scene.height.toString();
+}
+
+function rootScrollCacheReady(canvas, scene) {
+  return canvas.rootScrollCache !== null && canvas.rootScrollCache.key === rootScrollCacheKey(scene);
+}
+
+function buildRootScrollCache(canvas, scene) {
+  var backing = create(scene.contentWidth, scene.scrollHeight, {
+    background: scene.background,
+    backend: canvas.actualBackend
+  });
+  drawSceneScrollableLayerWith(xmlSceneRenderer(), backing, scene, canvas.sceneOptions);
+  canvas.rootScrollCache = {
+    key: rootScrollCacheKey(scene),
+    image: backing.image
+  };
+  return canvas.rootScrollCache;
+}
+
+function rootScrollCacheFor(canvas, scene) {
+  if (!rootScrollCacheReady(canvas, scene)) {
+    return buildRootScrollCache(canvas, scene);
+  }
+  return canvas.rootScrollCache;
+}
+
+function presentRootScrollCache(canvas) {
+  var target = requireCanvas(canvas);
+  var scene = target.scene;
+  if (scene === null) {
+    fail("jayess:canvas expected a canvas rendered from an XML scene");
+  }
+  var cache = rootScrollCacheFor(target, scene);
+  target.renderStats.cachePresents = target.renderStats.cachePresents + 1;
+  clear(target, scene.background);
+  transparentBlitClipped(target.image, cache.image, 0, 0 - scene.scrollOffsetY, 0, 0, scene.contentWidth, scene.height);
+  drawSceneFixedLayerWith(xmlSceneRenderer(), target, scene, target.sceneOptions);
   return target;
 }
 
@@ -1791,6 +1885,7 @@ function shapeTextOptions(shape) {
     textTransform: shape.textTransform,
     textDecoration: shape.textDecoration,
     textOverflow: shape.textOverflow,
+    textWrap: shape.textWrap,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -1821,6 +1916,7 @@ function textLayoutCacheKey(shape, rect) {
     shape.letterSpacing.toString() + "|" +
     shape.wordSpacing.toString() + "|" +
     shape.textTransform + "|" +
+    shape.textWrap + "|" +
     shape.textOverflow;
 }
 
@@ -1952,25 +2048,132 @@ function redrawShapeScrollArea(canvas, shape) {
   return redrawAttachedSceneRegion(canvas, viewportRegionForShape(canvas, shape, info.fullRect), skipShadowMap(shape.id));
 }
 
-function setShapeScroll(canvas, shape, scrollX, scrollY) {
-  var maxX = maxScrollXFor(canvas, shape);
-  var maxY = maxScrollYFor(canvas, shape);
-  var nextX = clamp(scrollX, 0, maxX);
-  var nextY = clamp(scrollY, 0, maxY);
-  if (nextX === shape.scrollOffsetX && nextY === shape.scrollOffsetY) {
+function redrawShapeScrollbarArea(canvas, shape, info) {
+  var region = null;
+  if (info.vertical) {
+    region = unionRegion(region, {
+      x: info.fullRect.x + info.fullRect.width - shape.scrollbarWidth,
+      y: info.fullRect.y,
+      width: shape.scrollbarWidth,
+      height: info.fullRect.height
+    });
+  }
+  if (info.horizontal) {
+    region = unionRegion(region, {
+      x: info.fullRect.x,
+      y: info.fullRect.y + info.fullRect.height - shape.scrollbarWidth,
+      width: info.fullRect.width,
+      height: shape.scrollbarWidth
+    });
+  }
+  if (!validRegion(region)) {
+    return canvas;
+  }
+  return redrawAttachedSceneRegion(canvas, viewportRegionForShape(canvas, shape, region), skipShadowMap(shape.id));
+}
+
+function integerDelta(value) {
+  var rounded = round(value);
+  if (rounded !== value) {
+    return null;
+  }
+  return rounded;
+}
+
+function redrawVerticalShapeScrollByCopy(canvas, shape, info, deltaY) {
+  var amount = abs(deltaY);
+  var rect = clampRegionToCanvas(canvas, viewportRegionForShape(canvas, shape, info.rect));
+  if (!validRegion(rect) || amount <= 0 || amount >= rect.height) {
     return false;
   }
-  shape.scrollOffsetX = nextX;
-  shape.scrollOffsetY = nextY;
-  redrawShapeScrollArea(canvas, shape);
+  if (deltaY > 0) {
+    canvas.renderStats.copyRectScrolls = canvas.renderStats.copyRectScrolls + 1;
+    copyImageRect(canvas.image, rect.x, rect.y + amount, rect.width, rect.height - amount, rect.x, rect.y);
+    redrawAttachedSceneRegion(canvas, {
+      x: rect.x,
+      y: rect.y + rect.height - amount,
+      width: rect.width,
+      height: amount
+    }, skipShadowMap(shape.id));
+  } else {
+    canvas.renderStats.copyRectScrolls = canvas.renderStats.copyRectScrolls + 1;
+    copyImageRect(canvas.image, rect.x, rect.y, rect.width, rect.height - amount, rect.x, rect.y + amount);
+    redrawAttachedSceneRegion(canvas, {
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: amount
+    }, skipShadowMap(shape.id));
+  }
+  redrawShapeScrollbarArea(canvas, shape, info);
   return true;
 }
 
-function wheelDelta(value) {
-  if (value === null) {
-    return 0;
+function redrawHorizontalShapeScrollByCopy(canvas, shape, info, deltaX) {
+  var amount = abs(deltaX);
+  var rect = clampRegionToCanvas(canvas, viewportRegionForShape(canvas, shape, info.rect));
+  if (!validRegion(rect) || amount <= 0 || amount >= rect.width) {
+    return false;
   }
-  return value;
+  if (deltaX > 0) {
+    canvas.renderStats.copyRectScrolls = canvas.renderStats.copyRectScrolls + 1;
+    copyImageRect(canvas.image, rect.x + amount, rect.y, rect.width - amount, rect.height, rect.x, rect.y);
+    redrawAttachedSceneRegion(canvas, {
+      x: rect.x + rect.width - amount,
+      y: rect.y,
+      width: amount,
+      height: rect.height
+    }, skipShadowMap(shape.id));
+  } else {
+    canvas.renderStats.copyRectScrolls = canvas.renderStats.copyRectScrolls + 1;
+    copyImageRect(canvas.image, rect.x, rect.y, rect.width - amount, rect.height, rect.x + amount, rect.y);
+    redrawAttachedSceneRegion(canvas, {
+      x: rect.x,
+      y: rect.y,
+      width: amount,
+      height: rect.height
+    }, skipShadowMap(shape.id));
+  }
+  redrawShapeScrollbarArea(canvas, shape, info);
+  return true;
+}
+
+function redrawShapeScrollAreaAfterOffsetChange(canvas, shape, oldX, oldY) {
+  var info = shapeTextMeasurement(canvas, shape);
+  if (info === null) {
+    return redrawShapePaint(canvas, shape);
+  }
+  var deltaX = integerDelta(shape.scrollOffsetX - oldX);
+  var deltaY = integerDelta(shape.scrollOffsetY - oldY);
+  if (deltaX === null || deltaY === null) {
+    return redrawShapeScrollArea(canvas, shape);
+  }
+  if (deltaX !== 0 && deltaY !== 0) {
+    return redrawShapeScrollArea(canvas, shape);
+  }
+  if (deltaY !== 0 && redrawVerticalShapeScrollByCopy(canvas, shape, info, deltaY)) {
+    return canvas;
+  }
+  if (deltaX !== 0 && redrawHorizontalShapeScrollByCopy(canvas, shape, info, deltaX)) {
+    return canvas;
+  }
+  return redrawShapeScrollArea(canvas, shape);
+}
+
+function setShapeScroll(canvas, shape, scrollX, scrollY) {
+  var maxX = maxScrollXFor(canvas, shape);
+  var maxY = maxScrollYFor(canvas, shape);
+  var nextX = clampedScrollOffset(scrollX, maxX);
+  var nextY = clampedScrollOffset(scrollY, maxY);
+  if (nextX === shape.scrollOffsetX && nextY === shape.scrollOffsetY) {
+    return false;
+  }
+  var oldX = shape.scrollOffsetX;
+  var oldY = shape.scrollOffsetY;
+  shape.scrollOffsetX = nextX;
+  shape.scrollOffsetY = nextY;
+  redrawShapeScrollAreaAfterOffsetChange(canvas, shape, oldX, oldY);
+  return true;
 }
 
 function scrollShapeByWheel(canvas, event) {
@@ -1981,8 +2184,8 @@ function scrollShapeByWheel(canvas, event) {
   return setShapeScroll(
     canvas,
     shape,
-    shape.scrollOffsetX + wheelDelta(event.deltaX) * 32,
-    shape.scrollOffsetY + wheelDelta(event.deltaY) * 32
+    wheelScrollOffset(shape.scrollOffsetX, event.deltaX, 32, maxScrollXFor(canvas, shape)),
+    wheelScrollOffset(shape.scrollOffsetY, event.deltaY, 32, maxScrollYFor(canvas, shape))
   );
 }
 
@@ -1998,12 +2201,12 @@ function maxSceneScrollY(canvas) {
 
 function setSceneScrollY(canvas, scrollY) {
   var maxY = maxSceneScrollY(canvas);
-  var nextY = clamp(scrollY, 0, maxY);
+  var nextY = clampedScrollOffset(scrollY, maxY);
   if (canvas.scene === null || nextY === canvas.scene.scrollOffsetY) {
     return false;
   }
   canvas.scene.scrollOffsetY = nextY;
-  redrawAttachedScene(canvas);
+  presentRootScrollCache(canvas);
   return true;
 }
 
@@ -2011,7 +2214,7 @@ function scrollSceneByWheel(canvas, event) {
   if (canvas.scene === null) {
     return false;
   }
-  return setSceneScrollY(canvas, canvas.scene.scrollOffsetY + wheelDelta(event.deltaY) * 48);
+  return setSceneScrollY(canvas, wheelScrollOffset(canvas.scene.scrollOffsetY, event.deltaY, 48, maxSceneScrollY(canvas)));
 }
 
 function scrollbarThumbRect(canvas, shape) {
@@ -2019,15 +2222,9 @@ function scrollbarThumbRect(canvas, shape) {
   if (info === null || shape.scrollbarWidth <= 0 || info.vertical !== true || info.measured.height <= info.rect.height) {
     return null;
   }
-  var thumbHeight = info.rect.height * info.rect.height / info.measured.height;
-  if (thumbHeight < shape.scrollbarWidth) {
-    thumbHeight = shape.scrollbarWidth;
-  }
+  var thumbHeight = scrollbarThumbSize(info.rect.height, info.measured.height, shape.scrollbarWidth);
   var maxScrollY = info.measured.height - info.rect.height;
-  var thumbY = info.rect.y;
-  if (maxScrollY > 0 && info.rect.height > thumbHeight) {
-    thumbY = info.rect.y + shape.scrollOffsetY * (info.rect.height - thumbHeight) / maxScrollY;
-  }
+  var thumbY = info.rect.y + scrollbarThumbOffset(shape.scrollOffsetY, maxScrollY, info.rect.height, thumbHeight);
   return {
     x: info.fullRect.x + info.fullRect.width - shape.scrollbarWidth,
     y: thumbY,

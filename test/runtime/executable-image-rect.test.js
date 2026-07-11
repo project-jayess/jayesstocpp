@@ -44,8 +44,12 @@ int main() {
   require(std::get<double>(items[4]) == 128.0, "fillRectAlpha red");
   require(std::get<double>(items[5]) == 0.0, "fillRectAlpha green");
   require(std::get<double>(items[6]) == 127.0, "fillRectAlpha blue");
-  require(std::get<double>(items[7]) == 255.0, "fillRect clipping writes visible pixel");
-  require(std::get<double>(items[8]) == 0.0, "fillRect clipping leaves hidden pixel");
+  require(std::get<double>(items[7]) == 255.0, "transparent fillRectAlpha red");
+  require(std::get<double>(items[8]) == 0.0, "transparent fillRectAlpha green");
+  require(std::get<double>(items[9]) == 0.0, "transparent fillRectAlpha blue");
+  require(std::get<double>(items[10]) > 0.5 && std::get<double>(items[10]) < 0.502, "transparent fillRectAlpha preserves alpha");
+  require(std::get<double>(items[11]) == 255.0, "fillRect clipping writes visible pixel");
+  require(std::get<double>(items[12]) == 0.0, "fillRect clipping leaves hidden pixel");
 
   auto widthError = thrown_message(${namespace}::invalidFillRect);
   require(widthError.find("fillRect width") != std::string::npos, "fillRect width diagnostic");

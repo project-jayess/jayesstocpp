@@ -52,6 +52,7 @@ export {
   quadraticCurve,
   renderScene,
   requestedBackend,
+  renderStats,
   restoreState,
   saveImage,
   savePpm,

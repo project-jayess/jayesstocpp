@@ -22,6 +22,7 @@ import {
   textAttribute,
   textDecorationAttribute,
   textOverflowAttribute,
+  textWrapAttribute,
   textTransformAttribute
 } from "./xml-attributes.js";
 
@@ -96,6 +97,7 @@ const sharedAttributes = [
   "text-transform",
   "text-decoration",
   "text-overflow",
+  "text-wrap",
   "overflow",
   "overflow-x",
   "overflow-y",
@@ -147,6 +149,7 @@ const textAttributes = [
   "text-transform",
   "text-decoration",
   "text-overflow",
+  "text-wrap",
   "overflow",
   "overflow-x",
   "overflow-y",
@@ -470,6 +473,7 @@ function normalizeShared(node, context) {
     textTransform: textTransformAttribute(attributes, "text-transform", "none"),
     textDecoration: textDecorationAttribute(attributes, "text-decoration", "none"),
     textOverflow: textOverflowAttribute(attributes, "text-overflow", "overflow"),
+    textWrap: textWrapAttribute(attributes, "text-wrap", "wrap"),
     overflow: overflowAttribute(attributes, "overflow", "visible"),
     overflowX: overflowAttribute(attributes, "overflow-x", overflowAttribute(attributes, "overflow", "visible")),
     overflowY: overflowAttribute(attributes, "overflow-y", overflowAttribute(attributes, "overflow", "visible")),
@@ -766,6 +770,7 @@ function normalizeShape(node, context) {
     textTransform: shared.textTransform,
     textDecoration: shared.textDecoration,
     textOverflow: shared.textOverflow,
+    textWrap: shared.textWrap,
     overflow: shared.overflow,
     overflowX: shared.overflowX,
     overflowY: shared.overflowY,
@@ -910,6 +915,7 @@ export function parseScene(xmlText, options) {
     scrollbarStyle: scrollbarStyleAttributes(root.attributes),
     scrollOffsetY: 0,
     scrollHeight: sceneScrollHeight(shapes, height),
+    hitCache: null,
     shapes: shapes
   };
 }

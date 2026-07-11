@@ -243,6 +243,18 @@ inline jayess::value jayessImageBlit(const std::vector<jayess::value>& jayessArg
   );
 }
 
+inline jayess::value jayessImageCopyRect(const std::vector<jayess::value>& jayessArgs) {
+  return jayess::image_copy_rect(
+    jayess::argument_at(jayessArgs, 0),
+    jayess::argument_at(jayessArgs, 1),
+    jayess::argument_at(jayessArgs, 2),
+    jayess::argument_at(jayessArgs, 3),
+    jayess::argument_at(jayessArgs, 4),
+    jayess::argument_at(jayessArgs, 5),
+    jayess::argument_at(jayessArgs, 6)
+  );
+}
+
 inline jayess::value jayessImageFlipHorizontal(const std::vector<jayess::value>& jayessArgs) {
   return jayess::image_flip_horizontal(jayess::argument_at(jayessArgs, 0));
 }

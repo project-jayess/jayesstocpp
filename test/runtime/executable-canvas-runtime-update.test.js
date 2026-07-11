@@ -44,6 +44,21 @@ int main() {
   require(std::get<double>(scrolled[2]) == 1.0, "scrolled mouseover event count");
   require(std::get<double>(scrolled[3]) == 1.0, "scrolled mouseover target");
   require(std::get<double>(scrolled[4]) == 255.0, "scrolled hover redraws viewport pixel");
+  require(std::get<double>(scrolled[5]) > 0.0, "root scroll uses cache present path");
+  require(std::get<double>(scrolled[6]) == 2.0, "scrolled target mouseUp and click event count");
+  require(std::get<double>(scrolled[7]) == 1.0, "scrolled click targets document element");
+  require(std::get<double>(scrolled[8]) == 2.0, "scrolled fixed mouseUp and click event count");
+  require(std::get<double>(scrolled[9]) == 1.0, "scrolled click targets fixed overlay");
+
+  auto nestedScrollValue = ${namespace}::nestedScrollSummary(std::vector<jayess::value>{});
+  const auto& nestedScroll = std::get<jayess::array_ptr>(nestedScrollValue)->items;
+  require(std::get<double>(nestedScroll[0]) == 1.0, "nested scroll initial hit");
+  require(std::get<double>(nestedScroll[1]) > 0.0, "nested scroll offset changed");
+  require(std::get<double>(nestedScroll[2]) == 1.0, "nested scroll hit remains stable");
+  require(std::get<double>(nestedScroll[4]) > 0.0, "nested scroll uses copyRect path");
+  require(std::get<double>(nestedScroll[5]) == 1.0, "nested horizontal scroll initial hit");
+  require(std::get<double>(nestedScroll[6]) > 0.0, "nested horizontal scroll offset changed");
+  require(std::get<double>(nestedScroll[7]) == 1.0, "nested horizontal scroll hit remains stable");
 
   auto clickValue = ${namespace}::clickSummary(std::vector<jayess::value>{});
   const auto& click = std::get<jayess::array_ptr>(clickValue)->items;

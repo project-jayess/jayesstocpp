@@ -372,6 +372,21 @@ export function textOverflowAttribute(attributes, name, fallback) {
   return requireTextOverflow(trim(value), name);
 }
 
+function requireTextWrap(value, label) {
+  if (value === "wrap" || value === "nowrap") {
+    return value;
+  }
+  fail("jayess:canvas XML " + label + " must be wrap or nowrap");
+}
+
+export function textWrapAttribute(attributes, name, fallback) {
+  var value = attributeValue(attributes, name, null);
+  if (value === null) {
+    return fallback;
+  }
+  return requireTextWrap(trim(value), name);
+}
+
 function requireOverflow(value, label) {
   if (value === "visible" || value === "hidden" || value === "auto" || value === "scroll") {
     return value;

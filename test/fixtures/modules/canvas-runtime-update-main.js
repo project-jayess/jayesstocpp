@@ -1,9 +1,11 @@
 import {
   addEventListener,
   dispatchEvent,
+  findElement,
   getPixel,
   hitElement,
   hitElements,
+  renderStats,
   renderScene,
   setAttribute,
   setAttributes
@@ -74,13 +76,48 @@ export function scrolledHoverSummary() {
 
   var events = dispatchEvent(canvas, { type: "mouseMove", x: 8, y: 6 });
   var changed = getPixel(canvas, 8, 6);
+  dispatchEvent(canvas, { type: "mouseDown", x: 8, y: 6 });
+  var clickEvents = dispatchEvent(canvas, { type: "mouseUp", x: 8, y: 6 });
+  dispatchEvent(canvas, { type: "mouseDown", x: 26, y: 6 });
+  var fixedClickEvents = dispatchEvent(canvas, { type: "mouseUp", x: 26, y: 6 });
+  var stats = renderStats(canvas);
 
   return [
     hit.id === "target" ? 1 : 0,
     fixedHit.id === "fixed" ? 1 : 0,
     events.length,
     events[0].targetId === "target" ? 1 : 0,
-    changed.red
+    changed.red,
+    stats.cachePresents,
+    clickEvents.length,
+    clickEvents[1].targetId === "target" ? 1 : 0,
+    fixedClickEvents.length,
+    fixedClickEvents[1].targetId === "fixed" ? 1 : 0
+  ];
+}
+
+export function nestedScrollSummary() {
+  var canvas = renderScene("<scene layout=\"none\" width=\"80\" height=\"54\" background=\"#ffffff\"><rectangle position=\"absolute\" id=\"panel\" x=\"4\" y=\"4\" width=\"44\" height=\"24\" fill=\"#ffffff\" font-color=\"#000000\" font-size=\"7\" line-height=\"8\" overflow=\"auto\" scrollbar-width=\"4\">Line one wraps through the panel. Line two keeps this text taller than the visible area. Line three gives the scrollbar room.</rectangle><rectangle position=\"absolute\" id=\"wide\" x=\"4\" y=\"34\" width=\"44\" height=\"14\" fill=\"#ffffff\" font-color=\"#000000\" font-size=\"7\" line-height=\"8\" text-wrap=\"nowrap\" overflow-x=\"auto\" overflow-y=\"hidden\" scrollbar-width=\"4\">abcdefghijklmnopqrstuvwxyz 1234567890</rectangle></scene>", null);
+  var beforeHit = hitElement(canvas, 8, 8);
+  dispatchEvent(canvas, { type: "wheel", x: 8, y: 8, deltaX: 0, deltaY: 0.25 });
+  var panel = findElement(canvas, "panel");
+  var afterHit = hitElement(canvas, 8, 8);
+  var sample = getPixel(canvas, 45, 8);
+  var beforeWideHit = hitElement(canvas, 8, 38);
+  dispatchEvent(canvas, { type: "wheel", x: 8, y: 38, deltaX: 1, deltaY: 0 });
+  var wide = findElement(canvas, "wide");
+  var afterWideHit = hitElement(canvas, 8, 38);
+  var stats = renderStats(canvas);
+
+  return [
+    beforeHit.id === "panel" ? 1 : 0,
+    panel.scrollOffsetY,
+    afterHit.id === "panel" ? 1 : 0,
+    sample.red,
+    stats.copyRectScrolls,
+    beforeWideHit.id === "wide" ? 1 : 0,
+    wide.scrollOffsetX,
+    afterWideHit.id === "wide" ? 1 : 0
   ];
 }
 

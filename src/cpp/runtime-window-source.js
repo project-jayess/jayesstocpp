@@ -484,12 +484,26 @@ value window_dispatch_events(const value& windowValue) {
   auto emitter = value(window_event_emitter(window));
   long long lastMouseMoveIndex = -1;
   long long lastResizeIndex = -1;
+  long long lastWheelIndex = -1;
+  double wheelDeltaX = 0.0;
+  double wheelDeltaY = 0.0;
   for (std::size_t index = 0; index < events->items.size(); ++index) {
     const auto type = window_event_type(events->items[index]);
     if (type == "mouseMove") {
       lastMouseMoveIndex = static_cast<long long>(index);
     } else if (type == "resize") {
       lastResizeIndex = static_cast<long long>(index);
+    } else if (type == "wheel" && std::holds_alternative<object_ptr>(events->items[index])) {
+      lastWheelIndex = static_cast<long long>(index);
+      const auto event = std::get<object_ptr>(events->items[index]);
+      const auto deltaX = event->fields.find("deltaX");
+      const auto deltaY = event->fields.find("deltaY");
+      if (deltaX != event->fields.end() && std::holds_alternative<double>(deltaX->second)) {
+        wheelDeltaX += std::get<double>(deltaX->second);
+      }
+      if (deltaY != event->fields.end() && std::holds_alternative<double>(deltaY->second)) {
+        wheelDeltaY += std::get<double>(deltaY->second);
+      }
     }
   }
   auto emitted = std::make_shared<array_value>();
@@ -501,6 +515,16 @@ value window_dispatch_events(const value& windowValue) {
     }
     if (type == "resize" && static_cast<long long>(index) != lastResizeIndex) {
       continue;
+    }
+    if (type == "wheel") {
+      if (static_cast<long long>(index) != lastWheelIndex) {
+        continue;
+      }
+      if (std::holds_alternative<object_ptr>(event)) {
+        auto wheel = std::get<object_ptr>(event);
+        wheel->fields["deltaX"] = wheelDeltaX;
+        wheel->fields["deltaY"] = wheelDeltaY;
+      }
     }
     emitted->items.push_back(event);
     if (!type.empty()) {

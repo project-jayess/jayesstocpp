@@ -20,6 +20,11 @@ function requireScene(source) {
   fail("jayess:canvas expected a canvas rendered from an XML scene");
 }
 
+function clearHitCache(source) {
+  var scene = requireScene(source);
+  scene.hitCache = null;
+}
+
 function parseNumber(value, name) {
   var parsed = parseFloat(trim(value + ""));
   if (parsed === null) {
@@ -161,6 +166,14 @@ function parseTextOverflow(value, name) {
   fail("jayess:canvas XML runtime attribute " + name + " must be overflow, clip, or ellipsis");
 }
 
+function parseTextWrap(value, name) {
+  var text = trim(value + "");
+  if (text === "wrap" || text === "nowrap") {
+    return text;
+  }
+  fail("jayess:canvas XML runtime attribute " + name + " must be wrap or nowrap");
+}
+
 function parseOverflow(value, name) {
   var text = trim(value + "");
   if (text === "visible" || text === "hidden" || text === "auto" || text === "scroll") {
@@ -278,6 +291,8 @@ export function updateElementAttribute(source, id, name, value) {
     shape.textDecoration = parseTextDecoration(value, name);
   } else if (name === "text-overflow") {
     shape.textOverflow = parseTextOverflow(value, name);
+  } else if (name === "text-wrap") {
+    shape.textWrap = parseTextWrap(value, name);
   } else if (name === "overflow") {
     shape.overflow = parseOverflow(value, name);
     shape.overflowX = shape.overflow;
@@ -350,6 +365,7 @@ export function updateElementAttribute(source, id, name, value) {
   }
   shape.textLayoutCache = null;
   shape.textBitmapCache = null;
+  clearHitCache(source);
   return shape;
 }
 
@@ -607,9 +623,58 @@ function collectShapeHitsInShapes(shapes, x, y, scrollY, hits) {
   }
 }
 
-function hitInScene(scene, x, y) {
+function copyHit(hit) {
+  return {
+    id: hit.id,
+    kind: hit.kind,
+    x: hit.x,
+    y: hit.y
+  };
+}
+
+function copyHits(hits) {
+  var copied = [];
+  for (var index = 0; index < hits.length; index = index + 1) {
+    copied.push(copyHit(hits[index]));
+  }
+  return copied;
+}
+
+function hitCacheMatches(cache, scene, x, y) {
+  return cache !== null &&
+    cache.x === x &&
+    cache.y === y &&
+    cache.scrollOffsetY === scene.scrollOffsetY;
+}
+
+function cachedHitTests(scene, x, y) {
+  if (hitCacheMatches(scene.hitCache, scene, x, y)) {
+    return scene.hitCache.hits;
+  }
   var hits = [];
+  var shapes = [];
   collectHitsInShapes(scene.shapes, x, y, scene.scrollOffsetY, hits);
+  collectShapeHitsInShapes(scene.shapes, x, y, scene.scrollOffsetY, shapes);
+  scene.hitCache = {
+    x: x,
+    y: y,
+    scrollOffsetY: scene.scrollOffsetY,
+    hits: hits,
+    shapes: shapes
+  };
+  return hits;
+}
+
+function cachedHitShapes(scene, x, y) {
+  if (hitCacheMatches(scene.hitCache, scene, x, y)) {
+    return scene.hitCache.shapes;
+  }
+  cachedHitTests(scene, x, y);
+  return scene.hitCache.shapes;
+}
+
+function hitInScene(scene, x, y) {
+  var hits = cachedHitTests(scene, x, y);
   if (hits.length === 0) {
     return null;
   }
@@ -617,21 +682,21 @@ function hitInScene(scene, x, y) {
 }
 
 export function hitTest(source, x, y) {
-  return hitInScene(requireScene(source), x, y);
+  var hit = hitInScene(requireScene(source), x, y);
+  if (hit === null) {
+    return null;
+  }
+  return copyHit(hit);
 }
 
 export function hitTests(source, x, y) {
   var scene = requireScene(source);
-  var hits = [];
-  collectHitsInShapes(scene.shapes, x, y, scene.scrollOffsetY, hits);
-  return hits;
+  return copyHits(cachedHitTests(scene, x, y));
 }
 
 export function hitShapes(source, x, y) {
   var scene = requireScene(source);
-  var hits = [];
-  collectShapeHitsInShapes(scene.shapes, x, y, scene.scrollOffsetY, hits);
-  return hits;
+  return cachedHitShapes(scene, x, y);
 }
 
 function listenerBucket(canvas, name) {

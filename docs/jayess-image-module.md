@@ -44,6 +44,7 @@
 - `subimage(image, x, y, width, height)`
 - `resizeNearest(image, width, height)`
 - `blit(target, source, x, y)`
+- `copyRect(image, sourceX, sourceY, width, height, targetX, targetY)`
 - `flipHorizontal(image)`
 - `flipVertical(image)`
 - `rotate90(image)`
@@ -86,7 +87,7 @@ See [jayess-image-decoder-externals.md](./jayess-image-decoder-externals.md) for
 
 `fillRect` writes one clipped solid-color rectangle into the target image and returns the same image. `fillRectAlpha` does the same but blends one source color over the destination rectangle using the source alpha channel. Both helpers accept non-negative integer widths and heights, clip against the image bounds, and treat zero-sized rectangles as no-ops.
 
-`crop`, `subimage`, `resizeNearest`, `flipHorizontal`, `flipVertical`, and `rotate90` return new images. `subimage` is intentionally a copy-based helper, not a live mutable view: it preserves the familiar “subimage” concept while avoiding aliasing and lifetime surprises between parent and child image regions. `blit` copies source pixels into the target with clipping and returns the target image. `transparentBlit` blends source pixels over the target using the source alpha channel and also returns the target image.
+`crop`, `subimage`, `resizeNearest`, `flipHorizontal`, `flipVertical`, and `rotate90` return new images. `subimage` is intentionally a copy-based helper, not a live mutable view: it preserves the familiar “subimage” concept while avoiding aliasing and lifetime surprises between parent and child image regions. `blit` copies source pixels into the target with clipping and returns the target image. `copyRect` copies a rectangular region within the same image buffer, clips source and target bounds, preserves RGBA bytes exactly, handles overlapping source and target regions safely, and returns the same image. `transparentBlit` blends source pixels over the target using the source alpha channel and also returns the target image.
 
 ## Implementation Direction
 

@@ -73,6 +73,7 @@ Shared attributes should stay explicit:
 - `text-transform`
 - `text-decoration`
 - `text-overflow`
+- `text-wrap`
 - `overflow`
 - `overflow-x`
 - `overflow-y`
@@ -181,6 +182,7 @@ Text layout attributes apply to labels and `<text>` elements:
 - `text-transform="none|uppercase|lowercase"` transforms text before measuring and drawing.
 - `text-decoration="none|underline|overline|line-through"` draws a simple one-pixel decoration line.
 - `text-overflow="overflow|clip|ellipsis"` controls text that exceeds the label box. The default is `overflow`, meaning text stays in normal wrapped flow and can make the text content larger than its box. The separate `overflow`, `overflow-x`, and `overflow-y` attributes decide whether that overflow is visible, clipped, or represented with scrollbar indicators. `ellipsis` truncates the first rendered line with `...`.
+- `text-wrap="wrap|nowrap"` controls line wrapping inside a text-backed shape. The default is `wrap`. Use `nowrap` with `overflow-x="auto"` or `overflow-x="scroll"` when the element should behave like a horizontal text scroll pane.
 - `overflow="visible|hidden|auto|scroll"` controls clipping for text boxes.
 - `overflow-x` and `overflow-y` override one axis.
 
@@ -196,6 +198,12 @@ Use scrollbars as a visual overflow indicator for element text:
 ```
 
 `scrollbar-color` uses `thumb track` order. `scrollbar-thumb` and `scrollbar-track` may name image handles supplied through render options or local image paths. Image thumbs can use `scrollbar-thumb-width` and `scrollbar-thumb-height` to draw custom artwork at a fixed size while the computed thumb position still follows the scroll range.
+
+Root scene scrolling and element text scrolling use retained canvas state. The root scene keeps a cached scrollable backing image for non-fixed content and presents the current viewport from that cache during ordinary wheel scrolling. `position="fixed"` elements and the root scrollbar are painted after the cached content so overlays stay viewport-relative. Text-backed element scroll panes keep their measured text layout and rendered text bitmap cache, copy already-visible pixels for small single-axis scrolls, then repaint only the newly exposed strip and scrollbar area. Large jumps, diagonal scrolls, invalid regions, resized panes, changed attributes, and changed render options fall back to a full repaint of the affected area.
+
+The manual probe at `custom-test/canvas-window` includes an automated smoke mode for scroll-performance checks. Run the built executable from its `dist` directory with `JAYESS_CANVAS_WINDOW_SMOKE=1` to exercise root scrolling, nested pane scrolling, fixed overlay hit testing, hover/click routing, and render counters without entering the native window loop.
+
+For CPU-friendly scenes, keep long scrolling content in root flow or in a small number of scroll panes, avoid changing text or image attributes during every wheel event, prefer stable image handles through render options, and keep fixed overlays compact. Application code should still batch its own high-frequency input work and present once per frame where practical.
 
 `<group>` is a deterministic container for nested shape elements. A group can use shared attributes such as `id`, `x`, `y`, `xy`, and `visible`. Its resolved `x` and `y` are added to descendant shape coordinates during scene normalization; it does not introduce CSS inheritance, transforms, or browser-style DOM behavior.
 

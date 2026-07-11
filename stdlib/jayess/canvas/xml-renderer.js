@@ -64,6 +64,7 @@ function textOptions(shape) {
     textTransform: shape.textTransform,
     textDecoration: shape.textDecoration,
     textOverflow: shape.textOverflow,
+    textWrap: shape.textWrap,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -95,6 +96,7 @@ function labelOptions(shape) {
     textTransform: shape.textTransform,
     textDecoration: shape.textDecoration,
     textOverflow: shape.textOverflow,
+    textWrap: shape.textWrap,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -235,6 +237,7 @@ function textLayoutCacheKey(shape, box, options) {
     shape.letterSpacing.toString() + "|" +
     shape.wordSpacing.toString() + "|" +
     shape.textTransform + "|" +
+    shape.textWrap + "|" +
     shape.textOverflow;
 }
 
@@ -263,6 +266,7 @@ function bitmapCacheKey(shape, box, measured) {
     shape.wordSpacing.toString() + "|" +
     shape.textTransform + "|" +
     shape.textDecoration + "|" +
+    shape.textWrap + "|" +
     shape.textOverflow + "|" +
     labelColor(shape).red.toString() + "," +
     labelColor(shape).green.toString() + "," +
@@ -297,6 +301,7 @@ function textLayerOptions(options) {
     textTransform: options.textTransform,
     textDecoration: options.textDecoration,
     textOverflow: options.textOverflow,
+    textWrap: options.textWrap,
     overflow: options.overflow,
     overflowX: options.overflowX,
     overflowY: options.overflowY,
@@ -948,6 +953,24 @@ function drawShapeInRegion(renderer, canvas, shape, options, region, deltaY) {
   return canvas;
 }
 
+function drawShapeLayer(renderer, canvas, shape, options, fixedLayer, inheritedFixed) {
+  if (shape.visible !== true) {
+    return canvas;
+  }
+  var isFixed = inheritedFixed || shape.position === "fixed";
+  if (shape.kind === "group") {
+    var children = orderedShapes(shape.children);
+    for (var index = 0; index < children.length; index = index + 1) {
+      drawShapeLayer(renderer, canvas, children[index], options, fixedLayer, isFixed);
+    }
+    return canvas;
+  }
+  if (isFixed === fixedLayer) {
+    drawShape(renderer, canvas, shape, options);
+  }
+  return canvas;
+}
+
 function sceneNeedsVerticalScrollbar(scene) {
   return scene.scrollbarWidth > 0 &&
     (scene.overflowY === "scroll" || (scene.overflowY === "auto" && scene.scrollHeight > scene.height));
@@ -1009,6 +1032,27 @@ export function drawSceneWith(renderer, canvas, scene, options) {
   if (renderer.attachScene !== null) {
     renderer.attachScene(canvas, scene, options);
   }
+  return canvas;
+}
+
+export function drawSceneScrollableLayerWith(renderer, canvas, scene, options) {
+  var shapes = orderedShapes(scene.shapes);
+  renderer.pushClip(canvas, 0, 0, scene.contentWidth, scene.scrollHeight);
+  for (var index = 0; index < shapes.length; index = index + 1) {
+    drawShapeLayer(renderer, canvas, shapes[index], options, false, false);
+  }
+  renderer.popClip(canvas);
+  return canvas;
+}
+
+export function drawSceneFixedLayerWith(renderer, canvas, scene, options) {
+  var shapes = orderedShapes(scene.shapes);
+  renderer.pushClip(canvas, 0, 0, scene.width, scene.height);
+  for (var index = 0; index < shapes.length; index = index + 1) {
+    drawShapeLayer(renderer, canvas, shapes[index], options, true, false);
+  }
+  renderer.popClip(canvas);
+  drawSceneVerticalScrollbar(renderer, canvas, scene, options);
   return canvas;
 }
 

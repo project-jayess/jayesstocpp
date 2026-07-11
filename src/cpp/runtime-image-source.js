@@ -50,6 +50,7 @@ value image_decode_webp(const value& bytes);
 value image_decode_image(const value& bytes);
 value image_crop(const value& image, const value& x, const value& y, const value& width, const value& height);
 value image_resize_nearest(const value& image, const value& width, const value& height);
+value image_copy_rect(const value& image, const value& sourceX, const value& sourceY, const value& width, const value& height, const value& targetX, const value& targetY);
 value image_blit(const value& target, const value& source, const value& x, const value& y);
 value image_flip_horizontal(const value& image);
 value image_flip_vertical(const value& image);
@@ -231,13 +232,18 @@ std::array<unsigned char, 4> image_read_pixel(const image_ptr& image, int x, int
 }
 
 std::array<unsigned char, 4> image_alpha_blend(const std::array<unsigned char, 4>& destination, const std::array<unsigned char, 4>& source) {
-  const auto alpha = static_cast<int>(source[3]);
-  const auto inverse = 255 - alpha;
+  const auto sourceAlpha = static_cast<int>(source[3]);
+  const auto destinationAlpha = static_cast<int>(destination[3]);
+  const auto inverse = 255 - sourceAlpha;
+  const auto outputAlpha = sourceAlpha + (destinationAlpha * inverse) / 255;
+  if (outputAlpha <= 0) {
+    return {0, 0, 0, 0};
+  }
   return {
-    static_cast<unsigned char>((static_cast<int>(source[0]) * alpha + static_cast<int>(destination[0]) * inverse) / 255),
-    static_cast<unsigned char>((static_cast<int>(source[1]) * alpha + static_cast<int>(destination[1]) * inverse) / 255),
-    static_cast<unsigned char>((static_cast<int>(source[2]) * alpha + static_cast<int>(destination[2]) * inverse) / 255),
-    255
+    static_cast<unsigned char>((static_cast<int>(source[0]) * sourceAlpha + static_cast<int>(destination[0]) * destinationAlpha * inverse / 255) / outputAlpha),
+    static_cast<unsigned char>((static_cast<int>(source[1]) * sourceAlpha + static_cast<int>(destination[1]) * destinationAlpha * inverse / 255) / outputAlpha),
+    static_cast<unsigned char>((static_cast<int>(source[2]) * sourceAlpha + static_cast<int>(destination[2]) * destinationAlpha * inverse / 255) / outputAlpha),
+    static_cast<unsigned char>(outputAlpha)
   };
 }
 
@@ -996,6 +1002,49 @@ value image_blit(const value& targetValue, const value& sourceValue, const value
     }
   }
   return targetValue;
+}
+
+value image_copy_rect(const value& imageValue, const value& sourceXValue, const value& sourceYValue, const value& widthValue, const value& heightValue, const value& targetXValue, const value& targetYValue) {
+  const auto image = require_image_value(imageValue);
+  const auto sourceX = require_image_offset(sourceXValue, "Jayess image copyRect source x must be an integer within supported range");
+  const auto sourceY = require_image_offset(sourceYValue, "Jayess image copyRect source y must be an integer within supported range");
+  const auto width = require_image_span(widthValue, "Jayess image copyRect width must be a non-negative integer");
+  const auto height = require_image_span(heightValue, "Jayess image copyRect height must be a non-negative integer");
+  const auto targetX = require_image_offset(targetXValue, "Jayess image copyRect target x must be an integer within supported range");
+  const auto targetY = require_image_offset(targetYValue, "Jayess image copyRect target y must be an integer within supported range");
+
+  long long startX = 0;
+  long long startY = 0;
+  startX = (std::max<long long>)(startX, -static_cast<long long>(sourceX));
+  startX = (std::max<long long>)(startX, -static_cast<long long>(targetX));
+  startY = (std::max<long long>)(startY, -static_cast<long long>(sourceY));
+  startY = (std::max<long long>)(startY, -static_cast<long long>(targetY));
+
+  long long spanWidth = static_cast<long long>(width) - startX;
+  long long spanHeight = static_cast<long long>(height) - startY;
+  spanWidth = (std::min<long long>)(spanWidth, static_cast<long long>(image->width) - (static_cast<long long>(sourceX) + startX));
+  spanWidth = (std::min<long long>)(spanWidth, static_cast<long long>(image->width) - (static_cast<long long>(targetX) + startX));
+  spanHeight = (std::min<long long>)(spanHeight, static_cast<long long>(image->height) - (static_cast<long long>(sourceY) + startY));
+  spanHeight = (std::min<long long>)(spanHeight, static_cast<long long>(image->height) - (static_cast<long long>(targetY) + startY));
+  if (spanWidth <= 0 || spanHeight <= 0) {
+    return imageValue;
+  }
+
+  const auto sourceStartX = static_cast<long long>(sourceX) + startX;
+  const auto sourceStartY = static_cast<long long>(sourceY) + startY;
+  const auto targetStartX = static_cast<long long>(targetX) + startX;
+  const auto targetStartY = static_cast<long long>(targetY) + startY;
+  const auto rowBytes = static_cast<std::size_t>(spanWidth) * 4U;
+  const auto step = targetStartY > sourceStartY ? -1LL : 1LL;
+  const auto firstRow = targetStartY > sourceStartY ? spanHeight - 1 : 0LL;
+
+  for (long long rowIndex = 0; rowIndex < spanHeight; ++rowIndex) {
+    const auto row = firstRow + rowIndex * step;
+    const auto sourceOffset = image_pixel_offset(image, static_cast<int>(sourceStartX), static_cast<int>(sourceStartY + row));
+    const auto targetOffset = image_pixel_offset(image, static_cast<int>(targetStartX), static_cast<int>(targetStartY + row));
+    std::memmove(&image->pixels[targetOffset], &image->pixels[sourceOffset], rowBytes);
+  }
+  return imageValue;
 }
 
 value image_flip_horizontal(const value& input) {

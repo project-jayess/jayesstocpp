@@ -130,6 +130,43 @@ int main() {
   const auto closeTail = std::get<jayess::object_ptr>(closeItems[1]);
   require(std::get<std::string>(closeTail->fields["type"]) == "close", "window close appends close event");
 
+  auto coalescedWindow = std::make_shared<jayess::window_state>();
+  coalescedWindow->closed = true;
+  coalescedWindow->events.push_back(jayess::make_object({
+    {"type", std::string("wheel")},
+    {"deltaX", 1.0},
+    {"deltaY", 2.0},
+    {"x", 4.0},
+    {"y", 5.0}
+  }));
+  coalescedWindow->events.push_back(jayess::make_object({
+    {"type", std::string("wheel")},
+    {"deltaX", 3.0},
+    {"deltaY", 4.0},
+    {"x", 8.0},
+    {"y", 9.0}
+  }));
+  coalescedWindow->events.push_back(jayess::make_object({
+    {"type", std::string("mouseMove")},
+    {"x", 10.0},
+    {"y", 11.0}
+  }));
+  coalescedWindow->events.push_back(jayess::make_object({
+    {"type", std::string("mouseMove")},
+    {"x", 12.0},
+    {"y", 13.0}
+  }));
+  auto coalesced = jayess::window_dispatch_events(coalescedWindow);
+  const auto& coalescedItems = std::get<jayess::array_ptr>(coalesced)->items;
+  require(coalescedItems.size() == 2, "window dispatch coalesces high-frequency events");
+  const auto coalescedWheel = std::get<jayess::object_ptr>(coalescedItems[0]);
+  require(std::get<std::string>(coalescedWheel->fields["type"]) == "wheel", "window coalesced wheel type");
+  require(std::get<double>(coalescedWheel->fields["deltaX"]) == 4.0, "window coalesced wheel deltaX");
+  require(std::get<double>(coalescedWheel->fields["deltaY"]) == 6.0, "window coalesced wheel deltaY");
+  require(std::get<double>(coalescedWheel->fields["x"]) == 8.0, "window coalesced wheel x keeps latest pointer");
+  const auto coalescedMouse = std::get<jayess::object_ptr>(coalescedItems[1]);
+  require(std::get<double>(coalescedMouse->fields["x"]) == 12.0, "window coalesced mouseMove keeps latest pointer");
+
   std::cout << "ok\\n";
   return 0;
 }
