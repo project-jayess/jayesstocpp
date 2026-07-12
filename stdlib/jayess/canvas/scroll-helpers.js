@@ -1,4 +1,5 @@
 import { clamp } from "./scalar-helpers.js";
+import { round } from "jayess:math";
 
 export function wheelDelta(value) {
   if (value === null) {
@@ -8,7 +9,7 @@ export function wheelDelta(value) {
 }
 
 export function clampedScrollOffset(value, maximum) {
-  return clamp(value, 0, maximum);
+  return round(clamp(value, 0, maximum));
 }
 
 export function wheelScrollOffset(current, delta, step, maximum) {

@@ -174,6 +174,31 @@ function parseTextWrap(value, name) {
   fail("jayess:canvas XML runtime attribute " + name + " must be wrap or nowrap");
 }
 
+function parseTextSelection(value, name) {
+  var text = trim(value + "");
+  if (text === "none" || text.length === 0) {
+    return null;
+  }
+  var parts = compactParts(text);
+  if (parts.length !== 2) {
+    fail("jayess:canvas XML runtime attribute " + name + " must be none or: start end");
+  }
+  var start = parseNumber(parts[0], name + " start");
+  var end = parseNumber(parts[1], name + " end");
+  if (start < 0 || end < 0) {
+    fail("jayess:canvas XML runtime attribute " + name + " must be non-negative");
+  }
+  if (end < start) {
+    var previousStart = start;
+    start = end;
+    end = previousStart;
+  }
+  return {
+    start: start,
+    end: end
+  };
+}
+
 function parseOverflow(value, name) {
   var text = trim(value + "");
   if (text === "visible" || text === "hidden" || text === "auto" || text === "scroll") {
@@ -293,6 +318,15 @@ export function updateElementAttribute(source, id, name, value) {
     shape.textOverflow = parseTextOverflow(value, name);
   } else if (name === "text-wrap") {
     shape.textWrap = parseTextWrap(value, name);
+  } else if (name === "text-select") {
+    shape.textSelection = parseTextSelection(value, name);
+    shape.textSelectionKind = shape.textSelection === null ? "" : "text";
+  } else if (name === "text-select-color") {
+    applyColorAttribute(shape, "textSelectColor", value);
+  } else if (name === "mouse-select") {
+    shape.mouseSelect = parseBoolean(value, name);
+  } else if (name === "mouse-select-color") {
+    applyColorAttribute(shape, "mouseSelectColor", value);
   } else if (name === "overflow") {
     shape.overflow = parseOverflow(value, name);
     shape.overflowX = shape.overflow;

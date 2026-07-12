@@ -412,6 +412,20 @@ void window_windows_fill_black(const window_ptr& window) {
   api.release_dc(hwnd, dc);
 }
 
+void window_windows_sync_client_size(const window_ptr& window) {
+  auto& api = window_windows_api();
+  const auto hwnd = window_windows_handle(window);
+  jayess_rect client{};
+  if (api.get_client_rect(hwnd, &client) == 0) {
+    return;
+  }
+  const auto width = (std::max)(1, static_cast<int>(client.right - client.left));
+  const auto height = (std::max)(1, static_cast<int>(client.bottom - client.top));
+  if (width != window->width || height != window->height) {
+    window_push_resize_event(window, width, height);
+  }
+}
+
 void window_platform_create(const window_ptr& window) {
   auto& api = window_windows_api();
   window_windows_ensure_registered();
@@ -439,6 +453,7 @@ void window_platform_create(const window_ptr& window) {
   window->adapter = "windows-win32";
   window->host_display = hwnd;
   window->host_window = 1;
+  window_windows_sync_client_size(window);
 }
 
 void window_platform_show(const window_ptr& window) {
@@ -446,6 +461,7 @@ void window_platform_show(const window_ptr& window) {
   const auto hwnd = window_windows_handle(window);
   api.show_window(hwnd, jayess_sw_show);
   api.update_window(hwnd);
+  window_windows_sync_client_size(window);
   window_windows_fill_black(window);
 }
 

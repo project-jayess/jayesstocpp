@@ -114,7 +114,7 @@ function defaultRenderStats() {
   };
 }
 
-function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, clickStartElementId, rootScrollCache, renderStats, requestedBackend, actualBackend) {
+function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, textSelectionDragState, clickStartElementId, selectedTextShapeId, rootScrollCache, renderStats, requestedBackend, actualBackend) {
   return {
     image: image,
     title: title,
@@ -126,7 +126,9 @@ function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOpti
     hoveredElementId: hoveredElementId,
     canvasListeners: canvasListeners,
     scrollDragState: scrollDragState,
+    textSelectionDragState: textSelectionDragState,
     clickStartElementId: clickStartElementId,
+    selectedTextShapeId: selectedTextShapeId,
     rootScrollCache: rootScrollCache,
     renderStats: renderStats,
     requestedBackend: requestedBackend,
@@ -419,7 +421,7 @@ export function create(width, height, options) {
   var title = optionValue(options, "title", "");
   var requestedBackend = requestedBackendValue(options);
   var actualBackend = actualBackendValue(requestedBackend);
-  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, "", null, defaultRenderStats(), requestedBackend, actualBackend);
+  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, null, "", "", null, defaultRenderStats(), requestedBackend, actualBackend);
 }
 
 export function clear(canvas, color) {
@@ -441,7 +443,7 @@ export function getPixel(canvas, x, y) {
 
 export function copy(canvas) {
   var source = requireCanvas(canvas);
-  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.clickStartElementId, null, defaultRenderStats(), source.requestedBackend, source.actualBackend);
+  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.textSelectionDragState, source.clickStartElementId, source.selectedTextShapeId, null, defaultRenderStats(), source.requestedBackend, source.actualBackend);
 }
 
 export function renderStats(canvas) {
@@ -856,9 +858,29 @@ function ellipsePixelInside(column, row, x, y, width, height) {
   return dx * dx + dy * dy <= 1;
 }
 
+function clipContainsRect(canvas, x, y, width, height) {
+  var clip = currentClipRegion(canvas);
+  return x >= clip.x &&
+    y >= clip.y &&
+    x + width <= clip.x + clip.width &&
+    y + height <= clip.y + clip.height;
+}
+
 function fillEllipseBox(canvas, x, y, width, height, color) {
-  var resolvedColor = fillColorValue(canvas, color);
-  fillImageEllipse(requireCanvas(canvas).image, x, y, width, height, resolvedColor);
+  var target = requireCanvas(canvas);
+  var resolvedColor = fillColorValue(target, color);
+  if (clipContainsRect(target, x, y, width, height)) {
+    fillImageEllipse(target.image, x, y, width, height, resolvedColor);
+    return target;
+  }
+  var rect = clippedRect(target, x, y, width, height, null);
+  for (var row = rect.y; row < rect.y + rect.height; row = row + 1) {
+    for (var column = rect.x; column < rect.x + rect.width; column = column + 1) {
+      if (ellipsePixelInside(column, row, x, y, width, height)) {
+        drawPixel(target, column, row, resolvedColor);
+      }
+    }
+  }
   return canvas;
 }
 
@@ -1348,6 +1370,64 @@ function drawTextDecoration(canvas, rect, lineWidth, x, y, metrics, color, decor
   return canvas;
 }
 
+function textSelectionRange(options) {
+  var selection = optionValue(options, "select", null);
+  if (selection === null) {
+    return null;
+  }
+  var start = round(selection.start);
+  var end = round(selection.end);
+  if (start < 0) {
+    start = 0;
+  }
+  if (end < 0) {
+    end = 0;
+  }
+  if (end < start) {
+    var previousStart = start;
+    start = end;
+    end = previousStart;
+  }
+  if (start === end) {
+    return null;
+  }
+  return {
+    start: start,
+    end: end
+  };
+}
+
+function selectedTextColor(canvas, options) {
+  var color = optionValue(options, "selectColor", null);
+  if (color === null) {
+    return rgba(96, 165, 250, 0.38);
+  }
+  return fillColorValue(canvas, color);
+}
+
+function drawTextSelection(canvas, rect, lineText, lineStart, x, y, metrics, options) {
+  var selection = textSelectionRange(options);
+  if (selection === null) {
+    return canvas;
+  }
+  var lineEnd = lineStart + lineText.length;
+  var start = maxValue(lineStart, selection.start);
+  var end = minValue(lineEnd, selection.end);
+  if (start >= end) {
+    return canvas;
+  }
+  var prefix = sliceString(lineText, 0, start - lineStart);
+  var selected = sliceString(lineText, start - lineStart, end - lineStart);
+  var highlightX = x + measureText(canvas, prefix, options).width;
+  var highlightWidth = measureText(canvas, selected, options).width;
+  var drawWidth = round(highlightWidth);
+  if (drawWidth <= 0) {
+    drawWidth = 1;
+  }
+  fillRectAlpha(canvas, round(highlightX), round(y), drawWidth, round(metrics.lineHeight), selectedTextColor(canvas, options));
+  return canvas;
+}
+
 function alignedTextX(rect, lineWidth, align) {
   if (align === "center") {
     return rect.x + round((rect.width - lineWidth) / 2);
@@ -1532,13 +1612,16 @@ export function drawTextBox(canvas, textValue, rectValue, options) {
   if (clipped) {
     pushClip(target, rect.x, rect.y, rect.width, rect.height);
   }
+  var lineStart = 0;
   for (var index = 0; index < lines.length; index = index + 1) {
     var lineText = lines[index];
     var lineWidth = layout.widths[index];
     var cursorX = alignedTextX(rect, lineWidth, horizontal) - scrollX;
+    drawTextSelection(target, rect, lineText, lineStart, cursorX, cursorY, metrics, options);
     text(target, lineText, cursorX, cursorY, options);
     drawTextDecoration(target, rect, lineWidth, cursorX, cursorY, metrics, color, decoration);
     cursorY = cursorY + metrics.lineHeight;
+    lineStart = lineStart + lineText.length;
   }
   if (clipped) {
     popClip(target);
@@ -1624,8 +1707,21 @@ export function fillCapsule(canvas, x, y, width, height, color) {
   if (size.width === 0 || size.height === 0) {
     return canvas;
   }
-  fillImageCapsule(requireCanvas(canvas).image, x, y, size.width, size.height, fillColorValue(canvas, color));
-  return canvas;
+  var target = requireCanvas(canvas);
+  var resolvedColor = fillColorValue(target, color);
+  if (clipContainsRect(target, x, y, size.width, size.height)) {
+    fillImageCapsule(target.image, x, y, size.width, size.height, resolvedColor);
+    return target;
+  }
+  var rect = clippedRect(target, x, y, size.width, size.height, null);
+  for (var row = rect.y; row < rect.y + rect.height; row = row + 1) {
+    for (var column = rect.x; column < rect.x + rect.width; column = column + 1) {
+      if (capsulePixelInside(column, row, x, y, size.width, size.height)) {
+        drawPixel(target, column, row, resolvedColor);
+      }
+    }
+  }
+  return target;
 }
 
 export function drawCapsule(canvas, x, y, width, height, color, options) {
@@ -1875,6 +1971,7 @@ function skipShadowMap(id) {
 }
 
 function shapeTextOptions(shape) {
+  var selectionColor = shape.textSelectionKind === "mouse" ? shape.mouseSelectColor : shape.textSelectColor;
   var options = {
     fontFamily: shape.fontFamily,
     fontSize: shape.fontSize,
@@ -1886,6 +1983,8 @@ function shapeTextOptions(shape) {
     textDecoration: shape.textDecoration,
     textOverflow: shape.textOverflow,
     textWrap: shape.textWrap,
+    select: shape.textSelection,
+    selectColor: selectionColor,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -2046,6 +2145,158 @@ function redrawShapeScrollArea(canvas, shape) {
     return redrawShapePaint(canvas, shape);
   }
   return redrawAttachedSceneRegion(canvas, viewportRegionForShape(canvas, shape, info.fullRect), skipShadowMap(shape.id));
+}
+
+function documentYForShape(canvas, shape, y) {
+  if (canvas.scene === null || shape.position === "fixed") {
+    return y;
+  }
+  return y + canvas.scene.scrollOffsetY;
+}
+
+function textIndexForLineX(canvas, shape, lineText, lineStart, lineX, x, options) {
+  var localX = x - lineX;
+  if (localX <= 0) {
+    return lineStart;
+  }
+  var characters = stringChars(lineText);
+  var previousWidth = 0;
+  for (var index = 0; index < characters.length; index = index + 1) {
+    var nextWidth = measureText(canvas, sliceString(lineText, 0, index + 1), options).width;
+    var midpoint = previousWidth + (nextWidth - previousWidth) / 2;
+    if (localX < midpoint) {
+      return lineStart + index;
+    }
+    previousWidth = nextWidth;
+  }
+  return lineStart + lineText.length;
+}
+
+function textIndexAtPoint(canvas, shape, x, y) {
+  var info = shapeTextMeasurement(canvas, shape);
+  if (info === null) {
+    return 0;
+  }
+  var options = shapeTextOptions(shape);
+  var layout = measureTextBox(canvas, shape.text, info.rect, options);
+  var docY = documentYForShape(canvas, shape, y);
+  var contentTop = alignedTextY(info.rect, layout.height, shape.textAlignY) - shape.scrollOffsetY;
+  var lineStart = 0;
+  for (var index = 0; index < layout.lines.length; index = index + 1) {
+    var lineText = layout.lines[index];
+    var lineWidth = layout.widths[index];
+    var lineTop = contentTop + index * layout.lineHeight;
+    if (docY < lineTop + layout.lineHeight) {
+      var lineX = alignedTextX(info.rect, lineWidth, shape.textAlignX) - shape.scrollOffsetX;
+      return textIndexForLineX(canvas, shape, lineText, lineStart, lineX, x, options);
+    }
+    lineStart = lineStart + lineText.length;
+  }
+  return shape.text.length;
+}
+
+function selectableTextShapeAt(canvas, x, y) {
+  var shapes = hitShapes(canvas, x, y);
+  for (var index = 0; index < shapes.length; index = index + 1) {
+    var shape = shapes[index];
+    if (shape.mouseSelect === true && shape.text.length > 0) {
+      return shape;
+    }
+  }
+  return null;
+}
+
+function textSelectEvent(event, shape) {
+  return {
+    type: "textselect",
+    targetId: shape.id,
+    targetKind: shape.kind,
+    x: event.x,
+    y: event.y,
+    sourceEvent: event
+  };
+}
+
+function setMouseTextSelection(canvas, shape, anchor, focus) {
+  var start = minValue(anchor, focus);
+  var end = maxValue(anchor, focus);
+  if (start === end) {
+    shape.textSelection = null;
+    shape.textSelectionKind = "";
+  } else {
+    shape.textSelection = {
+      start: start,
+      end: end
+    };
+    shape.textSelectionKind = "mouse";
+  }
+  shape.textBitmapCache = null;
+  canvas.selectedTextShapeId = shape.id;
+  redrawShapeScrollArea(canvas, shape);
+  return true;
+}
+
+function clearActiveMouseTextSelection(canvas) {
+  if (canvas.selectedTextShapeId.length === 0) {
+    return null;
+  }
+  var shape = getElementById(canvas, canvas.selectedTextShapeId);
+  canvas.selectedTextShapeId = "";
+  if (shape === null || shape.textSelectionKind !== "mouse") {
+    return null;
+  }
+  shape.textSelection = null;
+  shape.textSelectionKind = "";
+  shape.textBitmapCache = null;
+  redrawShapeScrollArea(canvas, shape);
+  return shape;
+}
+
+function beginTextSelection(canvas, event) {
+  var shape = selectableTextShapeAt(canvas, event.x, event.y);
+  if (shape === null) {
+    canvas.textSelectionDragState = null;
+    return null;
+  }
+  if (canvas.selectedTextShapeId !== shape.id) {
+    clearActiveMouseTextSelection(canvas);
+  }
+  var index = textIndexAtPoint(canvas, shape, event.x, event.y);
+  canvas.textSelectionDragState = {
+    shape: shape,
+    anchor: index,
+    focus: index
+  };
+  setMouseTextSelection(canvas, shape, index, index);
+  return textSelectEvent(event, shape);
+}
+
+function updateTextSelectionDrag(canvas, event) {
+  var state = canvas.textSelectionDragState;
+  if (state === null) {
+    return null;
+  }
+  var nextFocus = textIndexAtPoint(canvas, state.shape, event.x, event.y);
+  if (nextFocus === state.focus) {
+    return null;
+  }
+  state.focus = nextFocus;
+  setMouseTextSelection(canvas, state.shape, state.anchor, state.focus);
+  return textSelectEvent(event, state.shape);
+}
+
+function isLeftMouseEvent(event) {
+  var names = keys(event);
+  var hasButton = false;
+  for (var index = 0; index < names.length; index = index + 1) {
+    if (names[index] === "button") {
+      hasButton = true;
+    }
+  }
+  if (!hasButton || event.button === null) {
+    return true;
+  }
+  return event.button === "left" || event.button === 0;
 }
 
 function redrawShapeScrollbarArea(canvas, shape, info) {
@@ -2217,7 +2468,7 @@ function scrollSceneByWheel(canvas, event) {
   return setSceneScrollY(canvas, wheelScrollOffset(canvas.scene.scrollOffsetY, event.deltaY, 48, maxSceneScrollY(canvas)));
 }
 
-function scrollbarThumbRect(canvas, shape) {
+function shapeScrollbarInfo(canvas, shape) {
   var info = shapeTextMeasurement(canvas, shape);
   if (info === null || shape.scrollbarWidth <= 0 || info.vertical !== true || info.measured.height <= info.rect.height) {
     return null;
@@ -2225,13 +2476,24 @@ function scrollbarThumbRect(canvas, shape) {
   var thumbHeight = scrollbarThumbSize(info.rect.height, info.measured.height, shape.scrollbarWidth);
   var maxScrollY = info.measured.height - info.rect.height;
   var thumbY = info.rect.y + scrollbarThumbOffset(shape.scrollOffsetY, maxScrollY, info.rect.height, thumbHeight);
-  return {
+  var thumb = viewportRegionForShape(canvas, shape, {
     x: info.fullRect.x + info.fullRect.width - shape.scrollbarWidth,
     y: thumbY,
     width: shape.scrollbarWidth,
-    height: thumbHeight,
+    height: thumbHeight
+  });
+  var track = viewportRegionForShape(canvas, shape, {
+    x: info.fullRect.x + info.fullRect.width - shape.scrollbarWidth,
+    y: info.rect.y,
+    width: shape.scrollbarWidth,
+    height: info.rect.height
+  });
+  return {
+    thumb: thumb,
+    track: track,
     trackY: info.rect.y,
     trackHeight: info.rect.height,
+    viewportTrackY: track.y,
     maxScrollY: maxScrollY
   };
 }
@@ -2240,26 +2502,118 @@ function eventInsideRect(event, rect) {
   return event.x >= rect.x && event.y >= rect.y && event.x < rect.x + rect.width && event.y < rect.y + rect.height;
 }
 
+function scrollInteractionResult(handled, changed) {
+  return {
+    handled: handled,
+    changed: changed
+  };
+}
+
+function canvasScrollEvent(event) {
+  return {
+    type: "scroll",
+    targetId: "",
+    targetKind: "",
+    x: event.x,
+    y: event.y,
+    sourceEvent: event
+  };
+}
+
+function scrollForTrackPoint(y, trackY, trackHeight, thumbHeight, maxScrollY) {
+  var movable = trackHeight - thumbHeight;
+  if (movable <= 0 || maxScrollY <= 0) {
+    return 0;
+  }
+  return (y - trackY - thumbHeight / 2) * maxScrollY / movable;
+}
+
+function sceneScrollbarInfo(canvas) {
+  var scene = canvas.scene;
+  var maxScrollY = maxSceneScrollY(canvas);
+  if (scene === null || scene.scrollbarWidth <= 0 || maxScrollY <= 0) {
+    return null;
+  }
+  var thumbHeight = scrollbarThumbSize(scene.height, scene.scrollHeight, scene.scrollbarWidth);
+  var thumbY = scrollbarThumbOffset(scene.scrollOffsetY, maxScrollY, scene.height, thumbHeight);
+  return {
+    thumb: {
+      x: scene.contentWidth,
+      y: thumbY,
+      width: scene.scrollbarWidth,
+      height: thumbHeight
+    },
+    track: {
+      x: scene.contentWidth,
+      y: 0,
+      width: scene.scrollbarWidth,
+      height: scene.height
+    },
+    trackY: 0,
+    trackHeight: scene.height,
+    maxScrollY: maxScrollY
+  };
+}
+
+function beginSceneScrollDrag(canvas, event) {
+  var info = sceneScrollbarInfo(canvas);
+  if (info === null || !eventInsideRect(event, info.track)) {
+    return scrollInteractionResult(false, false);
+  }
+  var changed = false;
+  if (!eventInsideRect(event, info.thumb)) {
+    changed = setSceneScrollY(canvas, scrollForTrackPoint(event.y, info.track.y, info.trackHeight, info.thumb.height, info.maxScrollY));
+    info = sceneScrollbarInfo(canvas);
+    if (info === null) {
+      canvas.scrollDragState = null;
+      return scrollInteractionResult(true, changed);
+    }
+  }
+  if (eventInsideRect(event, info.thumb)) {
+    canvas.scrollDragState = {
+      kind: "scene",
+      startY: event.y,
+      startScrollY: canvas.scene.scrollOffsetY,
+      trackHeight: info.trackHeight,
+      thumbHeight: info.thumb.height,
+      maxScrollY: info.maxScrollY
+    };
+  }
+  return scrollInteractionResult(true, changed);
+}
+
 function beginScrollDrag(canvas, event) {
   var shape = topScrollableShapeAt(canvas, event.x, event.y);
   if (shape === null) {
-    canvas.scrollDragState = null;
-    return false;
+    return beginSceneScrollDrag(canvas, event);
   }
-  var thumb = scrollbarThumbRect(canvas, shape);
-  if (thumb === null || !eventInsideRect(event, thumb)) {
+  var info = shapeScrollbarInfo(canvas, shape);
+  if (info === null || !eventInsideRect(event, info.track)) {
+    return beginSceneScrollDrag(canvas, event);
+  }
+  var changed = false;
+  if (!eventInsideRect(event, info.thumb)) {
+    changed = setShapeScroll(canvas, shape, shape.scrollOffsetX, scrollForTrackPoint(event.y, info.track.y, info.trackHeight, info.thumb.height, info.maxScrollY));
+    info = shapeScrollbarInfo(canvas, shape);
+    if (info === null) {
+      canvas.scrollDragState = null;
+      return scrollInteractionResult(true, changed);
+    }
+  }
+  if (!eventInsideRect(event, info.thumb)) {
     canvas.scrollDragState = null;
-    return false;
+    return scrollInteractionResult(true, changed);
   }
   canvas.scrollDragState = {
+    kind: "shape",
     shape: shape,
     startY: event.y,
     startScrollY: shape.scrollOffsetY,
-    trackHeight: thumb.trackHeight,
-    thumbHeight: thumb.height,
-    maxScrollY: thumb.maxScrollY
+    trackHeight: info.trackHeight,
+    thumbHeight: info.thumb.height,
+    maxScrollY: info.maxScrollY
   };
-  return true;
+  return scrollInteractionResult(true, changed);
 }
 
 function updateScrollDrag(canvas, event) {
@@ -2273,6 +2627,9 @@ function updateScrollDrag(canvas, event) {
   }
   var delta = event.y - drag.startY;
   var nextY = drag.startScrollY + delta * drag.maxScrollY / movable;
+  if (drag.kind === "scene") {
+    return setSceneScrollY(canvas, nextY);
+  }
   return setShapeScroll(canvas, drag.shape, drag.shape.scrollOffsetX, nextY);
 }
 
@@ -2386,6 +2743,34 @@ export function setAttributes(canvas, id, attributes) {
   return redrawAttachedSceneRegion(target, unionRegion(oldBounds, newBounds), null);
 }
 
+export function selectedText(canvas) {
+  var target = requireCanvas(canvas);
+  if (target.selectedTextShapeId.length === 0) {
+    return "";
+  }
+  var shape = getElementById(target, target.selectedTextShapeId);
+  if (shape === null || shape.textSelection === null) {
+    return "";
+  }
+  var start = round(shape.textSelection.start);
+  var end = round(shape.textSelection.end);
+  if (end < start) {
+    var previousStart = start;
+    start = end;
+    end = previousStart;
+  }
+  if (start < 0) {
+    start = 0;
+  }
+  if (end > shape.text.length) {
+    end = shape.text.length;
+  }
+  if (start >= end) {
+    return "";
+  }
+  return sliceString(shape.text, start, end);
+}
+
 export function hitElement(canvas, x, y) {
   return hitTest(canvas, x, y);
 }
@@ -2407,9 +2792,25 @@ export function dispatchEvent(canvas, event) {
     return [];
   }
   if (event.type === "mouseDown") {
-    if (beginScrollDrag(target, event)) {
+    var scrollStart = beginScrollDrag(target, event);
+    if (scrollStart.handled) {
       target.clickStartElementId = "";
+      if (scrollStart.changed) {
+        return [canvasScrollEvent(event)];
+      }
       return [];
+    }
+    var selectionStart = beginTextSelection(target, event);
+    if (selectionStart !== null) {
+      target.clickStartElementId = "";
+      return [selectionStart];
+    }
+    if (isLeftMouseEvent(event)) {
+      var clearedSelection = clearActiveMouseTextSelection(target);
+      if (clearedSelection !== null) {
+        target.clickStartElementId = "";
+        return [textSelectEvent(event, clearedSelection)];
+      }
     }
     var downHit = hitTest(target, event.x, event.y);
     target.clickStartElementId = downHit === null ? "" : downHit.id;
@@ -2419,6 +2820,16 @@ export function dispatchEvent(canvas, event) {
     return dispatchCanvasTargetEvent(target, event, downHit, "mouseDown");
   }
   if (event.type === "mouseUp") {
+    if (target.textSelectionDragState !== null) {
+      var selectionEnd = updateTextSelectionDrag(target, event);
+      var selectedShape = target.textSelectionDragState.shape;
+      target.textSelectionDragState = null;
+      target.clickStartElementId = "";
+      if (selectionEnd !== null) {
+        return [selectionEnd];
+      }
+      return [textSelectEvent(event, selectedShape)];
+    }
     if (target.scrollDragState !== null) {
       target.scrollDragState = null;
       target.clickStartElementId = "";
@@ -2453,7 +2864,16 @@ export function dispatchEvent(canvas, event) {
     return emitted;
   }
   if (event.type === "mouseMove" && target.scrollDragState !== null) {
-    updateScrollDrag(target, event);
+    if (updateScrollDrag(target, event)) {
+      return [canvasScrollEvent(event)];
+    }
+    return [];
+  }
+  if (event.type === "mouseMove" && target.textSelectionDragState !== null) {
+    var selectionMove = updateTextSelectionDrag(target, event);
+    if (selectionMove !== null) {
+      return [selectionMove];
+    }
     return [];
   }
   if (event.type === "mouseMove") {

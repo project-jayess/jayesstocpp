@@ -55,6 +55,7 @@ function textOptions(shape) {
   if (shape.fontColor !== null) {
     color = shape.fontColor;
   }
+  var selectionColor = shape.textSelectionKind === "mouse" ? shape.mouseSelectColor : shape.textSelectColor;
   var options = {
     color: color,
     fontFamily: shape.fontFamily,
@@ -65,6 +66,8 @@ function textOptions(shape) {
     textDecoration: shape.textDecoration,
     textOverflow: shape.textOverflow,
     textWrap: shape.textWrap,
+    select: shape.textSelection,
+    selectColor: selectionColor,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -85,6 +88,7 @@ function labelColor(shape) {
 }
 
 function labelOptions(shape) {
+  var selectionColor = shape.textSelectionKind === "mouse" ? shape.mouseSelectColor : shape.textSelectColor;
   var options = {
     color: labelColor(shape),
     fontFamily: shape.fontFamily,
@@ -97,6 +101,8 @@ function labelOptions(shape) {
     textDecoration: shape.textDecoration,
     textOverflow: shape.textOverflow,
     textWrap: shape.textWrap,
+    select: shape.textSelection,
+    selectColor: selectionColor,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -256,6 +262,9 @@ function measureShapeTextBox(renderer, canvas, shape, box, options) {
 
 function bitmapCacheKey(shape, box, measured) {
   var lineHeight = shape.lineHeight > 0 ? shape.lineHeight : 0;
+  var selection = shape.textSelection === null ? "none" : shape.textSelection.start.toString() + "," + shape.textSelection.end.toString();
+  var color = shape.textSelectionKind === "mouse" ? shape.mouseSelectColor : shape.textSelectColor;
+  var selectionColor = color === null ? "default" : color.red.toString() + "," + color.green.toString() + "," + color.blue.toString() + "," + color.alpha.toString();
   return shape.text + "|" +
     box.width.toString() + "x" + box.height.toString() + "|" +
     measured.width.toString() + "x" + measured.height.toString() + "|" +
@@ -268,6 +277,8 @@ function bitmapCacheKey(shape, box, measured) {
     shape.textDecoration + "|" +
     shape.textWrap + "|" +
     shape.textOverflow + "|" +
+    selection + "|" +
+    selectionColor + "|" +
     labelColor(shape).red.toString() + "," +
     labelColor(shape).green.toString() + "," +
     labelColor(shape).blue.toString() + "," +
@@ -302,6 +313,8 @@ function textLayerOptions(options) {
     textDecoration: options.textDecoration,
     textOverflow: options.textOverflow,
     textWrap: options.textWrap,
+    select: options.select,
+    selectColor: options.selectColor,
     overflow: options.overflow,
     overflowX: options.overflowX,
     overflowY: options.overflowY,
@@ -863,6 +876,14 @@ function shapeViewportRenderBoundsWith(renderer, shape, deltaY) {
   return offsetBounds(bounds, deltaY);
 }
 
+function shapeViewportPaintBoundsWith(renderer, shape, deltaY) {
+  var bounds = shapePaintBoundsWith(renderer, shape);
+  if (shape.position === "fixed") {
+    return bounds;
+  }
+  return offsetBounds(bounds, deltaY);
+}
+
 function drawShape(renderer, canvas, shape, options) {
   if (shape.visible !== true) {
     return canvas;
@@ -947,7 +968,7 @@ function drawShapeInRegion(renderer, canvas, shape, options, region, deltaY) {
     }
     return canvas;
   }
-  if (boundsIntersect(shapeViewportRenderBoundsWith(renderer, shape, deltaY), region)) {
+  if (boundsIntersect(shapeViewportPaintBoundsWith(renderer, shape, deltaY), region)) {
     drawTranslatedShape(renderer, canvas, shape, options, deltaY);
   }
   return canvas;

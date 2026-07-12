@@ -390,7 +390,6 @@ value window_create(const value& optionsValue) {
     throw_window_unavailable();
   }
   window_platform_create(window);
-  window_push_resize_event(window, window->width, window->height);
   return window;
 }
 

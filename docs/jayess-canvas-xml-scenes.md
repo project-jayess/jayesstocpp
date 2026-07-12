@@ -74,6 +74,10 @@ Shared attributes should stay explicit:
 - `text-decoration`
 - `text-overflow`
 - `text-wrap`
+- `text-select`
+- `text-select-color`
+- `mouse-select`
+- `mouse-select-color`
 - `overflow`
 - `overflow-x`
 - `overflow-y`
@@ -183,6 +187,8 @@ Text layout attributes apply to labels and `<text>` elements:
 - `text-decoration="none|underline|overline|line-through"` draws a simple one-pixel decoration line.
 - `text-overflow="overflow|clip|ellipsis"` controls text that exceeds the label box. The default is `overflow`, meaning text stays in normal wrapped flow and can make the text content larger than its box. The separate `overflow`, `overflow-x`, and `overflow-y` attributes decide whether that overflow is visible, clipped, or represented with scrollbar indicators. `ellipsis` truncates the first rendered line with `...`.
 - `text-wrap="wrap|nowrap"` controls line wrapping inside a text-backed shape. The default is `wrap`. Use `nowrap` with `overflow-x="auto"` or `overflow-x="scroll"` when the element should behave like a horizontal text scroll pane.
+- `text-select="start end"` highlights a character range in the rendered text. `text-select="none"` clears selection. `text-select-color` sets the static highlight color and defaults to a translucent blue when omitted.
+- `mouse-select="true|false"` enables pointer-drag text selection for that text-backed shape. `mouse-select-color` sets the drag-created highlight color. The canvas emits `textselect` events while dragging and `selectedText(canvas)` returns the selected string so applications can call `jayess:clipboard.writeText(...)` for shortcuts such as Ctrl+C.
 - `overflow="visible|hidden|auto|scroll"` controls clipping for text boxes.
 - `overflow-x` and `overflow-y` override one axis.
 
@@ -282,7 +288,7 @@ Scene helpers should be layered over those primitives:
 
 `renderScene(xmlText, options?)` accepts `backend: "auto" | "cpu" | "gpu"`. Missing `backend` defaults to `"auto"`, which currently records an automatic request and uses the portable CPU renderer as the actual backend. `backend: "cpu"` selects the same renderer explicitly. `backend: "gpu"` is reserved until XML scene rendering has a real GPU draw path; it reports a focused runtime diagnostic rather than pretending that the existing CPU image buffer is GPU-rendered. Use `requestedBackend(canvas)` and `actualBackend(canvas)` to inspect the selected path.
 
-`renderScene` also attaches the normalized scene tree to the returned canvas for runtime updates. `setAttribute(canvas, id, name, value)` mutates one existing element attribute by `id` and redraws the canvas buffer immediately. `setAttributes(canvas, id, attributes)` batches several attribute updates into one redraw and is the preferred event-handler path. `hitElement(canvas, x, y)` returns the topmost visible ID-bearing element at a canvas coordinate, using shape-aware geometry for ellipses, capsules, triangles, and polygons. `hitElements(canvas, x, y)` returns all visible ID-bearing elements at that coordinate, ordered topmost first. `dispatchEvent(canvas, windowEvent)` derives first-slice canvas events from window input; currently `mouseMove` can emit `mouseover` and `mouseout`. Apps still decide when to feed window events into canvas and when to present the updated canvas.
+`renderScene` also attaches the normalized scene tree to the returned canvas for runtime updates. `setAttribute(canvas, id, name, value)` mutates one existing element attribute by `id` and redraws the canvas buffer immediately. `setAttributes(canvas, id, attributes)` batches several attribute updates into one redraw and is the preferred event-handler path. `hitElement(canvas, x, y)` returns the topmost visible ID-bearing element at a canvas coordinate, using shape-aware geometry for ellipses, capsules, triangles, and polygons. `hitElements(canvas, x, y)` returns all visible ID-bearing elements at that coordinate, ordered topmost first. `dispatchEvent(canvas, windowEvent)` derives first-slice canvas events from window input; currently pointer movement can emit `mouseover`, `mouseout`, `statechange`, `scroll`, and `textselect` events. Apps still decide when to feed window events into canvas and when to present the updated canvas.
 
 Use `packXml("./scene.xml")` when a scene should be embedded into the generated C++ instead of read from disk at runtime. Use `packImage("./icon.png")` or another supported local image path to embed small local image assets for XML `<image>` maps or direct drawing code. Packed `.ppm`, `.pgm`, `.bmp`, `.png`, `.jpeg`, `.jpg`, `.psd`, `.gif`, and `.webp` assets decode at runtime from embedded bytes.
 

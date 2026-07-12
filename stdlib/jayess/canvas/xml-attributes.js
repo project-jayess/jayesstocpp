@@ -387,6 +387,32 @@ export function textWrapAttribute(attributes, name, fallback) {
   return requireTextWrap(trim(value), name);
 }
 
+export function selectionAttribute(attributes, name, fallback) {
+  var value = attributeValue(attributes, name, null);
+  if (value === null) {
+    return fallback;
+  }
+  var normalized = trim(value);
+  if (normalized === "none" || normalized.length === 0) {
+    return null;
+  }
+  var parts = compactParts(normalized);
+  if (parts.length !== 2) {
+    fail("jayess:canvas XML " + name + " must be none or: start end");
+  }
+  var start = requireNonNegative(parseNumberValue(parts[0], name + " start"), name + " start");
+  var end = requireNonNegative(parseNumberValue(parts[1], name + " end"), name + " end");
+  if (end < start) {
+    var previousStart = start;
+    start = end;
+    end = previousStart;
+  }
+  return {
+    start: start,
+    end: end
+  };
+}
+
 function requireOverflow(value, label) {
   if (value === "visible" || value === "hidden" || value === "auto" || value === "scroll") {
     return value;

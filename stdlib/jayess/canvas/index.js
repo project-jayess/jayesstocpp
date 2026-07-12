@@ -56,6 +56,7 @@ export {
   restoreState,
   saveImage,
   savePpm,
+  selectedText,
   saveState,
   scale,
   setAttribute,

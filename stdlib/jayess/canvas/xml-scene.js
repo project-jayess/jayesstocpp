@@ -15,6 +15,7 @@ import {
   rejectForbiddenGeometryAttributes,
   rejectUnknownAttributes,
   scrollbarColorAttribute,
+  selectionAttribute,
   requiredSizeAttribute,
   shadowAttribute,
   sizeAttribute,
@@ -98,6 +99,10 @@ const sharedAttributes = [
   "text-decoration",
   "text-overflow",
   "text-wrap",
+  "text-select",
+  "text-select-color",
+  "mouse-select",
+  "mouse-select-color",
   "overflow",
   "overflow-x",
   "overflow-y",
@@ -150,6 +155,10 @@ const textAttributes = [
   "text-decoration",
   "text-overflow",
   "text-wrap",
+  "text-select",
+  "text-select-color",
+  "mouse-select",
+  "mouse-select-color",
   "overflow",
   "overflow-x",
   "overflow-y",
@@ -423,6 +432,7 @@ function normalizeShared(node, context) {
   var padding = sizeAttribute(attributes, "padding", 0);
   var fontColor = colorAttribute(attributes, "font-color", null);
   var fontSize = sizeAttribute(attributes, "font-size", 0);
+  var textSelection = selectionAttribute(attributes, "text-select", null);
   if (isButton) {
     if (fill === null) {
       fill = defaultButtonFill();
@@ -474,6 +484,11 @@ function normalizeShared(node, context) {
     textDecoration: textDecorationAttribute(attributes, "text-decoration", "none"),
     textOverflow: textOverflowAttribute(attributes, "text-overflow", "overflow"),
     textWrap: textWrapAttribute(attributes, "text-wrap", "wrap"),
+    textSelection: textSelection,
+    textSelectionKind: textSelection === null ? "" : "text",
+    textSelectColor: colorAttribute(attributes, "text-select-color", null),
+    mouseSelect: booleanAttribute(attributes, "mouse-select", false),
+    mouseSelectColor: colorAttribute(attributes, "mouse-select-color", null),
     overflow: overflowAttribute(attributes, "overflow", "visible"),
     overflowX: overflowAttribute(attributes, "overflow-x", overflowAttribute(attributes, "overflow", "visible")),
     overflowY: overflowAttribute(attributes, "overflow-y", overflowAttribute(attributes, "overflow", "visible")),
@@ -771,6 +786,11 @@ function normalizeShape(node, context) {
     textDecoration: shared.textDecoration,
     textOverflow: shared.textOverflow,
     textWrap: shared.textWrap,
+    textSelection: shared.textSelection,
+    textSelectionKind: shared.textSelectionKind,
+    textSelectColor: shared.textSelectColor,
+    mouseSelect: shared.mouseSelect,
+    mouseSelectColor: shared.mouseSelectColor,
     overflow: shared.overflow,
     overflowX: shared.overflowX,
     overflowY: shared.overflowY,

@@ -1,3 +1,4 @@
+import { writeText as writeClipboardText } from "jayess:clipboard";
 import { writeLine } from "jayess:console";
 import
   {
@@ -8,11 +9,12 @@ import
     packImage,
     renderScene,
     renderStats,
+    selectedText,
     setAttributes,
   } from "jayess:canvas";
 import { packFont, registerFont } from "jayess:font";
 import { hasEnv } from "jayess:process";
-import { create } from "jayess:window";
+import { create, height as windowHeight, width as windowWidth } from "jayess:window";
 
 function positiveSize(value, fallback)
 {
@@ -38,6 +40,16 @@ function textOf(value)
   return value.toString();
 }
 
+function isControlKey(event)
+{
+  return event.key === "Control" || event.key === "control" || event.key === "Ctrl" || event.code === "Control";
+}
+
+function isCopyKey(event)
+{
+  return event.key === "c" || event.key === "C" || event.code === "KeyC";
+}
+
 function sceneXml(width, height, antialias)
 {
   var sceneWidth = positiveSize(width, 1280);
@@ -54,6 +66,7 @@ function sceneXml(width, height, antialias)
       <group width="400" grow="1" height="100%" layout="column" gap="14">
         <rectangle width="100%" height="78" corners="14" fill="#e8f3ff" outline="#9ed8ff" outline-thickness="2" padding="12" font-color="#253342" font-family="Noto Sans Mono" font-size="14" text-transform="uppercase" text-decoration="underline">Main column grows to fill remaining space</rectangle>
         <button id="auto-button" width="220" height="42">Default button</button>
+        <rectangle id="selection-demo" width="100%" height="64" corners="12" fill="#ffffff" outline="#38bdf8" outline-thickness="2" padding="12" font-color="#0f172a" font-family="Noto Sans Mono" font-size="14" line-height="18" text-align="left middle" text-select="0 22" text-select-color="#bae6fd" mouse-select="true" mouse-select-color="#bbf7d0">Selected text attribute demo: drag across this text, then press Ctrl+C to copy.</rectangle>
         <ellipse id="hover-ellipse" width="100%" max-width="320" height="150" fill="#39ff88" outline="#253342" outline-thickness="6" shadow="14 18 10 1 rgba(0,0,0,0.28)" padding="16" font-color="#102015" font-family="Noto Sans Mono" font-size="14">Hover me</ellipse>
         <rectangle width="100%" height="76" corners="10 24" fill="#fff7d6" outline="#ffcc00" outline-thickness="2" padding="10" font-color="#253342" font-family="Noto Sans Mono" font-size="12" line-height="15" overflow="hidden" text-align-x="right" text-align-y="bottom">Hidden overflow keeps this label inside the rounded card.</rectangle>
         <rectangle id="nested-panel" width="100%" height="86" corners="10" fill="#eef2ff" outline="#818cf8" outline-thickness="2" padding="10" font-color="#312e81" font-family="Noto Sans Mono" font-size="15" line-height="19" overflow="auto" scrollbar-width="22" scrollbar-thumb="girl-thumb" scrollbar-thumb-width="22" scrollbar-thumb-height="22" scrollbar-thumb-corners="11" scrollbar-track-color="#c7d2fe" scrollbar-track-opacity="0.7" scrollbar-track-corners="7" text-align="left top">Vertical scrollbar test: this panel is intentionally short and the text is intentionally long. Line one should be visible near the top. Line two should wrap because the panel width is constrained. Line three adds more content so the measured text height exceeds the visible box. Line four should require scrolling to inspect. Line five keeps the scrollbar thumb small enough to notice. Line six confirms wheel or scrollbar movement has room to change the visible text. Line seven is here so the bottom content cannot fit at once.</rectangle>
@@ -173,7 +186,7 @@ function runSmokeProbe(scrollbarThumb)
     x: 880,
     y: 480,
     deltaX: 0,
-    deltaY: 1
+    deltaY: 4
   });
   var fixedHit = hitElement(canvas, 760, 490);
   requireSmoke(fixedHit !== null && fixedHit.id === "fixed-badge", "canvas-window smoke fixed overlay hit failed after root scroll");
@@ -181,7 +194,7 @@ function runSmokeProbe(scrollbarThumb)
   dispatchCanvasEvent(canvas, {
     type: "wheel",
     x: 360,
-    y: 505,
+    y: 430,
     deltaX: 0,
     deltaY: 1
   });
@@ -230,10 +243,8 @@ export function main()
   {
     return runSmokeProbe(scrollbarThumb);
   }
-  var initialWidth = 1280;
-  var initialHeight = 720;
-  var latestWidth = initialWidth;
-  var latestHeight = initialHeight;
+  var requestedWidth = 1280;
+  var requestedHeight = 720;
   var eventStats = {
     mouseMove: 0,
     wheel: 0,
@@ -243,13 +254,19 @@ export function main()
     renderRequests: 0,
     replacements: 0
   };
+  var controlDown = false;
   var window = create({
     title: "Jayess Canvas Window",
-    width: initialWidth,
-    height: initialHeight
+    width: requestedWidth,
+    height: requestedHeight
   });
   window.setFps(60);
-  var canvas = buildCanvas(initialWidth, initialHeight, 0, scrollbarThumb);
+  window.show();
+  window.dispatchEvents();
+
+  var latestWidth = positiveSize(windowWidth(window), requestedWidth);
+  var latestHeight = positiveSize(windowHeight(window), requestedHeight);
+  var canvas = buildCanvas(latestWidth, latestHeight, 0, scrollbarThumb);
   var state = { canvas: canvas };
   attachCanvasEvents(canvas, window);
 
@@ -318,6 +335,31 @@ export function main()
     }
   });
 
+  window.addEventListener("keyDown", function (event)
+  {
+    if (isControlKey(event))
+    {
+      controlDown = true;
+    }
+    if (controlDown && isCopyKey(event))
+    {
+      var text = selectedText(state.canvas);
+      if (text.length > 0)
+      {
+        writeClipboardText(text);
+        writeLine("canvas-window copied selected text: " + text);
+      }
+    }
+  });
+
+  window.addEventListener("keyUp", function (event)
+  {
+    if (isControlKey(event))
+    {
+      controlDown = false;
+    }
+  });
+
   window.addEventListener("resize", function (event)
   {
     eventStats.resize = eventStats.resize + 1;
@@ -342,8 +384,6 @@ export function main()
     writeLine("canvas-window is closed");
   });
 
-  window.show();
-  window.dispatchEvents();
   requestProbeRender(canvas);
 
   window.run();

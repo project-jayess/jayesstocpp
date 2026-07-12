@@ -60,6 +60,23 @@ int main() {
   require(std::get<double>(nestedScroll[6]) > 0.0, "nested horizontal scroll offset changed");
   require(std::get<double>(nestedScroll[7]) == 1.0, "nested horizontal scroll hit remains stable");
 
+  auto scrollbarDragValue = ${namespace}::scrollbarDragSummary(std::vector<jayess::value>{});
+  const auto& scrollbarDrag = std::get<jayess::array_ptr>(scrollbarDragValue)->items;
+  require(std::get<double>(scrollbarDrag[0]) > 0.0, "nested scrollbar drag changes offset");
+  require(std::get<double>(scrollbarDrag[1]) == 1.0, "nested scrollbar drag keeps integer offset");
+  require(std::get<double>(scrollbarDrag[2]) > 0.0, "root scrollbar drag changes offset");
+  require(std::get<double>(scrollbarDrag[3]) == 1.0, "root scrollbar drag keeps integer offset");
+  require(std::get<double>(scrollbarDrag[4]) == 1.0, "root scrollbar drag updates hit testing");
+  require(std::get<double>(scrollbarDrag[5]) > 0.0, "root scrollbar drag uses cache present path");
+  require(std::get<double>(scrollbarDrag[6]) == 1.0, "nested scrollbar track click emits scroll event");
+  require(std::get<double>(scrollbarDrag[7]) == 1.0, "nested scrollbar track click event type");
+  require(std::get<double>(scrollbarDrag[8]) == 1.0, "nested scrollbar drag emits scroll event");
+  require(std::get<double>(scrollbarDrag[9]) == 1.0, "nested scrollbar drag event type");
+  require(std::get<double>(scrollbarDrag[10]) == 1.0, "root scrollbar track click emits scroll event");
+  require(std::get<double>(scrollbarDrag[11]) == 1.0, "root scrollbar track click event type");
+  require(std::get<double>(scrollbarDrag[12]) == 1.0, "root scrollbar drag emits scroll event");
+  require(std::get<double>(scrollbarDrag[13]) == 1.0, "root scrollbar drag event type");
+
   auto clickValue = ${namespace}::clickSummary(std::vector<jayess::value>{});
   const auto& click = std::get<jayess::array_ptr>(clickValue)->items;
   require(std::get<double>(click[0]) == 1.0, "mouseDown event count");
@@ -81,6 +98,35 @@ int main() {
   require(std::get<double>(button[3]) == std::get<double>(button[1]), "button release returns to hover");
   require(std::get<double>(button[4]) == 255.0, "button user handler overrides event fill");
   require(std::get<double>(button[5]) == 0.0, "button user handler override green");
+
+  auto dirtyButtonValue = ${namespace}::buttonDirtyRedrawSummary(std::vector<jayess::value>{});
+  const auto& dirtyButton = std::get<jayess::array_ptr>(dirtyButtonValue)->items;
+  require(std::get<double>(dirtyButton[0]) == std::get<double>(dirtyButton[1]), "button dirty redraw preserves nearby ellipse outline red");
+  require(std::get<double>(dirtyButton[2]) == std::get<double>(dirtyButton[3]), "button dirty redraw preserves nearby ellipse outline green");
+  require(std::get<double>(dirtyButton[4]) == std::get<double>(dirtyButton[5]), "button dirty redraw preserves nearby ellipse label");
+
+  auto textSelectionValue = ${namespace}::textSelectionSummary(std::vector<jayess::value>{});
+  const auto& textSelection = std::get<jayess::array_ptr>(textSelectionValue)->items;
+  require(std::get<double>(textSelection[0]) > 0.0, "text select draws configured red highlight");
+  require(std::get<double>(textSelection[1]) == 0.0, "text select starts without green highlight");
+  require(std::get<double>(textSelection[2]) == 0.0, "runtime text select clears previous red highlight");
+  require(std::get<double>(textSelection[3]) > 0.0, "runtime text select draws configured green highlight");
+  require(std::get<double>(textSelection[4]) == 0.0, "runtime text select none clears highlight");
+
+  auto mouseTextSelectionValue = ${namespace}::mouseTextSelectionSummary(std::vector<jayess::value>{});
+  const auto& mouseTextSelection = std::get<jayess::array_ptr>(mouseTextSelectionValue)->items;
+  require(std::get<double>(mouseTextSelection[0]) == 1.0, "mouse text select starts with textselect event");
+  require(std::get<double>(mouseTextSelection[1]) == 1.0, "mouse text select mousedown event type");
+  require(std::get<double>(mouseTextSelection[2]) == 1.0, "mouse text select drag emits event");
+  require(std::get<double>(mouseTextSelection[3]) == 1.0, "mouse text select drag event type");
+  require(std::get<double>(mouseTextSelection[4]) == 1.0, "mouse text select exposes selected text");
+  require(std::get<double>(mouseTextSelection[5]) > 0.0, "mouse text select draws configured highlight");
+  require(std::get<double>(mouseTextSelection[6]) == 1.0, "mouse text select mouseup emits event");
+  require(std::get<double>(mouseTextSelection[7]) == 1.0, "mouse text select mouseup event type");
+  require(std::get<double>(mouseTextSelection[8]) == 1.0, "mouse text select clears on left mousedown");
+  require(std::get<double>(mouseTextSelection[9]) == 1.0, "mouse text select clear event type");
+  require(std::get<double>(mouseTextSelection[10]) == 0.0, "mouse text select clear removes selected text");
+  require(std::get<double>(mouseTextSelection[11]) == 0.0, "mouse text select clear removes highlight");
   std::cout << "ok\\n";
   return 0;
 }
