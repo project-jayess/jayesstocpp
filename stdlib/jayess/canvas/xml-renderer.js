@@ -1,6 +1,6 @@
 import { rgb, rgba } from "jayess:color";
 import { round } from "jayess:math";
-import { startsWith } from "jayess:string";
+import { slice, startsWith } from "jayess:string";
 import { parseScene } from "./xml-scene.js";
 import { drawShapeShadow } from "./xml-shadow.js";
 
@@ -55,7 +55,6 @@ function textOptions(shape) {
   if (shape.fontColor !== null) {
     color = shape.fontColor;
   }
-  var selectionColor = shape.textSelectionKind === "mouse" ? shape.mouseSelectColor : shape.textSelectColor;
   var options = {
     color: color,
     fontFamily: shape.fontFamily,
@@ -67,7 +66,13 @@ function textOptions(shape) {
     textOverflow: shape.textOverflow,
     textWrap: shape.textWrap,
     select: shape.textSelection,
-    selectColor: selectionColor,
+    selectColor: shape.textSelectColor,
+    selectPadding: shape.textSelectPadding,
+    selectCorners: shape.textSelectCorners,
+    mouseSelect: shape.mouseTextSelection,
+    mouseSelectColor: shape.mouseSelectColor,
+    mouseSelectPadding: shape.mouseSelectPadding,
+    mouseSelectCorners: shape.mouseSelectCorners,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -88,7 +93,6 @@ function labelColor(shape) {
 }
 
 function labelOptions(shape) {
-  var selectionColor = shape.textSelectionKind === "mouse" ? shape.mouseSelectColor : shape.textSelectColor;
   var options = {
     color: labelColor(shape),
     fontFamily: shape.fontFamily,
@@ -102,7 +106,13 @@ function labelOptions(shape) {
     textOverflow: shape.textOverflow,
     textWrap: shape.textWrap,
     select: shape.textSelection,
-    selectColor: selectionColor,
+    selectColor: shape.textSelectColor,
+    selectPadding: shape.textSelectPadding,
+    selectCorners: shape.textSelectCorners,
+    mouseSelect: shape.mouseTextSelection,
+    mouseSelectColor: shape.mouseSelectColor,
+    mouseSelectPadding: shape.mouseSelectPadding,
+    mouseSelectCorners: shape.mouseSelectCorners,
     overflow: shape.overflow,
     overflowX: shape.overflowX,
     overflowY: shape.overflowY,
@@ -263,8 +273,13 @@ function measureShapeTextBox(renderer, canvas, shape, box, options) {
 function bitmapCacheKey(shape, box, measured) {
   var lineHeight = shape.lineHeight > 0 ? shape.lineHeight : 0;
   var selection = shape.textSelection === null ? "none" : shape.textSelection.start.toString() + "," + shape.textSelection.end.toString();
-  var color = shape.textSelectionKind === "mouse" ? shape.mouseSelectColor : shape.textSelectColor;
-  var selectionColor = color === null ? "default" : color.red.toString() + "," + color.green.toString() + "," + color.blue.toString() + "," + color.alpha.toString();
+  var selectionColor = shape.textSelectColor === null ? "default" : shape.textSelectColor.red.toString() + "," + shape.textSelectColor.green.toString() + "," + shape.textSelectColor.blue.toString() + "," + shape.textSelectColor.alpha.toString();
+  var selectionPadding = shape.textSelectPadding;
+  var corners = shape.textSelectCorners;
+  var selectionCorners = corners === null ? "none" : corners.topLeft.toString() + "," + corners.topRight.toString() + "," + corners.bottomRight.toString() + "," + corners.bottomLeft.toString();
+  var mouseSelection = shape.mouseTextSelection === null ? "none" : shape.mouseTextSelection.start.toString() + "," + shape.mouseTextSelection.end.toString();
+  var mouseColor = shape.mouseSelectColor === null ? "default" : shape.mouseSelectColor.red.toString() + "," + shape.mouseSelectColor.green.toString() + "," + shape.mouseSelectColor.blue.toString() + "," + shape.mouseSelectColor.alpha.toString();
+  var mouseCorners = shape.mouseSelectCorners === null ? "none" : shape.mouseSelectCorners.topLeft.toString() + "," + shape.mouseSelectCorners.topRight.toString() + "," + shape.mouseSelectCorners.bottomRight.toString() + "," + shape.mouseSelectCorners.bottomLeft.toString();
   return shape.text + "|" +
     box.width.toString() + "x" + box.height.toString() + "|" +
     measured.width.toString() + "x" + measured.height.toString() + "|" +
@@ -279,6 +294,12 @@ function bitmapCacheKey(shape, box, measured) {
     shape.textOverflow + "|" +
     selection + "|" +
     selectionColor + "|" +
+    selectionPadding.toString() + "|" +
+    selectionCorners + "|" +
+    mouseSelection + "|" +
+    mouseColor + "|" +
+    shape.mouseSelectPadding.toString() + "|" +
+    mouseCorners + "|" +
     labelColor(shape).red.toString() + "," +
     labelColor(shape).green.toString() + "," +
     labelColor(shape).blue.toString() + "," +
@@ -398,6 +419,170 @@ function drawCachedTextLayer(renderer, canvas, shape, layout, options) {
   return canvas;
 }
 
+function lineHeightForShape(shape) {
+  if (shape.lineHeight > 0) {
+    return shape.lineHeight;
+  }
+  if (shape.fontSize > 0) {
+    return shape.fontSize + 2;
+  }
+  return 12;
+}
+
+function caretYForShape(shape, box, caretHeight) {
+  if (shape.textAlignY === "bottom") {
+    return box.y + box.height - caretHeight;
+  }
+  if (shape.textAlignY === "middle") {
+    return box.y + (box.height - caretHeight) / 2;
+  }
+  return box.y;
+}
+
+function caretAlignedTextX(box, lineWidth, align) {
+  if (lineWidth > box.width) {
+    return box.x;
+  }
+  if (align === "center") {
+    return box.x + round((box.width - lineWidth) / 2);
+  }
+  if (align === "right") {
+    return box.x + box.width - lineWidth;
+  }
+  return box.x;
+}
+
+function caretAlignedTextY(box, textHeight, align) {
+  if (textHeight > box.height) {
+    return box.y;
+  }
+  if (align === "bottom") {
+    return box.y + box.height - textHeight;
+  }
+  if (align === "middle") {
+    return box.y + round((box.height - textHeight) / 2);
+  }
+  return box.y;
+}
+
+function lineStartIndexes(textValue, lines) {
+  var starts = [];
+  var searchStart = 0;
+  for (var index = 0; index < lines.length; index = index + 1) {
+    var line = lines[index];
+    var found = -1;
+    if (line.length === 0) {
+      found = searchStart;
+    } else {
+      var limit = textValue.length - line.length;
+      var cursor = searchStart;
+      while (cursor <= limit && found < 0) {
+        if (slice(textValue, cursor, cursor + line.length) === line) {
+          found = cursor;
+        }
+        cursor = cursor + 1;
+      }
+    }
+    if (found < 0) {
+      found = searchStart;
+    }
+    starts.push(found);
+    searchStart = found + line.length;
+  }
+  return starts;
+}
+
+function caretPositionForShape(renderer, canvas, shape, box, options, index) {
+  var layout = renderer.measureTextBox(canvas, shape.text, box, options);
+  var starts = lineStartIndexes(shape.text, layout.lines);
+  for (var lineIndex = 0; lineIndex < layout.lines.length; lineIndex = lineIndex + 1) {
+    var lineText = layout.lines[lineIndex];
+    var lineStart = starts[lineIndex];
+    var lineEnd = lineStart + lineText.length;
+    if (index <= lineEnd || lineIndex === layout.lines.length - 1) {
+      var localIndex = index - lineStart;
+      if (localIndex < 0) {
+        localIndex = 0;
+      }
+      if (localIndex > lineText.length) {
+        localIndex = lineText.length;
+      }
+      var prefix = slice(lineText, 0, localIndex);
+      return {
+        x: caretAlignedTextX(box, layout.widths[lineIndex], shape.textAlignX) + renderer.measureText(canvas, prefix, options).width - shape.scrollOffsetX,
+        y: caretAlignedTextY(box, layout.height, shape.textAlignY) + lineIndex * layout.lineHeight - shape.scrollOffsetY
+      };
+    }
+  }
+  return {
+    x: box.x - shape.scrollOffsetX,
+    y: caretYForShape(shape, box, lineHeightForShape(shape)) - shape.scrollOffsetY
+  };
+}
+
+function maxNumber(left, right) {
+  if (left > right) {
+    return left;
+  }
+  return right;
+}
+
+function minNumber(left, right) {
+  if (left < right) {
+    return left;
+  }
+  return right;
+}
+
+function intersectRect(left, right) {
+  var x = maxNumber(left.x, right.x);
+  var y = maxNumber(left.y, right.y);
+  var rightEdge = minNumber(left.x + left.width, right.x + right.width);
+  var bottomEdge = minNumber(left.y + left.height, right.y + right.height);
+  if (rightEdge <= x || bottomEdge <= y) {
+    return { x: x, y: y, width: 0, height: 0 };
+  }
+  return { x: x, y: y, width: rightEdge - x, height: bottomEdge - y };
+}
+
+function drawTextInputCaret(renderer, canvas, shape, box, options) {
+  if (shape.textInput !== true || shape.textInputFocused !== true || shape.textCursorVisible !== true) {
+    return canvas;
+  }
+  var cursorWidth = shape.textCursorWidth;
+  if (cursorWidth <= 0) {
+    cursorWidth = 1;
+  }
+  var cursorHeight = shape.textCursorHeight;
+  if (cursorHeight <= 0) {
+    cursorHeight = lineHeightForShape(shape);
+  }
+  if (cursorHeight > box.height) {
+    cursorHeight = box.height;
+  }
+  var index = shape.textCursorIndex;
+  if (index < 0) {
+    index = 0;
+  }
+  if (index > shape.text.length) {
+    index = shape.text.length;
+  }
+  var caret = caretPositionForShape(renderer, canvas, shape, box, options, index);
+  var visible = intersectRect(
+    { x: caret.x, y: caret.y, width: cursorWidth, height: cursorHeight },
+    box
+  );
+  if (visible.width <= 0 || visible.height <= 0) {
+    return canvas;
+  }
+  if (shape.textCursorCorners !== null && visible.width === cursorWidth && visible.height === cursorHeight) {
+    renderer.fillRoundedRect(canvas, visible.x, visible.y, visible.width, visible.height, shape.textCursorCorners, shape.textCursorColor);
+  } else {
+    renderer.fillRect(canvas, visible.x, visible.y, visible.width, visible.height, shape.textCursorColor);
+  }
+  return canvas;
+}
+
 function drawScrollbars(renderer, canvas, shape, x, y, width, height, layout, options) {
   if (shape.scrollbarWidth <= 0) {
     return canvas;
@@ -466,6 +651,7 @@ function drawShapeLabelInBox(renderer, canvas, shape, x, y, width, height, rende
   } else {
     renderer.drawTextBox(canvas, shape.text, layout.contentBox, options);
   }
+  drawTextInputCaret(renderer, canvas, shape, layout.contentBox, options);
   drawScrollbars(renderer, canvas, shape, x + padding, y + padding, innerWidth, innerHeight, layout, renderOptions);
   return canvas;
 }

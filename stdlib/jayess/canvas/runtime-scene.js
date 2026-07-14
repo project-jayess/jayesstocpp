@@ -323,10 +323,42 @@ export function updateElementAttribute(source, id, name, value) {
     shape.textSelectionKind = shape.textSelection === null ? "" : "text";
   } else if (name === "text-select-color") {
     applyColorAttribute(shape, "textSelectColor", value);
+  } else if (name === "text-select-padding") {
+    shape.textSelectPadding = parseNumber(value, name);
+  } else if (name === "text-select-corners") {
+    if (value === null || value === "none") {
+      shape.textSelectCorners = null;
+    } else {
+      shape.textSelectCorners = parseCorners(value, name);
+    }
   } else if (name === "mouse-select") {
     shape.mouseSelect = parseBoolean(value, name);
   } else if (name === "mouse-select-color") {
     applyColorAttribute(shape, "mouseSelectColor", value);
+  } else if (name === "mouse-select-padding") {
+    shape.mouseSelectPadding = parseNumber(value, name);
+  } else if (name === "mouse-select-corners") {
+    if (value === null || value === "none") {
+      shape.mouseSelectCorners = null;
+    } else {
+      shape.mouseSelectCorners = parseCorners(value, name);
+    }
+  } else if (name === "text-input") {
+    shape.textInput = parseBoolean(value, name);
+  } else if (name === "text-cursor") {
+    shape.textCursorColor = parseColor(value);
+  } else if (name === "text-cursor-width") {
+    shape.textCursorWidth = parseNumber(value, name);
+  } else if (name === "text-cursor-height") {
+    shape.textCursorHeight = parseNumber(value, name);
+  } else if (name === "text-cursor-corners") {
+    if (value === null || value === "none") {
+      shape.textCursorCorners = null;
+    } else {
+      shape.textCursorCorners = parseCorners(value, name);
+    }
+  } else if (name === "text-cursor-speed") {
+    shape.textCursorSpeed = parseNumber(value, name);
   } else if (name === "overflow") {
     shape.overflow = parseOverflow(value, name);
     shape.overflowX = shape.overflow;
@@ -755,6 +787,11 @@ function emitCanvasEvent(canvas, event) {
   for (var index = 0; index < listeners.length; index = index + 1) {
     listeners[index](event);
   }
+}
+
+export function emitCanvasCustomEvent(canvas, event) {
+  emitCanvasEvent(canvas, event);
+  return event;
 }
 
 function enrichMouseEvent(source, hit, fallbackType) {

@@ -245,6 +245,15 @@ std::string window_linux_key_name(unsigned long keysym) {
   if (keysym == 0xff1bUL) {
     return "Escape";
   }
+  if (keysym == 0xffffUL) {
+    return "Delete";
+  }
+  if (keysym == 0xff50UL) {
+    return "Home";
+  }
+  if (keysym == 0xff57UL) {
+    return "End";
+  }
   if (keysym == 0xff51UL) {
     return "ArrowLeft";
   }
@@ -270,6 +279,10 @@ std::string window_linux_key_name(unsigned long keysym) {
     return "Meta";
   }
   return "unknown";
+}
+
+bool window_linux_modifier(unsigned int state, unsigned int mask) {
+  return (state & mask) != 0U;
 }
 
 void window_x11_platform_frame(const window_ptr& window) {
@@ -467,7 +480,19 @@ void window_x11_platform_poll_events(const window_ptr& window) {
     }
     if (event.type == keyPress || event.type == keyRelease) {
       const auto keysym = api.lookup_keysym(&event.key, 0);
-      window_push_key_event(window, event.type == keyPress ? "keyDown" : "keyUp", window_linux_key_name(keysym));
+      constexpr unsigned int shiftMask = 1U;
+      constexpr unsigned int controlMask = 4U;
+      constexpr unsigned int mod1Mask = 8U;
+      constexpr unsigned int mod4Mask = 64U;
+      window_push_key_event(
+        window,
+        event.type == keyPress ? "keyDown" : "keyUp",
+        window_linux_key_name(keysym),
+        window_linux_modifier(event.key.state, shiftMask),
+        window_linux_modifier(event.key.state, controlMask),
+        window_linux_modifier(event.key.state, mod1Mask),
+        window_linux_modifier(event.key.state, mod4Mask)
+      );
       continue;
     }
     if (event.type == buttonPress || event.type == buttonRelease) {

@@ -87,6 +87,8 @@ Window handles also expose a small method-style surface for user code that reads
 
 These methods are aliases over the module functions. `window.renderCanvas(canvas)` and `window.present(canvas)` present immediately. `window.requestRender(canvas)` stores the canvas and asks `window.run()` to present it on the next loop tick, which is preferable inside input callbacks. `window.run()` is the simple high-level loop for normal programs. `window.dispatchEvents()`, `window.isClosing()`, and `window.shouldClose()` are lower-level pieces for custom loops, games, animation, tests, or frame helpers.
 
+`window.run()` also emits a `frame` event once per loop tick. The event has `{ type: "frame", millis }`, where `millis` is a monotonic `std::chrono::steady_clock` millisecond value. This is intended for lightweight UI animation and caret ticking without adding a hidden 1 ms busy loop to every generated binary.
+
 Example:
 
 ```js

@@ -1,5 +1,6 @@
 import { abs, round, sqrt } from "jayess:math";
 import { rgb, rgba } from "jayess:color";
+import { millis } from "jayess:time";
 import {
   bitmapFontByName,
   defaultBitmapFont,
@@ -50,6 +51,7 @@ import {
   dispatchCanvasClickEvent,
   dispatchCanvasEvent,
   dispatchCanvasTargetEvent,
+  emitCanvasCustomEvent,
   getElementById,
   hitTest,
   hitTests,
@@ -94,6 +96,12 @@ import {
   shapePaintBoundsWith,
   shapeRenderBoundsWith
 } from "./xml-renderer.js";
+import {
+  parseScene,
+  sceneBackground,
+  sceneSize,
+  sceneTitle
+} from "./xml-scene.js";
 export {
   parseScene,
   sceneBackground,
@@ -114,7 +122,7 @@ function defaultRenderStats() {
   };
 }
 
-function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, textSelectionDragState, clickStartElementId, selectedTextShapeId, rootScrollCache, renderStats, requestedBackend, actualBackend) {
+function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOptions, hoveredElementId, canvasListeners, scrollDragState, textSelectionDragState, clickStartElementId, selectedTextShapeId, focusedTextInputShapeId, rootScrollCache, renderStats, requestedBackend, actualBackend) {
   return {
     image: image,
     title: title,
@@ -129,6 +137,7 @@ function makeCanvas(image, title, clipStack, state, stateStack, scene, sceneOpti
     textSelectionDragState: textSelectionDragState,
     clickStartElementId: clickStartElementId,
     selectedTextShapeId: selectedTextShapeId,
+    focusedTextInputShapeId: focusedTextInputShapeId,
     rootScrollCache: rootScrollCache,
     renderStats: renderStats,
     requestedBackend: requestedBackend,
@@ -421,7 +430,7 @@ export function create(width, height, options) {
   var title = optionValue(options, "title", "");
   var requestedBackend = requestedBackendValue(options);
   var actualBackend = actualBackendValue(requestedBackend);
-  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, null, "", "", null, defaultRenderStats(), requestedBackend, actualBackend);
+  return makeCanvas(createImage(width, height, background), title, defaultClipStack(), defaultState(), [], null, null, "", {}, null, null, "", "", "", null, defaultRenderStats(), requestedBackend, actualBackend);
 }
 
 export function clear(canvas, color) {
@@ -443,7 +452,7 @@ export function getPixel(canvas, x, y) {
 
 export function copy(canvas) {
   var source = requireCanvas(canvas);
-  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.textSelectionDragState, source.clickStartElementId, source.selectedTextShapeId, null, defaultRenderStats(), source.requestedBackend, source.actualBackend);
+  return makeCanvas(copyImage(source.image), source.title, copyClipStack(source.clipStack), copyDrawingState(source.state), copyDrawingStateStack(source.stateStack), source.scene, source.sceneOptions, source.hoveredElementId, source.canvasListeners, source.scrollDragState, source.textSelectionDragState, source.clickStartElementId, source.selectedTextShapeId, source.focusedTextInputShapeId, null, defaultRenderStats(), source.requestedBackend, source.actualBackend);
 }
 
 export function renderStats(canvas) {
@@ -1370,8 +1379,7 @@ function drawTextDecoration(canvas, rect, lineWidth, x, y, metrics, color, decor
   return canvas;
 }
 
-function textSelectionRange(options) {
-  var selection = optionValue(options, "select", null);
+function textSelectionRangeFrom(selection) {
   if (selection === null) {
     return null;
   }
@@ -1397,6 +1405,10 @@ function textSelectionRange(options) {
   };
 }
 
+function textSelectionRange(options) {
+  return textSelectionRangeFrom(optionValue(options, "select", null));
+}
+
 function selectedTextColor(canvas, options) {
   var color = optionValue(options, "selectColor", null);
   if (color === null) {
@@ -1405,8 +1417,7 @@ function selectedTextColor(canvas, options) {
   return fillColorValue(canvas, color);
 }
 
-function drawTextSelection(canvas, rect, lineText, lineStart, x, y, metrics, options) {
-  var selection = textSelectionRange(options);
+function drawTextSelectionRange(canvas, lineText, lineStart, x, y, metrics, options, selection, color, paddingValue, corners) {
   if (selection === null) {
     return canvas;
   }
@@ -1424,7 +1435,32 @@ function drawTextSelection(canvas, rect, lineText, lineStart, x, y, metrics, opt
   if (drawWidth <= 0) {
     drawWidth = 1;
   }
-  fillRectAlpha(canvas, round(highlightX), round(y), drawWidth, round(metrics.lineHeight), selectedTextColor(canvas, options));
+  var padding = round(paddingValue);
+  var drawX = round(highlightX) - padding;
+  var drawY = round(y) - padding;
+  var drawHeight = round(metrics.lineHeight) + padding * 2;
+  drawWidth = drawWidth + padding * 2;
+  if (corners !== null) {
+    for (var row = drawY; row < drawY + drawHeight; row = row + 1) {
+      var span = roundedRectRowSpan(drawX, drawY, drawWidth, drawHeight, corners, row);
+      fillRectAlpha(canvas, span.left, row, span.right - span.left, 1, color);
+    }
+  } else {
+    fillRectAlpha(canvas, drawX, drawY, drawWidth, drawHeight, color);
+  }
+  return canvas;
+}
+
+function drawTextSelection(canvas, rect, lineText, lineStart, x, y, metrics, options) {
+  var selection = textSelectionRange(options);
+  var mouseSelection = textSelectionRangeFrom(optionValue(options, "mouseSelect", null));
+  drawTextSelectionRange(canvas, lineText, lineStart, x, y, metrics, options, selection, selectedTextColor(canvas, options), optionValue(options, "selectPadding", 0), optionValue(options, "selectCorners", null));
+  if (mouseSelection !== null) {
+    var mouseOptions = {
+      selectColor: optionValue(options, "mouseSelectColor", null)
+    };
+    drawTextSelectionRange(canvas, lineText, lineStart, x, y, metrics, options, mouseSelection, selectedTextColor(canvas, mouseOptions), optionValue(options, "mouseSelectPadding", 0), optionValue(options, "mouseSelectCorners", null));
+  }
   return canvas;
 }
 
@@ -1815,6 +1851,103 @@ export function renderScene(xmlText, options) {
   return renderSceneWith(xmlSceneRenderer(), xmlText, options);
 }
 
+function collectShapesById(shapes, byId) {
+  for (var index = 0; index < shapes.length; index = index + 1) {
+    var shape = shapes[index];
+    if (shape.id !== null && shape.id.length > 0) {
+      byId[shape.id] = shape;
+    }
+    if (shape.children !== null && shape.children.length > 0) {
+      collectShapesById(shape.children, byId);
+    }
+  }
+}
+
+function shapeMapById(scene) {
+  var byId = {};
+  if (scene !== null) {
+    collectShapesById(scene.shapes, byId);
+  }
+  return byId;
+}
+
+function copyRuntimeShapeState(previous, next) {
+  next.text = previous.text;
+  next.fill = previous.fill;
+  next.outline = previous.outline;
+  next.outlineThickness = previous.outlineThickness;
+  next.outlineOpacity = previous.outlineOpacity;
+  next.opacity = previous.opacity;
+  next.visible = previous.visible;
+  next.textSelection = previous.textSelection;
+  next.textSelectionKind = previous.textSelectionKind;
+  next.textSelectColor = previous.textSelectColor;
+  next.textSelectPadding = previous.textSelectPadding;
+  next.textSelectCorners = previous.textSelectCorners;
+  next.mouseTextSelection = previous.mouseTextSelection;
+  next.mouseSelectColor = previous.mouseSelectColor;
+  next.mouseSelectPadding = previous.mouseSelectPadding;
+  next.mouseSelectCorners = previous.mouseSelectCorners;
+  next.textInputFocused = previous.textInputFocused;
+  next.textCursorIndex = previous.textCursorIndex;
+  next.textCursorVisible = previous.textCursorVisible;
+  next.textCursorLastTick = previous.textCursorLastTick;
+  next.textUndoStack = previous.textUndoStack;
+  next.textRedoStack = previous.textRedoStack;
+  next.textLastEditMillis = previous.textLastEditMillis;
+  next.scrollOffsetX = previous.scrollOffsetX;
+  next.scrollOffsetY = previous.scrollOffsetY;
+}
+
+function preserveRuntimeSceneState(previousScene, nextScene) {
+  var previousById = shapeMapById(previousScene);
+  var nextById = shapeMapById(nextScene);
+  var ids = keys(nextById);
+  for (var index = 0; index < ids.length; index = index + 1) {
+    var id = ids[index];
+    var previous = previousById[id];
+    if (previous !== null) {
+      copyRuntimeShapeState(previous, nextById[id]);
+    }
+  }
+  if (previousScene !== null) {
+    nextScene.scrollOffsetY = clampedScrollOffset(previousScene.scrollOffsetY, maxValue(0, nextScene.scrollHeight - nextScene.height));
+  }
+}
+
+function sceneHasElementId(scene, id) {
+  if (scene === null || id === null || id.length === 0) {
+    return false;
+  }
+  return getElementById({ scene: scene }, id) !== null;
+}
+
+function keepExistingElementId(scene, id) {
+  if (sceneHasElementId(scene, id)) {
+    return id;
+  }
+  return "";
+}
+
+export function reflowScene(canvas, xmlText, options) {
+  var target = requireCanvas(canvas);
+  var nextScene = parseScene(xmlText, options);
+  preserveRuntimeSceneState(target.scene, nextScene);
+  target.image = createImage(nextScene.width, nextScene.height, nextScene.background);
+  target.title = nextScene.title;
+  target.scene = nextScene;
+  target.sceneOptions = options;
+  target.hoveredElementId = keepExistingElementId(nextScene, target.hoveredElementId);
+  target.selectedTextShapeId = keepExistingElementId(nextScene, target.selectedTextShapeId);
+  target.focusedTextInputShapeId = keepExistingElementId(nextScene, target.focusedTextInputShapeId);
+  target.scrollDragState = null;
+  target.textSelectionDragState = null;
+  target.rootScrollCache = null;
+  target.renderStats.fullRedraws = target.renderStats.fullRedraws + 1;
+  drawSceneWith(xmlSceneRenderer(), target, nextScene, options);
+  return target;
+}
+
 function redrawAttachedScene(canvas) {
   var target = requireCanvas(canvas);
   var scene = target.scene;
@@ -2172,6 +2305,33 @@ function textIndexForLineX(canvas, shape, lineText, lineStart, lineX, x, options
   return lineStart + lineText.length;
 }
 
+function lineStartIndexes(textValue, lines) {
+  var starts = [];
+  var searchStart = 0;
+  for (var index = 0; index < lines.length; index = index + 1) {
+    var line = lines[index];
+    var found = -1;
+    if (line.length === 0) {
+      found = searchStart;
+    } else {
+      var limit = textValue.length - line.length;
+      var cursor = searchStart;
+      while (cursor <= limit && found < 0) {
+        if (sliceString(textValue, cursor, cursor + line.length) === line) {
+          found = cursor;
+        }
+        cursor = cursor + 1;
+      }
+    }
+    if (found < 0) {
+      found = searchStart;
+    }
+    starts.push(found);
+    searchStart = found + line.length;
+  }
+  return starts;
+}
+
 function textIndexAtPoint(canvas, shape, x, y) {
   var info = shapeTextMeasurement(canvas, shape);
   if (info === null) {
@@ -2181,16 +2341,15 @@ function textIndexAtPoint(canvas, shape, x, y) {
   var layout = measureTextBox(canvas, shape.text, info.rect, options);
   var docY = documentYForShape(canvas, shape, y);
   var contentTop = alignedTextY(info.rect, layout.height, shape.textAlignY) - shape.scrollOffsetY;
-  var lineStart = 0;
+  var starts = lineStartIndexes(shape.text, layout.lines);
   for (var index = 0; index < layout.lines.length; index = index + 1) {
     var lineText = layout.lines[index];
     var lineWidth = layout.widths[index];
     var lineTop = contentTop + index * layout.lineHeight;
     if (docY < lineTop + layout.lineHeight) {
       var lineX = alignedTextX(info.rect, lineWidth, shape.textAlignX) - shape.scrollOffsetX;
-      return textIndexForLineX(canvas, shape, lineText, lineStart, lineX, x, options);
+      return textIndexForLineX(canvas, shape, lineText, starts[index], lineX, x, options);
     }
-    lineStart = lineStart + lineText.length;
   }
   return shape.text.length;
 }
@@ -2221,14 +2380,12 @@ function setMouseTextSelection(canvas, shape, anchor, focus) {
   var start = minValue(anchor, focus);
   var end = maxValue(anchor, focus);
   if (start === end) {
-    shape.textSelection = null;
-    shape.textSelectionKind = "";
+    shape.mouseTextSelection = null;
   } else {
-    shape.textSelection = {
+    shape.mouseTextSelection = {
       start: start,
       end: end
     };
-    shape.textSelectionKind = "mouse";
   }
   shape.textBitmapCache = null;
   canvas.selectedTextShapeId = shape.id;
@@ -2242,11 +2399,10 @@ function clearActiveMouseTextSelection(canvas) {
   }
   var shape = getElementById(canvas, canvas.selectedTextShapeId);
   canvas.selectedTextShapeId = "";
-  if (shape === null || shape.textSelectionKind !== "mouse") {
+  if (shape === null || shape.mouseTextSelection === null) {
     return null;
   }
-  shape.textSelection = null;
-  shape.textSelectionKind = "";
+  shape.mouseTextSelection = null;
   shape.textBitmapCache = null;
   redrawShapeScrollArea(canvas, shape);
   return shape;
@@ -2258,16 +2414,12 @@ function beginTextSelection(canvas, event) {
     canvas.textSelectionDragState = null;
     return null;
   }
-  if (canvas.selectedTextShapeId !== shape.id) {
-    clearActiveMouseTextSelection(canvas);
-  }
   var index = textIndexAtPoint(canvas, shape, event.x, event.y);
   canvas.textSelectionDragState = {
     shape: shape,
     anchor: index,
     focus: index
   };
-  setMouseTextSelection(canvas, shape, index, index);
   return textSelectEvent(event, shape);
 }
 
@@ -2281,8 +2433,306 @@ function updateTextSelectionDrag(canvas, event) {
     return null;
   }
   state.focus = nextFocus;
+  if (canvas.selectedTextShapeId.length > 0 && canvas.selectedTextShapeId !== state.shape.id) {
+    clearActiveMouseTextSelection(canvas);
+  }
   setMouseTextSelection(canvas, state.shape, state.anchor, state.focus);
   return textSelectEvent(event, state.shape);
+}
+
+function textInputEvent(event, shape) {
+  var x = event.x;
+  var y = event.y;
+  if (x === null) {
+    x = 0;
+  }
+  if (y === null) {
+    y = 0;
+  }
+  return {
+    type: "textinput",
+    targetId: shape.id,
+    targetKind: shape.kind,
+    x: x,
+    y: y,
+    sourceEvent: event
+  };
+}
+
+function textFocusEvent(event, shape, type) {
+  var x = event.x;
+  var y = event.y;
+  if (x === null) {
+    x = 0;
+  }
+  if (y === null) {
+    y = 0;
+  }
+  return {
+    type: type,
+    targetId: shape.id,
+    targetKind: shape.kind,
+    x: x,
+    y: y,
+    sourceEvent: event
+  };
+}
+
+function topTextInputShapeAt(canvas, x, y) {
+  var hits = hitShapes(canvas, x, y);
+  for (var index = 0; index < hits.length; index = index + 1) {
+    if (hits[index].textInput === true) {
+      return hits[index];
+    }
+  }
+  return null;
+}
+
+function clampTextCursorIndex(shape, index) {
+  if (index < 0) {
+    return 0;
+  }
+  if (index > shape.text.length) {
+    return shape.text.length;
+  }
+  return index;
+}
+
+function clearFocusedTextInput(canvas, event) {
+  if (canvas.focusedTextInputShapeId.length === 0) {
+    return null;
+  }
+  var previous = getElementById(canvas, canvas.focusedTextInputShapeId);
+  canvas.focusedTextInputShapeId = "";
+  if (previous === null || previous.textInputFocused !== true) {
+    return null;
+  }
+  previous.textInputFocused = false;
+  previous.textCursorVisible = false;
+  previous.textBitmapCache = null;
+  redrawShapeScrollArea(canvas, previous);
+  return textFocusEvent(event, previous, "blur");
+}
+
+function focusTextInput(canvas, shape, event) {
+  if (shape === null || shape.textInput !== true) {
+    return clearFocusedTextInput(canvas, event);
+  }
+  if (canvas.focusedTextInputShapeId.length > 0 && canvas.focusedTextInputShapeId !== shape.id) {
+    var blurEvent = clearFocusedTextInput(canvas, event);
+    if (blurEvent !== null) {
+      emitCanvasCustomEvent(canvas, blurEvent);
+    }
+  }
+  canvas.focusedTextInputShapeId = shape.id;
+  shape.textInputFocused = true;
+  shape.textCursorIndex = clampTextCursorIndex(shape, textIndexAtPoint(canvas, shape, event.x, event.y));
+  shape.textCursorVisible = true;
+  shape.textCursorLastTick = 0;
+  shape.textBitmapCache = null;
+  redrawShapeScrollArea(canvas, shape);
+  return textFocusEvent(event, shape, "focus");
+}
+
+function focusedTextInputShape(canvas) {
+  if (canvas.focusedTextInputShapeId.length === 0) {
+    return null;
+  }
+  var shape = getElementById(canvas, canvas.focusedTextInputShapeId);
+  if (shape === null || shape.textInput !== true || shape.textInputFocused !== true) {
+    canvas.focusedTextInputShapeId = "";
+    return null;
+  }
+  return shape;
+}
+
+function replaceTextRange(text, start, end, inserted) {
+  return sliceString(text, 0, start) + inserted + sliceString(text, end, text.length);
+}
+
+function textSnapshot(shape) {
+  return {
+    text: shape.text,
+    cursor: shape.textCursorIndex
+  };
+}
+
+function restoreTextSnapshot(shape, snapshot) {
+  shape.text = snapshot.text;
+  shape.textCursorIndex = clampTextCursorIndex(shape, snapshot.cursor);
+  shape.textCursorVisible = true;
+  shape.textCursorLastTick = 0;
+  shape.textLayoutCache = null;
+  shape.textBitmapCache = null;
+}
+
+function pushTextUndoSnapshot(shape) {
+  var now = millis();
+  if (shape.textLastEditMillis <= 0 || now - shape.textLastEditMillis > 300) {
+    shape.textUndoStack.push(textSnapshot(shape));
+  }
+  shape.textLastEditMillis = now;
+  shape.textRedoStack = [];
+}
+
+function applyTextUndo(canvas, shape) {
+  if (shape.textUndoStack.length === 0) {
+    return false;
+  }
+  shape.textRedoStack.push(textSnapshot(shape));
+  restoreTextSnapshot(shape, shape.textUndoStack.pop());
+  shape.textLastEditMillis = 0;
+  redrawShapeScrollArea(canvas, shape);
+  return true;
+}
+
+function applyTextRedo(canvas, shape) {
+  if (shape.textRedoStack.length === 0) {
+    return false;
+  }
+  shape.textUndoStack.push(textSnapshot(shape));
+  restoreTextSnapshot(shape, shape.textRedoStack.pop());
+  shape.textLastEditMillis = 0;
+  redrawShapeScrollArea(canvas, shape);
+  return true;
+}
+
+function insertTextInputText(canvas, shape, text) {
+  if (text.length === 0) {
+    return false;
+  }
+  pushTextUndoSnapshot(shape);
+  var index = clampTextCursorIndex(shape, shape.textCursorIndex);
+  shape.text = replaceTextRange(shape.text, index, index, text);
+  shape.textCursorIndex = index + text.length;
+  shape.textCursorVisible = true;
+  shape.textCursorLastTick = 0;
+  shape.textLayoutCache = null;
+  shape.textBitmapCache = null;
+  redrawShapeScrollArea(canvas, shape);
+  return true;
+}
+
+function eventModifier(event, name) {
+  var names = keys(event);
+  for (var index = 0; index < names.length; index = index + 1) {
+    if (names[index] === name) {
+      return event[name] === true;
+    }
+  }
+  return false;
+}
+
+function isUndoKey(event) {
+  return (eventModifier(event, "ctrlKey") || eventModifier(event, "controlKey") || eventModifier(event, "metaKey")) &&
+    !eventModifier(event, "shiftKey") &&
+    (event.key === "z" || event.key === "Z" || event.code === "KeyZ");
+}
+
+function isRedoKey(event) {
+  return (eventModifier(event, "ctrlKey") || eventModifier(event, "controlKey") || eventModifier(event, "metaKey")) &&
+    eventModifier(event, "shiftKey") &&
+    (event.key === "z" || event.key === "Z" || event.code === "KeyZ");
+}
+
+function editFocusedTextInput(canvas, event) {
+  var shape = focusedTextInputShape(canvas);
+  if (shape === null) {
+    return null;
+  }
+  if (event.type === "textInput") {
+    if (eventModifier(event, "ctrlKey") || eventModifier(event, "controlKey") || eventModifier(event, "metaKey")) {
+      return null;
+    }
+    if (insertTextInputText(canvas, shape, event.text)) {
+      return textInputEvent(event, shape);
+    }
+    return null;
+  }
+  if (event.type !== "keyDown") {
+    return null;
+  }
+  if (isUndoKey(event)) {
+    if (applyTextUndo(canvas, shape)) {
+      return textInputEvent(event, shape);
+    }
+    return null;
+  }
+  if (isRedoKey(event)) {
+    if (applyTextRedo(canvas, shape)) {
+      return textInputEvent(event, shape);
+    }
+    return null;
+  }
+  var key = event.key;
+  var index = clampTextCursorIndex(shape, shape.textCursorIndex);
+  if (key === "Backspace") {
+    if (index <= 0) {
+      return null;
+    }
+    pushTextUndoSnapshot(shape);
+    shape.text = replaceTextRange(shape.text, index - 1, index, "");
+    shape.textCursorIndex = index - 1;
+  } else if (key === "Delete") {
+    if (index >= shape.text.length) {
+      return null;
+    }
+    pushTextUndoSnapshot(shape);
+    shape.text = replaceTextRange(shape.text, index, index + 1, "");
+  } else if (key === "ArrowLeft") {
+    shape.textCursorIndex = clampTextCursorIndex(shape, index - 1);
+  } else if (key === "ArrowRight") {
+    shape.textCursorIndex = clampTextCursorIndex(shape, index + 1);
+  } else if (key === "Home") {
+    shape.textCursorIndex = 0;
+  } else if (key === "End") {
+    shape.textCursorIndex = shape.text.length;
+  } else {
+    return null;
+  }
+  shape.textCursorVisible = true;
+  shape.textCursorLastTick = 0;
+  shape.textLayoutCache = null;
+  shape.textBitmapCache = null;
+  redrawShapeScrollArea(canvas, shape);
+  return textInputEvent(event, shape);
+}
+
+function cursorToggleInterval(shape) {
+  if (shape.textCursorSpeed <= 0) {
+    return 0;
+  }
+  return 500 / shape.textCursorSpeed;
+}
+
+export function tickTextCursor(canvas, nowMillis) {
+  var target = requireCanvas(canvas);
+  var shape = focusedTextInputShape(target);
+  if (shape === null) {
+    return false;
+  }
+  var interval = cursorToggleInterval(shape);
+  if (interval <= 0) {
+    if (shape.textCursorVisible !== true) {
+      shape.textCursorVisible = true;
+      redrawShapeScrollArea(target, shape);
+      return true;
+    }
+    return false;
+  }
+  if (shape.textCursorLastTick <= 0) {
+    shape.textCursorLastTick = nowMillis;
+    shape.textCursorVisible = true;
+    redrawShapeScrollArea(target, shape);
+    return true;
+  }
+  if (nowMillis - shape.textCursorLastTick < interval) {
+    return false;
+  }
+  shape.textCursorLastTick = nowMillis;
+  shape.textCursorVisible = !shape.textCursorVisible;
+  redrawShapeScrollArea(target, shape);
+  return true;
 }
 
 function isLeftMouseEvent(event) {
@@ -2749,11 +3199,11 @@ export function selectedText(canvas) {
     return "";
   }
   var shape = getElementById(target, target.selectedTextShapeId);
-  if (shape === null || shape.textSelection === null) {
+  if (shape === null || shape.mouseTextSelection === null) {
     return "";
   }
-  var start = round(shape.textSelection.start);
-  var end = round(shape.textSelection.end);
+  var start = round(shape.mouseTextSelection.start);
+  var end = round(shape.mouseTextSelection.end);
   if (end < start) {
     var previousStart = start;
     start = end;
@@ -2799,6 +3249,30 @@ export function dispatchEvent(canvas, event) {
         return [canvasScrollEvent(event)];
       }
       return [];
+    }
+    if (isLeftMouseEvent(event)) {
+      var inputShape = topTextInputShapeAt(target, event.x, event.y);
+      if (inputShape !== null) {
+        target.clickStartElementId = "";
+        var inputEvents = [];
+        var focusEvent = focusTextInput(target, inputShape, event);
+        if (focusEvent !== null) {
+          emitCanvasCustomEvent(target, focusEvent);
+          inputEvents.push(focusEvent);
+        }
+        var inputSelectionStart = beginTextSelection(target, event);
+        if (inputSelectionStart !== null) {
+          inputEvents.push(inputSelectionStart);
+        }
+        return inputEvents;
+      }
+      var clearedInput = clearFocusedTextInput(target, event);
+      if (clearedInput !== null) {
+        target.clickStartElementId = "";
+        clearActiveMouseTextSelection(target);
+        emitCanvasCustomEvent(target, clearedInput);
+        return [clearedInput];
+      }
     }
     var selectionStart = beginTextSelection(target, event);
     if (selectionStart !== null) {
@@ -2890,6 +3364,14 @@ export function dispatchEvent(canvas, event) {
       });
     }
     return emitted;
+  }
+  if (event.type === "keyDown" || event.type === "textInput") {
+    var editedInput = editFocusedTextInput(target, event);
+    if (editedInput !== null) {
+      emitCanvasCustomEvent(target, editedInput);
+      return [editedInput];
+    }
+    return [];
   }
   return dispatchCanvasEvent(target, event);
 }

@@ -51,6 +51,7 @@ export {
   pushClip,
   quadraticCurve,
   renderScene,
+  reflowScene,
   requestedBackend,
   renderStats,
   restoreState,
@@ -68,6 +69,7 @@ export {
   setTextSize,
   shadowMask,
   text,
+  tickTextCursor,
   translate,
   width
 } from "./core.js";

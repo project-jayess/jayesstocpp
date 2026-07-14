@@ -61,6 +61,7 @@ struct window_canvas_pixels {
 void window_push_close_event(const window_ptr& window);
 void window_push_resize_event(const window_ptr& window, int width, int height);
 void window_push_key_event(const window_ptr& window, const std::string& type, const std::string& key);
+void window_push_key_event(const window_ptr& window, const std::string& type, const std::string& key, bool shift, bool control, bool alt, bool meta);
 void window_push_text_input_event(const window_ptr& window, const std::string& text);
 void window_push_mouse_move_event(const window_ptr& window, int x, int y);
 void window_push_mouse_button_event(const window_ptr& window, const std::string& type, int button, int x, int y);
@@ -267,14 +268,23 @@ void window_push_resize_event(const window_ptr& window, int width, int height) {
 }
 
 void window_push_key_event(const window_ptr& window, const std::string& type, const std::string& key) {
+  window_push_key_event(window, type, key, false, false, false, false);
+}
+
+void window_push_key_event(const window_ptr& window, const std::string& type, const std::string& key, bool shift, bool control, bool alt, bool meta) {
   const auto normalized = window_normalize_key(key);
   window->events.push_back(window_event({
     {"type", type},
     {"key", normalized},
     {"code", window_event_code_for_key(normalized)},
-    {"pressed", type == "keyDown"}
+    {"pressed", type == "keyDown"},
+    {"shiftKey", shift},
+    {"ctrlKey", control},
+    {"controlKey", control},
+    {"altKey", alt},
+    {"metaKey", meta}
   }));
-  if (type == "keyDown" && normalized.size() == 1) {
+  if (type == "keyDown" && normalized.size() == 1 && !control && !meta) {
     window_push_text_input_event(window, normalized);
   }
 }
@@ -339,6 +349,24 @@ event_emitter_ptr window_event_emitter(const window_ptr& window) {
     window->event_emitter = std::make_shared<event_emitter>();
   }
   return window->event_emitter;
+}
+
+double window_frame_millis() {
+  const auto now = std::chrono::steady_clock::now().time_since_epoch();
+  return static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(now).count());
+}
+
+void window_emit_frame_event(const window_ptr& window) {
+  events_emit(
+    value(window_event_emitter(window)),
+    "frame",
+    make_array({
+      window_event({
+        {"type", std::string("frame")},
+        {"millis", window_frame_millis()}
+      })
+    })
+  );
 }
 
 std::string require_window_event_name(const value& nameValue) {
@@ -540,6 +568,7 @@ value window_run(const value& windowValue) {
   }
   while (!window->closed && !window->close_requested) {
     window_dispatch_events(windowValue);
+    window_emit_frame_event(window);
     if (window->render_requested && !std::holds_alternative<std::monostate>(window->current_canvas) && !window->closed && !window->close_requested && window->shown) {
       window_present(windowValue, window->current_canvas);
     }

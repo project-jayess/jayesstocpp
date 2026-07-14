@@ -8,9 +8,11 @@ import
     hitElement,
     packImage,
     renderScene,
+    reflowScene,
     renderStats,
     selectedText,
     setAttributes,
+    tickTextCursor,
   } from "jayess:canvas";
 import { packFont, registerFont } from "jayess:font";
 import { hasEnv } from "jayess:process";
@@ -50,6 +52,16 @@ function isCopyKey(event)
   return event.key === "c" || event.key === "C" || event.code === "KeyC";
 }
 
+function isUndoRedoKey(event)
+{
+  return event.key === "z" || event.key === "Z" || event.code === "KeyZ";
+}
+
+function isShiftKey(event)
+{
+  return event.key === "Shift" || event.key === "shift" || event.code === "Shift";
+}
+
 function sceneXml(width, height, antialias)
 {
   var sceneWidth = positiveSize(width, 1280);
@@ -66,9 +78,10 @@ function sceneXml(width, height, antialias)
       <group width="400" grow="1" height="100%" layout="column" gap="14">
         <rectangle width="100%" height="78" corners="14" fill="#e8f3ff" outline="#9ed8ff" outline-thickness="2" padding="12" font-color="#253342" font-family="Noto Sans Mono" font-size="14" text-transform="uppercase" text-decoration="underline">Main column grows to fill remaining space</rectangle>
         <button id="auto-button" width="220" height="42">Default button</button>
-        <rectangle id="selection-demo" width="100%" height="64" corners="12" fill="#ffffff" outline="#38bdf8" outline-thickness="2" padding="12" font-color="#0f172a" font-family="Noto Sans Mono" font-size="14" line-height="18" text-align="left middle" text-select="0 22" text-select-color="#bae6fd" mouse-select="true" mouse-select-color="#bbf7d0">Selected text attribute demo: drag across this text, then press Ctrl+C to copy.</rectangle>
+        <rectangle id="selection-demo" width="100%" height="64" corners="12" fill="#ffffff" outline="#38bdf8" outline-thickness="2" padding="12" font-color="#0f172a" font-family="Noto Sans Mono" font-size="14" line-height="18" text-align="left middle" overflow-y="auto" scrollbar-width="10" scrollbar-color="#38bdf8 #e0f2fe" text-select="0 22" text-select-color="#bae6fd" text-select-padding="2" text-select-corners="4" mouse-select="true" mouse-select-color="#bbf7d0" mouse-select-padding="2" mouse-select-corners="4" text-input="true" text-cursor="#0f172a" text-cursor-width="2" text-cursor-height="20" text-cursor-corners="1" text-cursor-speed="1.5">Selected text attribute demo: click and type, drag to select, then press Ctrl+C to copy.</rectangle>
         <ellipse id="hover-ellipse" width="100%" max-width="320" height="150" fill="#39ff88" outline="#253342" outline-thickness="6" shadow="14 18 10 1 rgba(0,0,0,0.28)" padding="16" font-color="#102015" font-family="Noto Sans Mono" font-size="14">Hover me</ellipse>
         <rectangle width="100%" height="76" corners="10 24" fill="#fff7d6" outline="#ffcc00" outline-thickness="2" padding="10" font-color="#253342" font-family="Noto Sans Mono" font-size="12" line-height="15" overflow="hidden" text-align-x="right" text-align-y="bottom">Hidden overflow keeps this label inside the rounded card.</rectangle>
+        <rectangle id="overflow-x-demo" width="100%" height="58" corners="10" fill="#f8fafc" outline="#64748b" outline-thickness="2" padding="10" font-color="#0f172a" font-family="Noto Sans Mono" font-size="13" line-height="16" text-wrap="nowrap" overflow-x="auto" overflow-y="hidden" scrollbar-width="10" scrollbar-color="#64748b #e2e8f0" text-align="left top">Horizontal overflow-x test: This is one deliberately very long single-line label that should stay on one line and require horizontal scrolling to inspect the far right end.</rectangle>
         <rectangle id="nested-panel" width="100%" height="86" corners="10" fill="#eef2ff" outline="#818cf8" outline-thickness="2" padding="10" font-color="#312e81" font-family="Noto Sans Mono" font-size="15" line-height="19" overflow="auto" scrollbar-width="22" scrollbar-thumb="girl-thumb" scrollbar-thumb-width="22" scrollbar-thumb-height="22" scrollbar-thumb-corners="11" scrollbar-track-color="#c7d2fe" scrollbar-track-opacity="0.7" scrollbar-track-corners="7" text-align="left top">Vertical scrollbar test: this panel is intentionally short and the text is intentionally long. Line one should be visible near the top. Line two should wrap because the panel width is constrained. Line three adds more content so the measured text height exceeds the visible box. Line four should require scrolling to inspect. Line five keeps the scrollbar thumb small enough to notice. Line six confirms wheel or scrollbar movement has room to change the visible text. Line seven is here so the bottom content cannot fit at once.</rectangle>
         <rectangle width="100%" height="72" corners="12" fill="#fce7f3" outline="#f472b6" outline-thickness="2" padding="10" font-color="#831843" font-family="Noto Sans KR" font-size="13" line-height="16" overflow="hidden" text-align="left middle">한국어 글꼴 테스트 Jayess Canvas</rectangle>
         <rectangle width="100%" height="380" corners="12" fill="#ecfdf5" outline="#10b981" outline-thickness="2" padding="14" font-color="#064e3b" font-family="Noto Sans Mono" font-size="14" line-height="18" text-align="left top">Extra root-scroll content. Use the mouse wheel outside the nested text scroller to move the scene. The fixed bottom-right badge should stay pinned to the viewport while this card moves underneath it.</rectangle>
@@ -181,6 +194,33 @@ function requireSmoke(condition, message)
 function runSmokeProbe(scrollbarThumb)
 {
   var canvas = buildCanvas(960, 540, 0, scrollbarThumb);
+  var input = findElement(canvas, "selection-demo");
+  requireSmoke(input !== null, "canvas-window smoke text input is missing");
+  var inputLength = input.text.length;
+  dispatchCanvasEvent(canvas, {
+    type: "mouseDown",
+    x: input.x + 8,
+    y: input.y + 8
+  });
+  dispatchCanvasEvent(canvas, {
+    type: "textInput",
+    text: "!"
+  });
+  var updatedInput = findElement(canvas, "selection-demo");
+  requireSmoke(updatedInput.text.length > inputLength, "canvas-window smoke text input did not update text");
+
+  var hoverShape = findElement(canvas, "hover-ellipse");
+  requireSmoke(hoverShape !== null, "canvas-window smoke hover ellipse is missing");
+  var hoverX = hoverShape.x + hoverShape.width / 2;
+  var hoverY = hoverShape.y + hoverShape.height / 2;
+  var hoverHit = hitElement(canvas, hoverX, hoverY);
+  dispatchCanvasEvent(canvas, {
+    type: "mouseMove",
+    x: hoverX,
+    y: hoverY
+  });
+  requireSmoke(hoverHit !== null, "canvas-window smoke hover hit did not resolve");
+
   dispatchCanvasEvent(canvas, {
     type: "wheel",
     x: 880,
@@ -200,15 +240,19 @@ function runSmokeProbe(scrollbarThumb)
   });
   var root = canvas.scene;
   var nestedPanel = findElement(canvas, "nested-panel");
-  requireSmoke(root.scrollOffsetY > 0, "canvas-window smoke root scroll did not move");
-  requireSmoke(nestedPanel !== null && nestedPanel.scrollOffsetY > 0, "canvas-window smoke nested scroll did not move");
-
-  var hoverHit = hitElement(canvas, 520, 255);
+  requireSmoke(nestedPanel !== null, "canvas-window smoke nested panel is missing");
+  var nestedPanelX = nestedPanel.x + 16;
+  var nestedPanelY = nestedPanel.y - root.scrollOffsetY + 16;
   dispatchCanvasEvent(canvas, {
-    type: "mouseMove",
-    x: 520,
-    y: 255
+    type: "wheel",
+    x: nestedPanelX,
+    y: nestedPanelY,
+    deltaX: 0,
+    deltaY: 1
   });
+  requireSmoke(root.scrollOffsetY > 0, "canvas-window smoke root scroll did not move");
+  requireSmoke(findElement(canvas, "nested-panel").scrollOffsetY > 0, "canvas-window smoke nested scroll did not move");
+
   dispatchCanvasEvent(canvas, {
     type: "mouseDown",
     x: 760,
@@ -219,7 +263,6 @@ function runSmokeProbe(scrollbarThumb)
     x: 760,
     y: 490
   });
-  requireSmoke(hoverHit !== null, "canvas-window smoke hover hit did not resolve");
 
   var button = findElement(canvas, "auto-button");
   requireSmoke(button !== null, "canvas-window smoke button is missing");
@@ -255,6 +298,8 @@ export function main()
     replacements: 0
   };
   var controlDown = false;
+  var shiftDown = false;
+  var suppressedShortcutText = "";
   var window = create({
     title: "Jayess Canvas Window",
     width: requestedWidth,
@@ -279,9 +324,12 @@ export function main()
   function replaceCanvas(width, height, antialias)
   {
     eventStats.replacements = eventStats.replacements + 1;
-    canvas = buildCanvas(width, height, antialias, scrollbarThumb);
+    canvas = reflowScene(canvas, sceneXml(width, height, antialias), {
+      images: {
+        "girl-thumb": scrollbarThumb
+      }
+    });
     state.canvas = canvas;
-    attachCanvasEvents(canvas, window);
     requestProbeRender(canvas);
   }
 
@@ -341,13 +389,31 @@ export function main()
     {
       controlDown = true;
     }
-    if (controlDown && isCopyKey(event))
+    if (isShiftKey(event))
+    {
+      shiftDown = true;
+    }
+    event.ctrlKey = event.ctrlKey === true || controlDown;
+    event.controlKey = event.controlKey === true || controlDown;
+    event.shiftKey = event.shiftKey === true || shiftDown;
+    if (event.ctrlKey && isCopyKey(event))
     {
       var text = selectedText(state.canvas);
       if (text.length > 0)
       {
         writeClipboardText(text);
         writeLine("canvas-window copied selected text: " + text);
+      }
+    } else
+    {
+      if (event.ctrlKey && isUndoRedoKey(event))
+      {
+        suppressedShortcutText = "z";
+      }
+      var emitted = dispatchCanvasEvent(state.canvas, event);
+      if (emitted.length > 0)
+      {
+        requestProbeRender(state.canvas);
       }
     }
   });
@@ -357,6 +423,39 @@ export function main()
     if (isControlKey(event))
     {
       controlDown = false;
+    }
+    if (isShiftKey(event))
+    {
+      shiftDown = false;
+    }
+  });
+
+  window.addEventListener("textInput", function (event)
+  {
+    if (suppressedShortcutText.length > 0 && event.text === suppressedShortcutText)
+    {
+      suppressedShortcutText = "";
+      return null;
+    }
+    suppressedShortcutText = "";
+    event.ctrlKey = event.ctrlKey === true || controlDown;
+    event.controlKey = event.controlKey === true || controlDown;
+    event.shiftKey = event.shiftKey === true || shiftDown;
+    if (!event.ctrlKey)
+    {
+      var emitted = dispatchCanvasEvent(state.canvas, event);
+      if (emitted.length > 0)
+      {
+        requestProbeRender(state.canvas);
+      }
+    }
+  });
+
+  window.addEventListener("frame", function (event)
+  {
+    if (tickTextCursor(state.canvas, event.millis))
+    {
+      requestProbeRender(state.canvas);
     }
   });
 
